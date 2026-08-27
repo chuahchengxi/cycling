@@ -4,90 +4,163 @@
 //
 //  Created by cheng xi on 23/5/26.
 //
+//  The route brief. Collapsed it is the one line from the board — distance,
+//  time, difficulty — over a START button. Expanded it adds the climb figures,
+//  the elevation graph and the marked obstacles.
+//
 
 import SwiftUI
+import Charts
 
 struct SheetView: View {
-    @State var distanceEstimated = 10
-    @State var timeEstimated = 40
-    @State var difficultyEstimated = "easy"
-    @State var uphillEstimated = 10
-    @State var downhillEstimated = 15
+    let route: Route
+    var obstacles: [Obstacle] = []
     @Binding var currentDetent: PresentationDetent
+    var onStart: () -> Void
+
+    private var collapsed: Bool { currentDetent == .fraction(0.28) }
+
     var body: some View {
-        if currentDetent == .fraction(0.2) {
-            Spacer()
-                .frame(height:40)
-            HStack {
-                Text("\(distanceEstimated) km")
-                    .bold()
-                    .font(.title)
-                    .padding()
-                Text("\(timeEstimated) min")
-                    .bold()
-                    .font(.title)
-                    .padding()
-                Text("\(difficultyEstimated)")
-                    .bold()
-                    .font(.title)
-                    .padding()
-            }
-            
-            Button{
-                
-            }label:{
-                Text("start")
-                    .font(.title)
-                    .frame(maxHeight: .infinity, alignment: .bottom)
-            }
-        }else {
-            VStack {
-                HStack{
-                    Text("\(distanceEstimated) km")
-                        .bold()
-                        .font(.title)
-                        .padding()
-                    Text("\(timeEstimated) min")
-                        .bold()
-                        .font(.title)
-                        .padding()
-                    Text("\(difficultyEstimated)")
-                        .bold()
-                        .font(.title)
-                        .padding()
-                }
-                .padding()
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text("Uphill:\(uphillEstimated) km ↗")
-                            .bold()
-                            .font(.title)
-                            .multilineTextAlignment(.leading)
-                        Text("Downhill:\(downhillEstimated) km ↘")
-                            .bold()
-                            .font(.title)
-                            .multilineTextAlignment(.leading)
+        VStack(spacing: 0) {
+            if collapsed {
+                summary.padding(.top, 24)
+                Spacer(minLength: 12)
+                startButton.padding([.horizontal, .bottom], 20)
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        summary
+                        climb
+                        elevationGraph
+                        if !obstacles.isEmpty { obstacleList }
+                        turnList
                     }
-                    Spacer()
+                    .padding(20)
+                    .padding(.bottom, 90)
                 }
-                .padding()
-                Image("graph1")
-                    .resizable()
-                    .scaledToFit()
-                    .clipped()
-                Button{
-                    
-                }label:{
-                    Text("start")
-                        .font(.title)
-                        .frame(maxHeight: .infinity, alignment: .bottom)
+                .safeAreaInset(edge: .bottom) {
+                    startButton.padding([.horizontal, .bottom], 20)
                 }
             }
         }
     }
+
+    // MARK: Pieces
+
+    private var summary: some View {
+        HStack(spacing: 20) {
+            Text(Fmt.km(route.distanceMeters))
+            Text(Fmt.duration(route.expectedSeconds))
+            Text(route.difficulty.rawValue)
+                .foregroundStyle(route.difficulty.color)
+        }
+        .font(.title2.bold())
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, collapsed ? 20 : 0)
+    }
+
+    private var climb: some View {
+        HStack(spacing: 28) {
+            Label("Uphill \(Int(route.ascentMeters)) m", systemImage: "arrow.up.right")
+            Label("Downhill \(Int(route.descentMeters)) m", systemImage: "arrow.down.right")
+        }
+        .font(.headline)
+        .foregroundStyle(.secondary)
+    }
+
+    @ViewBuilder
+    private var elevationGraph: some View {
+        let profile = route.elevations
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Elevation").font(.headline)
+            if profile.count > 1 {
+                Chart(Array(profile.enumerated()), id: \.offset) { index, metres in
+                    AreaMark(
+                        x: .value("Distance", Double(index) / Double(profile.count - 1) * route.distanceKM),
+                        y: .value("Elevation", metres))
+                    .interpolationMethod(.monotone)
+                    .foregroundStyle(.linearGradient(colors: [.accentColor.opacity(0.6), .accentColor.opacity(0.05)],
+                                                     startPoint: .top, endPoint: .bottom))
+                    LineMark(
+                        x: .value("Distance", Double(index) / Double(profile.count - 1) * route.distanceKM),
+                        y: .value("Elevation", metres))
+                    .interpolationMethod(.monotone)
+                    .foregroundStyle(Color.accentColor)
+                }
+                .chartXAxisLabel("km")
+                .chartYAxisLabel("m")
+                .frame(height: 160)
+            } else {
+                Text("No elevation data for this route.")
+                    .font(.footnote).foregroundStyle(.secondary)
+                    .frame(height: 60)
+            }
+        }
+    }
+
+    private var obstacleList: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Marked on this route").font(.headline)
+            ForEach(obstacles) { obstacle in
+                HStack(spacing: 12) {
+                    ObstacleBadge(kind: obstacle.kind)
+                    VStack(alignment: .leading) {
+                        Text(obstacle.kind.rawValue).font(.subheadline.weight(.semibold))
+                        Text(obstacle.note.isEmpty
+                             ? obstacle.reportedAt.formatted(.relative(presentation: .named))
+                             : obstacle.note)
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    if obstacle.confirmations > 0 {
+                        Text("\(obstacle.confirmations)×").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+        }
+    }
+
+    private var turnList: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Directions").font(.headline)
+            ForEach(route.steps) { step in
+                StepRow(step: step, distanceLabel: Fmt.km(step.maneuverOffset))
+            }
+        }
+    }
+
+    private var startButton: some View {
+        Button(action: onStart) {
+            Text("START")
+                .font(.title2.bold())
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 16)
+        }
+        .buttonStyle(.borderedProminent)
+        .buttonBorderShape(.roundedRectangle(radius: 18))
+        .disabled(route.polyline.count < 2)
+    }
 }
 
+/// One line of the turn list: the arrow, the distance, the instruction.
+struct StepRow: View {
+    let step: StoredStep
+    var distanceLabel: String
 
-#Preview {
-    SheetView(currentDetent: .constant(.large))
+    var body: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: step.maneuver.symbol)
+                .font(.title3)
+                .frame(width: 30)
+                .foregroundStyle(Color.accentColor)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(distanceLabel).font(.subheadline.weight(.semibold))
+                Text(step.instruction)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
+        }
+    }
 }
