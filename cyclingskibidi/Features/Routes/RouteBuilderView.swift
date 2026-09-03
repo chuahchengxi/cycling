@@ -15,6 +15,9 @@ struct RouteBuilderView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
 
+    var mode: RideMode = .moderate
+    var onSaved: (() -> Void)? = nil
+
     @State private var camera: MapCameraPosition = .userLocation(fallback: .automatic)
     @State private var waypoints: [Coord] = []
     @State private var plan = RoutePlan()
@@ -127,10 +130,11 @@ struct RouteBuilderView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             } else {
-                HStack(spacing: 10) {
+                FlowLayout {
                     Pill(text: Fmt.km(plan.distance))
                     Pill(text: Fmt.duration(plan.expected))
                     Pill(text: difficulty.rawValue, tint: difficulty.color)
+                    Pill(text: mode.rawValue, tint: .accentColor)
                     if plan.ascent > 0 { Pill(text: "↗ \(Int(plan.ascent)) m") }
                 }
             }
@@ -177,7 +181,7 @@ struct RouteBuilderView: View {
         planning = true
         planTask = Task {
             do {
-                let fresh = try await Routing.plan(through: waypoints)
+                let fresh = try await Routing.plan(through: waypoints, mode: mode)
                 guard !Task.isCancelled else { return }
                 plan = fresh
             } catch {
@@ -189,19 +193,12 @@ struct RouteBuilderView: View {
     }
 
     private func save() {
-        let route = Route(name: name.isEmpty ? "Route \(Date.now.formatted(date: .abbreviated, time: .shortened))" : name)
-        route.waypointData = Blob.encode(waypoints)
-        route.polylineData = Blob.encode(plan.polyline)
-        route.stepData = Blob.encode(plan.steps)
-        route.elevationData = Blob.encode(plan.elevations)
-        route.distanceMeters = plan.distance
-        route.expectedSeconds = plan.expected
-        route.ascentMeters = plan.ascent
-        route.descentMeters = plan.descent
-        route.difficulty = difficulty
+        let route = Route.make(
+            name: name.isEmpty ? "Route \(Date.now.formatted(date: .abbreviated, time: .shortened))" : name,
+            mode: mode, waypoints: waypoints, plan: plan)
         context.insert(route)
         try? context.save()
-        dismiss()
+        (onSaved ?? { dismiss() })()
     }
 
     private func runSearch() async {

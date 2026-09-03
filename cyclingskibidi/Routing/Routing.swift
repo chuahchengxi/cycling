@@ -206,3 +206,22 @@ extension Array {
         stride(from: 0, to: count, by: size).map { Array(self[$0..<Swift.min($0 + size, count)]) }
     }
 }
+
+extension Route {
+    /// Build a saved-ready Route from a plan. Shared by the map builder and the
+    /// import paths so the two never drift on which fields get written.
+    static func make(name: String, mode: RideMode, waypoints: [Coord], plan: RoutePlan) -> Route {
+        let route = Route(name: name)
+        route.mode = mode
+        route.waypointData = Blob.encode(waypoints)
+        route.polylineData = Blob.encode(plan.polyline)
+        route.stepData = Blob.encode(plan.steps)
+        route.elevationData = Blob.encode(plan.elevations)
+        route.distanceMeters = plan.distance
+        route.expectedSeconds = plan.expected
+        route.ascentMeters = plan.ascent
+        route.descentMeters = plan.descent
+        route.difficulty = .rated(distanceMeters: plan.distance, ascentMeters: plan.ascent)
+        return route
+    }
+}
