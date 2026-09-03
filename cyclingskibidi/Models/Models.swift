@@ -75,6 +75,34 @@ enum Difficulty: String, Codable, CaseIterable, Identifiable, Sendable {
     var tint: String { self == .easy ? "green" : self == .medium ? "orange" : "red" }
 }
 
+enum RideMode: String, Codable, CaseIterable, Identifiable, Sendable {
+    case fast = "Fast", moderate = "Moderate", leisure = "Leisure"
+    var id: String { rawValue }
+
+    var subtitle: String {
+        switch self {
+        case .fast:     return "Fastest way there — roads allowed, higher risk."
+        case .moderate: return "A balance of speed and safety."
+        case .leisure:  return "Scenic and relaxed — connectors and sights."
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .fast:     return "bolt.fill"
+        case .moderate: return "bicycle"
+        case .leisure:  return "leaf.fill"
+        }
+    }
+
+    static func selfCheck() {
+        // Raw values round-trip (they are persisted in Route.modeRaw).
+        for m in RideMode.allCases { assert(RideMode(rawValue: m.rawValue) == m) }
+        // Unknown raw value falls back at the call site, never crashes.
+        assert(RideMode(rawValue: "Nonsense") == nil)
+        assert(RideMode.allCases.count == 3)
+    }
+}
+
 enum ObstacleKind: String, Codable, CaseIterable, Identifiable, Sendable {
     case pothole = "Pothole"
     case gravel = "Loose gravel"
@@ -133,6 +161,7 @@ final class Route {
     var name: String = "Untitled route"
     var createdAt: Date = Date.now
     var difficultyRaw: String = Difficulty.easy.rawValue
+    var modeRaw: String = RideMode.moderate.rawValue
     var distanceMeters: Double = 0
     /// Routing engine's own estimate, in seconds.
     var expectedSeconds: Double = 0
@@ -154,6 +183,10 @@ final class Route {
     var difficulty: Difficulty {
         get { Difficulty(rawValue: difficultyRaw) ?? .easy }
         set { difficultyRaw = newValue.rawValue }
+    }
+    var mode: RideMode {
+        get { RideMode(rawValue: modeRaw) ?? .moderate }
+        set { modeRaw = newValue.rawValue }
     }
     var waypoints: [Coord] { Blob.decode([Coord].self, waypointData) ?? [] }
     var polyline: [Coord] { Blob.decode([Coord].self, polylineData) ?? [] }

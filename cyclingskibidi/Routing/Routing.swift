@@ -40,7 +40,11 @@ enum Routing {
     ///
     /// MKDirections routes one pair at a time, so a multi-waypoint route is one
     /// request per leg, stitched together with the step offsets carried forward.
-    static func plan(through waypoints: [Coord], fetchElevation: Bool = true) async throws -> RoutePlan {
+    // ponytail: mode is captured but unused here — the Phase 2 PCN engine swaps in
+    // behind this signature. See specs/2026-09-04-create-route-experience-design.md §G.
+    static func plan(through waypoints: [Coord],
+                     mode: RideMode = .moderate,
+                     fetchElevation: Bool = true) async throws -> RoutePlan {
         guard waypoints.count >= 2 else { return RoutePlan() }
 
         var plan = RoutePlan()
