@@ -120,6 +120,14 @@ struct RouteBuilderView: View {
 
     private var controls: some View {
         VStack(spacing: 12) {
+            if mode == .leisure, let region = camera.region {
+                DiscoveryPanel(region: region) { coord in
+                    waypoints.append(Coord(coord))
+                    camera = .region(.init(center: coord, latitudinalMeters: 1500, longitudinalMeters: 1500))
+                    replan()
+                }
+            }
+
             if planning {
                 ProgressView("Snapping to roads…").font(.footnote)
             } else if plan.polyline.isEmpty {
