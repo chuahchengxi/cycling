@@ -90,8 +90,27 @@ enum Providers {
         return imported
     }
 
+    /// Recent cycling workouts, newest first — the source list for building a Route
+    /// from a past ride. Does not import anything; read-only.
+    static func recentCyclingWorkouts(limit: Int = 30) async throws -> [HKWorkout] {
+        guard healthAvailable else { return [] }
+        try await requestAuthorization()
+        let descriptor = HKSampleQueryDescriptor(
+            predicates: [HKSamplePredicate.workout(HKQuery.predicateForWorkouts(with: .cycling))],
+            sortDescriptors: [SortDescriptor(\HKWorkout.startDate, order: .reverse)],
+            limit: limit)
+        return try await descriptor.result(for: store)
+    }
+
+    /// A workout's GPS trace, thinned to the handful of waypoints the router needs.
+    static func waypoints(for workout: HKWorkout, max count: Int = 12) async throws -> [Coord] {
+        let locs = try await locations(for: workout)
+        let coords = locs.map(\.coordinate)
+        return Geo.sample(coords, count: Swift.min(count, coords.count)).map { Coord($0) }
+    }
+
     /// A workout's GPS trace, stitched back together from its route series.
-    private static func locations(for workout: HKWorkout) async throws -> [CLLocation] {
+    static func locations(for workout: HKWorkout) async throws -> [CLLocation] {
         let routeDescriptor = HKAnchoredObjectQueryDescriptor(
             predicates: [HKSamplePredicate.workoutRoute(HKQuery.predicateForObjects(from: workout))],
             anchor: nil)
