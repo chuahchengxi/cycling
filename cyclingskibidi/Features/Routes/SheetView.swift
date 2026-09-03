@@ -48,11 +48,16 @@ struct SheetView: View {
     // MARK: Pieces
 
     private var summary: some View {
-        HStack(spacing: 20) {
+        HStack(spacing: 16) {
             Text(Fmt.km(route.distanceMeters))
+            Divider().frame(height: 22)
             Text(Fmt.duration(route.expectedSeconds))
-            Text(route.difficulty.rawValue)
-                .foregroundStyle(route.difficulty.color)
+            Divider().frame(height: 22)
+            Text(route.difficulty.rawValue).foregroundStyle(route.difficulty.color)
+            Spacer(minLength: 0)
+            Label(route.mode.rawValue, systemImage: route.mode.symbol)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.secondary)
         }
         .font(.title2.bold())
         .frame(maxWidth: .infinity, alignment: .leading)

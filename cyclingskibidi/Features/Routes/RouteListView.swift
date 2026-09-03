@@ -260,12 +260,13 @@ struct RouteCard: View {
                 .font(.title3.bold())
                 .lineLimit(1)
 
-            HStack(spacing: 8) {
+            FlowLayout {
                 Pill(text: Fmt.km(route.distanceMeters))
-                Pill(text: route.difficulty.rawValue, tint: route.difficulty.color)
                 Pill(text: Fmt.duration(route.expectedSeconds))
+                Pill(text: route.difficulty.rawValue, tint: route.difficulty.color)
+                Pill(text: route.mode.rawValue, tint: .accentColor)
             }
-            .padding(.top, 8)
+            .padding(.top, 10)
         }
         .padding(14)
         .background(.background.secondary, in: .rect(cornerRadius: 18))

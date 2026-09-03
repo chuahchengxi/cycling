@@ -116,9 +116,16 @@ struct NavigateView: View {
 
     private var navSheet: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 20) {
-                Text(Fmt.km(recorder.remainingDistance)).font(.title.bold())
-                Text(Fmt.clock(recorder.remainingSeconds)).font(.title.bold())
+            HStack(alignment: .firstTextBaseline, spacing: 16) {
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(Fmt.km(recorder.remainingDistance)).font(.title.bold())
+                    Text("to go").font(.caption2).foregroundStyle(.secondary)
+                }
+                Divider().frame(height: 34)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(Fmt.clock(recorder.remainingSeconds)).font(.title.bold())
+                    Text("left").font(.caption2).foregroundStyle(.secondary)
+                }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 0) {
                     Text(Fmt.eta(recorder.remainingSeconds)).font(.headline)
