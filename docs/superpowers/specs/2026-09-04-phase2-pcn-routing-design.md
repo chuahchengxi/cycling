@@ -74,12 +74,22 @@ bits only:
 - **Host:** start against the public instance `https://brouter.de/brouter`
   (best-effort, no SLA) behind a named `BRouterConfig.baseURL` constant, so swapping
   to a self-hosted instance later is a one-line change, not a code change. Profiles:
-  `trekking` for gap/leisure links, `fastbike` for fast mode — both named in
+  a **path-favouring** profile (`trekking`, which prefers footpaths/pavements/quiet
+  ways over roads) for gap/leisure links, `fastbike` for fast mode — both named in
   `BRouterConfig` so the routing knobs live in one place.
+- **Gaps prefer walkable paths, roads only when forced.** The gap profile is tuned
+  to take footpaths/pavements over roads wherever one exists; an actual road segment
+  appears only when there is no path alternative between two connector points.
+- **Road transparency + redirect (decided).** Any stitched segment that leaves the
+  PCN onto a road is tagged (`StoredStep.offConnector = true`) and drawn distinctly
+  in the preview, with a one-line summary (e.g. "1.2 km off-connector"). The rider
+  can **reject** the route, or **redirect** it by dropping/moving a waypoint — the
+  Phase 1 builder already re-plans on every waypoint edit, so "redirect" reuses that
+  mechanism, no new interaction to build. Nothing is hidden.
 - **Offline fallback:** if BRouter is unreachable, fall back to MapKit `.walking`
   for the gap (today's behaviour) so a route always returns.
-- Final route = `[road: start → PCN entry] + [strict PCN path] + [road: PCN exit →
-  destination]`, stitched into one polyline.
+- Final route = `[walkable/road: start → PCN entry] + [strict PCN path] +
+  [walkable/road: PCN exit → destination]`, stitched into one polyline.
 
 ### 5. Mode behaviour (what `plan(mode:)` branches on)
 - **Leisure / Moderate:** maximise PCN usage (component 3), stitch gaps minimally
@@ -119,8 +129,11 @@ consume `RoutePlan` exactly as they do now.
 - **Hosted-router dependency** — network, ToS, rate limits; the offline MapKit
   fallback is mandatory, not optional.
 - **Dataset licence** — Singapore Open Data Licence attribution.
-- **PCN coverage** — the network doesn't reach everywhere; the honest UX is "as
-  much PCN as exists between these points," not "100% PCN always."
+- **PCN coverage** — the network doesn't reach everywhere. Handling (decided): gaps
+  prefer **walkable paths** over roads; any unavoidable road segment is **flagged**
+  in the preview and the rider can **reject or redirect** (waypoint) around it.
+  Honest UX is "as much PCN as exists, walkable paths for the rest, roads only when
+  forced — always visible," not "100% PCN always."
 
 ## Open items — all resolved (2026-09-04)
 1. **PCN dataset:** ✅ data.gov.sg `d_a69ef89737379f231d2ae93fd1c5707f` ("Park
