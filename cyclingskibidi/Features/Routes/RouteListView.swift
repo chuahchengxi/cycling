@@ -2,15 +2,13 @@
 //  RouteListView.swift
 //  cyclingskibidi
 //
-//  First screen on the board: filter chips across the top, route cards down the
-//  page, search pinned to the bottom bar. Plus the two entry points the board
-//  leaves off — building your own route, and pulling rides off a Garmin or COROS.
+//  First screen on the board: search pinned to the top, filter chips and route
+//  cards below. The `+` button launches the create-route wizard.
 //
 
 import SwiftUI
 import SwiftData
 import MapKit
-import UniformTypeIdentifiers
 
 // MARK: - Filters
 
@@ -54,7 +52,6 @@ enum DifficultyFilter: String, CaseIterable, Identifiable {
 // MARK: - Screen
 
 struct RouteListView: View {
-    @Environment(\.modelContext) private var context
     @Query(sort: \Route.createdAt, order: .reverse) private var routes: [Route]
     @Query(sort: \Ride.startedAt, order: .reverse) private var rides: [Ride]
 
@@ -63,11 +60,8 @@ struct RouteListView: View {
     @State private var duration: DurationFilter = .any
     @State private var difficulty: DifficultyFilter = .any
 
-    @State private var building = false
+    @State private var creating = false
     @State private var showingStats = false
-    @State private var importingFile = false
-    @State private var importMessage: String?
-    @State private var importing = false
 
     private var filtered: [Route] {
         routes.filter { r in
@@ -98,23 +92,12 @@ struct RouteListView: View {
         .navigationTitle("Routes")
         .navigationDestination(for: Route.self) { RouteDetailView(route: $0) }
         .searchable(text: $search, placement: .toolbar, prompt: "Search...")
-        .searchToolbarBehavior(.minimize)
         .toolbar { toolbarItems }
-        .sheet(isPresented: $building) { RouteBuilderView() }
+        .sheet(isPresented: $creating) { CreateRouteFlow() }
         #if DEBUG
-        .onAppear { if Demo.screen == "build" { building = true } }
+        .onAppear { if Demo.screen == "build" { creating = true } }
         #endif
         .sheet(isPresented: $showingStats) { StatsView() }
-        .fileImporter(isPresented: $importingFile,
-                      allowedContentTypes: [.xml, .init(filenameExtension: "gpx") ?? .xml],
-                      allowsMultipleSelection: true,
-                      onCompletion: handleFiles)
-        .alert("Import", isPresented: .constant(importMessage != nil)) {
-            Button("OK") { importMessage = nil }
-        } message: {
-            Text(importMessage ?? "")
-        }
-        .overlay { if importing { ProgressView().controlSize(.large) } }
     }
 
     // MARK: Pieces
@@ -138,7 +121,7 @@ struct RouteListView: View {
                  : "Loosen a filter to see more routes.")
         } actions: {
             if routes.isEmpty {
-                Button("Create a route") { building = true }
+                Button("Create a route") { creating = true }
                     .buttonStyle(.borderedProminent)
             }
         }
@@ -154,49 +137,7 @@ struct RouteListView: View {
             .badge(rides.count)
         }
         ToolbarItem(placement: .topBarTrailing) {
-            Menu {
-                Button { building = true } label: { Label("Build a route", systemImage: "map") }
-                Divider()
-                Button { Task { await importHealth() } } label: {
-                    Label("Import from Garmin / COROS", systemImage: "applewatch.side.right")
-                }
-                Button { importingFile = true } label: {
-                    Label("Import a GPX file", systemImage: "doc.badge.plus")
-                }
-            } label: {
-                Image(systemName: "plus")
-            }
-        }
-    }
-
-    // MARK: Imports
-
-    private func importHealth() async {
-        importing = true
-        defer { importing = false }
-        do {
-            let n = try await Providers.importRides(into: context)
-            importMessage = n == 0
-                ? "No new cycling workouts found. Garmin and COROS rides show up here once their app has synced to Apple Health."
-                : "Imported \(n) ride\(n == 1 ? "" : "s")."
-        } catch {
-            importMessage = "Could not read Apple Health: \(error.localizedDescription)"
-        }
-    }
-
-    private func handleFiles(_ result: Result<[URL], Error>) {
-        do {
-            var count = 0
-            for url in try result.get() {
-                let parsed = try GPXParser.parse(url)
-                guard !parsed.points.isEmpty else { continue }
-                context.insert(parsed.makeRide())
-                count += 1
-            }
-            try? context.save()
-            importMessage = count == 0 ? "No track points in that file." : "Imported \(count) file\(count == 1 ? "" : "s")."
-        } catch {
-            importMessage = error.localizedDescription
+            Button { creating = true } label: { Image(systemName: "plus") }
         }
     }
 }
