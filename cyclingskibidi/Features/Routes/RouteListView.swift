@@ -137,7 +137,7 @@ struct RouteListView: View {
             .badge(rides.count)
         }
         ToolbarItem(placement: .topBarTrailing) {
-            Button { creating = true } label: { Image(systemName: "plus") }
+            Button { creating = true } label: { Label("Create route", systemImage: "plus") }
         }
     }
 }

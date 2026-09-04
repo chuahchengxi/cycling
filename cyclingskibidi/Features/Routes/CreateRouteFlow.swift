@@ -97,6 +97,7 @@ private struct SourceStep: View {
     @State private var busy = false
     @State private var message: String?
     @State private var activeSheet: ActiveSheet?
+    @State private var pendingBox: PreviewBox?
 
     var body: some View {
         List {
@@ -116,10 +117,10 @@ private struct SourceStep: View {
         }
         .overlay { if busy { ProgressView("Building route…").controlSize(.large) } }
         .alert("Import", isPresented: .constant(message != nil)) { Button("OK") { message = nil } } message: { Text(message ?? "") }
-        .sheet(item: $activeSheet) { sheet in
+        .sheet(item: $activeSheet, onDismiss: { if let box = pendingBox { pendingBox = nil; activeSheet = .preview(box) } }) { sheet in
             switch sheet {
             case .workouts:
-                WorkoutPicker(mode: mode) { box in activeSheet = .preview(box) }
+                WorkoutPicker(mode: mode) { box in pendingBox = box; activeSheet = nil }
             case .preview(let box):
                 RoutePreview(name: box.name, waypoints: box.waypoints, plan: box.plan, mode: mode) { onFinish() }
             }

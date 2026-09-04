@@ -19,6 +19,7 @@ struct RouteBuilderView: View {
     var onSaved: (() -> Void)? = nil
 
     @State private var camera: MapCameraPosition = .userLocation(fallback: .automatic)
+    @State private var mapRegion: MKCoordinateRegion?
     @State private var waypoints: [Coord] = []
     @State private var plan = RoutePlan()
     @State private var planning = false
@@ -87,6 +88,7 @@ struct RouteBuilderView: View {
                 waypoints.append(Coord(coord))
                 replan()
             }
+            .onMapCameraChange(frequency: .onEnd) { context in mapRegion = context.region }
         }
         .ignoresSafeArea(edges: .bottom)
     }
@@ -120,7 +122,7 @@ struct RouteBuilderView: View {
 
     private var controls: some View {
         VStack(spacing: 12) {
-            if mode == .leisure, let region = camera.region {
+            if mode == .leisure, let region = mapRegion ?? camera.region {
                 DiscoveryPanel(region: region) { coord in
                     waypoints.append(Coord(coord))
                     camera = .region(.init(center: coord, latitudinalMeters: 1500, longitudinalMeters: 1500))
