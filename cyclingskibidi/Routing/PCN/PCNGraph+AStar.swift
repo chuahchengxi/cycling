@@ -73,9 +73,13 @@ extension PCNGraph {
         let len = Geo.cumulative(route.coordinates).last ?? 0
         assert(abs(len - 444.8) < 4, "path length off: \(len)")
 
-        // Disconnected node returns nil: an island connector far away.
-        let island = PCNGraph(polylines: [[Coord(lat: 2.0, lon: 104.0), Coord(lat: 2.001, lon: 104.0)]])
-        assert(island.path(from: Coord(lat: 1.300, lon: 103.800), to: Coord(lat: 2.0, lon: 104.0)) != nil,
-               "single-component island should still route within itself")
+        // Disconnected components return nil: two separate legs in the same graph.
+        let east  = [Coord(lat: 1.300, lon: 103.800), Coord(lat: 1.300, lon: 103.802)]
+        let north = [Coord(lat: 1.300, lon: 103.802), Coord(lat: 1.302, lon: 103.802)]
+        let island = [Coord(lat: 2.000, lon: 104.000), Coord(lat: 2.001, lon: 104.000)]
+        let g2 = PCNGraph(polylines: [east, north, island])
+        let westKey   = key(Coord(lat: 1.300, lon: 103.800), cell: g2.cell)
+        let islandKey = key(Coord(lat: 2.000, lon: 104.000), cell: g2.cell)
+        assert(g2.path(from: westKey, to: islandKey) == nil, "disconnected components must return nil")
     }
 }
