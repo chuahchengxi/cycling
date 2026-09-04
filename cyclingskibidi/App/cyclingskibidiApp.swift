@@ -25,6 +25,7 @@ struct cyclingskibidiApp: App {
         RideMode.selfCheck()
         FlowLayout.selfCheck()
         Discovery.selfCheck()
+        CreateRouteFlow.selfCheck()
         #endif
     }
 
