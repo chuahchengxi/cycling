@@ -22,6 +22,7 @@ enum BRouterConfig {
     /// ponytail: profile name is a knob — confirm against BRouter's live list on-device.
     static let gapProfile = "trekking"
     /// Fast mode: roads allowed, quickest bike route.
+    /// ponytail: profile name is a knob — confirm "fastbike" against BRouter's live profile list on-device.
     static let fastProfile = "fastbike"
 }
 
