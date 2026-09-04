@@ -53,8 +53,16 @@ struct RouteDetailView: View {
         }
         .mapStyle(.standard(elevation: .realistic))
         .ignoresSafeArea(edges: .bottom)
-        .navigationTitle(route.name)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            // The route name sits beside the back button rather than as a large
+            // title, so the map gets the vertical space.
+            ToolbarItem(placement: .topBarLeading) {
+                Text(route.name)
+                    .font(.headline)
+                    .lineLimit(1)
+            }
+        }
         .onAppear(perform: frameRoute)
         .sheet(isPresented: $sheetShown) {
             SheetView(route: route, obstacles: nearby, currentDetent: $detent) {

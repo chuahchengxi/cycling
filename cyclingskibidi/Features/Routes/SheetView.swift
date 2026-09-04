@@ -48,11 +48,11 @@ struct SheetView: View {
     // MARK: Pieces
 
     private var summary: some View {
-        HStack(spacing: 16) {
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
             Text(Fmt.km(route.distanceMeters))
-            Divider().frame(height: 22)
+            summaryDivider
             Text(Fmt.duration(route.expectedSeconds))
-            Divider().frame(height: 22)
+            summaryDivider
             Text(route.difficulty.rawValue).foregroundStyle(route.difficulty.color)
             Spacer(minLength: 0)
             Label(route.mode.rawValue, systemImage: route.mode.symbol)
@@ -62,6 +62,15 @@ struct SheetView: View {
         .font(.title2.bold())
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, collapsed ? 20 : 0)
+    }
+
+    /// A vertical rule whose centre sits on the row's text baseline, so the big
+    /// metrics and the smaller mode label all line up rather than the mode text
+    /// floating above the numbers.
+    private var summaryDivider: some View {
+        Divider()
+            .frame(height: 22)
+            .alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] }
     }
 
     private var climb: some View {
