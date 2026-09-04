@@ -79,25 +79,25 @@ struct StatsView: View {
                         Text("Nothing in this window.").foregroundStyle(.secondary)
                     }
                     ForEach(scoped) { ride in
-                        RideRow(ride: ride)
+                        NavigationLink(value: ride) { RideRow(ride: ride) }
                     }
                     .onDelete(perform: delete)
                 }
             }
+            .navigationDestination(for: Ride.self) { RideDetailView(ride: $0) }
             .navigationTitle("Statistics")
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
                 ToolbarItem(placement: .topBarLeading) {
-                    Button {
-                        Task {
-                            importing = true
-                            _ = try? await Providers.importRides(into: context)
-                            importing = false
-                        }
-                    } label: {
+                    Button("Sync") { syncNow() }.disabled(importing)
+                }
+                ToolbarItem(placement: .topBarLeading) {
+                    Button { syncNow() } label: {
                         if importing { ProgressView() }
-                        else { Label("Sync", systemImage: "arrow.triangle.2.circlepath") }
+                        else { Image(systemName: "arrow.clockwise") }
                     }
+                    .disabled(importing)
+                    .accessibilityLabel("Refresh")
                 }
             }
         }
@@ -115,6 +115,17 @@ struct StatsView: View {
     private func delete(_ offsets: IndexSet) {
         for index in offsets { context.delete(scoped[index]) }
         try? context.save()
+    }
+
+    /// Pull in cycling workouts from Apple Health / Garmin / COROS. importRides
+    /// skips anything already stored, so Sync and Refresh both just fetch what's new.
+    private func syncNow() {
+        guard !importing else { return }
+        Task {
+            importing = true
+            _ = try? await Providers.importRides(into: context)
+            importing = false
+        }
     }
 }
 
