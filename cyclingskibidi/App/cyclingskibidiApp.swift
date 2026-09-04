@@ -26,6 +26,7 @@ struct cyclingskibidiApp: App {
         PCNGraph.selfCheck()
         PCNGraph.selfCheckAStar()
         BRouter.selfCheck()
+        PCNDataset.selfCheck()
         RideMode.selfCheck()
         FlowLayout.selfCheck()
         Discovery.selfCheck()
