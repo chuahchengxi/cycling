@@ -25,6 +25,7 @@ struct cyclingskibidiApp: App {
         GeoJSON.selfCheck()
         PCNGraph.selfCheck()
         PCNGraph.selfCheckAStar()
+        BRouter.selfCheck()
         RideMode.selfCheck()
         FlowLayout.selfCheck()
         Discovery.selfCheck()
