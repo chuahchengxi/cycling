@@ -54,16 +54,10 @@ struct RouteDetailView: View {
         }
         .mapStyle(.standard(elevation: .realistic))
         .ignoresSafeArea(edges: .bottom)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            // The route name sits beside the back button rather than as a large
-            // title, so the map gets the vertical space.
-            ToolbarItem(placement: .topBarLeading) {
-                Text(route.name)
-                    .font(.headline)
-                    .lineLimit(1)
-            }
-        }
+        // A long route name doesn't fit beside the back button (it truncated to
+        // "Bu…"), so show it in full as the large title below the bar instead.
+        .navigationTitle(route.name)
+        .navigationBarTitleDisplayMode(.large)
         .onAppear(perform: frameRoute)
         .sheet(isPresented: $sheetShown, onDismiss: {
             // Begin navigation only once the brief sheet is fully dismissed.

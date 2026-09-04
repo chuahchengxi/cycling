@@ -58,8 +58,11 @@ struct SheetView: View {
             Label(route.mode.rawValue, systemImage: route.mode.symbol)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: true, vertical: false)   // keep the mode on one line
         }
         .font(.title2.bold())
+        .lineLimit(1)
+        .minimumScaleFactor(0.75)   // shrink to fit rather than wrap ("Leisure"/"Moderate")
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, collapsed ? 20 : 0)
     }
