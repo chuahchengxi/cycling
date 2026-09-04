@@ -65,12 +65,15 @@ enum GeoJSON {
 extension GeoJSON {
     static func selfCheck() {
         // A LineString and a MultiLineString, both [lon,lat] with SG coordinates.
+        // Also a degenerate LineString (1 point) to exercise the count >= 2 filter.
         let json = """
         {"type":"FeatureCollection","features":[
           {"type":"Feature","geometry":{"type":"LineString",
             "coordinates":[[103.800,1.300],[103.802,1.300]]}},
           {"type":"Feature","geometry":{"type":"MultiLineString",
             "coordinates":[[[103.802,1.300],[103.802,1.302]]]}},
+          {"type":"Feature","geometry":{"type":"LineString",
+            "coordinates":[[103.801,1.301]]}},
           {"type":"Feature","geometry":{"type":"Point","coordinates":[103.8,1.3]}}
         ]}
         """
@@ -79,7 +82,7 @@ extension GeoJSON {
         // lon/lat not swapped: SG latitude is ~1.3, longitude ~103.8.
         assert(abs(lines[0][0].lat - 1.300) < 1e-9 && abs(lines[0][0].lon - 103.800) < 1e-9,
                "lon/lat swapped")
-        // The point feature was ignored, short rings dropped.
+        // The point and degenerate-LineString features were ignored, short rings dropped.
         assert(lines.allSatisfy { $0.count == 2 })
     }
 }
