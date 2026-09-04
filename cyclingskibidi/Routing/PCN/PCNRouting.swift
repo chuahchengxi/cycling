@@ -107,24 +107,13 @@ enum PCNRouting {
 // MARK: - Self check
 
 extension PCNRouting {
-    static func selfCheck() {
+    static func selfCheck() async {
         // Stitch with a straight-line gap stub (no network). Start 30 m south of
-        // the west end, end exactly on the north end of the fixture network.
+        // the fixture's west end, end exactly on the north node.
         let g = PCNGraph.fixture()
         let start = Coord(lat: 1.30 - 30 / PCNGraph.metresPerDegree, lon: 103.800)
         let end   = Coord(lat: 1.302, lon: 103.802)
-        let stub: (Coord, Coord) -> [Coord] = { [$0, $1] }   // straight line
-        let sem = DispatchSemaphore(value: 0)
-        var got: (poly: [Coord], offSegments: [[Coord]], offMeters: Double)!
-        Task { got = await stitched(waypoints: [start, end], graph: g, gap: { stub($0, $1) }); sem.signal() }
-        // `stitched` is MainActor-isolated (module default: SWIFT_DEFAULT_ACTOR_ISOLATION
-        // = MainActor), same as this init() call — so a detached task would still have to
-        // hop back onto this very thread to run it. A hard `sem.wait()` blocks that hop
-        // forever. Pump the run loop instead: it drains the queued MainActor continuation
-        // while this thread waits for the signal.
-        while sem.wait(timeout: .now()) == .timedOut {
-            RunLoop.current.run(mode: .default, before: Date(timeIntervalSinceNow: 0.01))
-        }
+        let got = await stitched(waypoints: [start, end], graph: g, gap: { [$0, $1] })
         // One off-connector segment (start -> west entry), ~30 m; end was on-node.
         assert(got.offSegments.count == 1, "expected 1 gap, got \(got.offSegments.count)")
         assert(abs(got.offMeters - 30) < 3, "off-connector metres off: \(got.offMeters)")
