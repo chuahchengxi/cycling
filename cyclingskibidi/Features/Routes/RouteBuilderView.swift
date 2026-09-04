@@ -74,6 +74,12 @@ struct RouteBuilderView: View {
                     MapPolyline(coordinates: plan.polyline.coordinates)
                         .stroke(.blue, style: .init(lineWidth: 6, lineCap: .round, lineJoin: .round))
                 }
+                // Off-connector stretches (roads/paths) drawn distinctly so the rider sees
+                // exactly what leaves the PCN and can reject or redirect it.
+                ForEach(Array(plan.offConnectorSegments.enumerated()), id: \.offset) { _, seg in
+                    MapPolyline(coordinates: seg.coordinates)
+                        .stroke(.orange, style: .init(lineWidth: 6, lineCap: .round, lineJoin: .round, dash: [2, 6]))
+                }
 
                 ForEach(Array(waypoints.enumerated()), id: \.offset) { index, point in
                     Annotation("", coordinate: point.cl) {
@@ -146,6 +152,9 @@ struct RouteBuilderView: View {
                     Pill(text: difficulty.rawValue, tint: difficulty.color)
                     Pill(text: mode.rawValue, tint: .accentColor)
                     if plan.ascent > 0 { Pill(text: "↗ \(Int(plan.ascent)) m") }
+                    if plan.offConnectorMeters > 0 {
+                        Pill(text: "⚠︎ \(Fmt.km(plan.offConnectorMeters)) off-connector", tint: .orange)
+                    }
                 }
             }
 
