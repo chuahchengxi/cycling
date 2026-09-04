@@ -9,7 +9,7 @@
 
 import Foundation
 
-enum GeoJSON {
+nonisolated enum GeoJSON {
 
     /// Every LineString/MultiLineString in a FeatureCollection, as [lat,lon]
     /// Coord polylines. Returns [] on any parse failure — a bad dataset must

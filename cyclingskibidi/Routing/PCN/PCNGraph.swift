@@ -13,9 +13,11 @@ import Foundation
 import CoreLocation
 
 /// A quantised coordinate cell — the graph's node identity.
-struct GridKey: Hashable { let la: Int; let lo: Int }
+nonisolated struct GridKey: Hashable { let la: Int; let lo: Int }
 
-struct PCNGraph {
+/// Sendable + nonisolated so the whole graph can be built off the main actor
+/// (see PCNDataset.graph()) and handed back across the task boundary.
+nonisolated struct PCNGraph: Sendable {
     /// Junctions within this many metres are treated as one node. Too small ->
     /// a disconnected network; too large -> invented shortcuts.
     /// ponytail: 6 m guess against SG data. Tune on-device with real routes.

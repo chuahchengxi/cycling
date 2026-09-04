@@ -25,31 +25,42 @@ enum PCNDataset {
     /// At most one refresh check per this interval. ponytail: weekly; loosen/tighten freely.
     static let refreshInterval: TimeInterval = 7 * 24 * 3600
 
-    private static let fileName = "pcn.geojson"
+    nonisolated private static let fileName = "pcn.geojson"
     private static var cachedGraph: PCNGraph?
+    /// In-flight build, so concurrent first-callers share one off-main build.
+    private static var building: Task<PCNGraph, Never>?
 
     // MARK: Graph
 
     /// The built graph from the freshest GeoJSON we have. Memoised — the graph is
     /// rebuilt only after a successful refresh (which clears the cache).
-    static func graph() -> PCNGraph {
+    /// The freshest graph, built OFF the main actor (a 1.9 MB decode + ~33k-vertex
+    /// adjacency build) and memoised. Concurrent first-callers share one build, so
+    /// the work never blocks the UI — not at launch, not on the first plan.
+    static func graph() async -> PCNGraph {
         if let g = cachedGraph { return g }
-        let data = downloadedData() ?? seedData() ?? Data()
-        let g = PCNGraph(polylines: GeoJSON.polylines(data))
+        if let building { return await building.value }
+        let task = Task.detached(priority: .userInitiated) { () -> PCNGraph in
+            let data = downloadedData() ?? seedData() ?? Data()
+            return PCNGraph(polylines: GeoJSON.polylines(data))
+        }
+        building = task
+        let g = await task.value
         cachedGraph = g
+        building = nil
         return g
     }
 
-    private static func seedData() -> Data? {
+    nonisolated private static func seedData() -> Data? {
         guard let url = Bundle.main.url(forResource: "pcn-seed", withExtension: "geojson") else { return nil }
         return try? Data(contentsOf: url)
     }
 
-    private static func downloadedData() -> Data? {
+    nonisolated private static func downloadedData() -> Data? {
         try? Data(contentsOf: cacheFileURL())
     }
 
-    private static func cacheFileURL() -> URL {
+    nonisolated private static func cacheFileURL() -> URL {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent(fileName)
@@ -78,6 +89,7 @@ enum PCNDataset {
         try? data.write(to: cacheFileURL(), options: .atomic)
         UserDefaults.standard.set(manifest.version, forKey: "pcnVersion")
         cachedGraph = nil   // next graph() rebuilds from the new data
+        building = nil
     }
 
     // MARK: Pure helpers (tested)
@@ -94,7 +106,7 @@ enum PCNDataset {
 // MARK: - Self check
 
 extension PCNDataset {
-    static func selfCheck() {
+    static func selfCheck() async {
         // Version compare gates on strictly-newer.
         let m = PCNManifest(version: 5, url: "x", sha256: "y")
         assert(isNewer(m, thanCached: 4) && !isNewer(m, thanCached: 5) && !isNewer(m, thanCached: 6))
@@ -102,7 +114,7 @@ extension PCNDataset {
         assert(sha256Hex(Data()) == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855")
         // The bundled seed is present and parses to a non-trivial network.
         // ponytail: comment out if running before the seed file is added.
-        let g = graph()
+        let g = await graph()
         assert(!g.isEmpty, "pcn-seed.geojson missing or empty — is it in the bundle?")
     }
 }

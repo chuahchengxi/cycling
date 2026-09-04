@@ -133,7 +133,7 @@ extension Array where Element == StoredStep {
 enum Geo {
     static let earthRadius = 6_371_008.8
 
-    static func distance(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> Double {
+    nonisolated static func distance(_ a: CLLocationCoordinate2D, _ b: CLLocationCoordinate2D) -> Double {
         let dLat = (b.latitude - a.latitude) * .pi / 180
         let dLon = (b.longitude - a.longitude) * .pi / 180
         let la1 = a.latitude * .pi / 180, la2 = b.latitude * .pi / 180

@@ -53,7 +53,7 @@ enum Routing {
             // Quickest cycling route, roads allowed — one BRouter call, no PCN.
             poly = await BRouter.route(waypoints, profile: BRouterConfig.fastProfile)
         case .moderate, .leisure:
-            let graph = PCNDataset.graph()
+            let graph = await PCNDataset.graph()
             let result = await PCNRouting.stitched(
                 waypoints: waypoints, graph: graph,
                 gap: { await BRouter.route([$0, $1], profile: BRouterConfig.gapProfile) })

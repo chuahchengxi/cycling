@@ -16,7 +16,7 @@ import CoreLocation
 /// A single point on a route. Stored inside a blob rather than as its own
 /// @Model: a 90 km route is ~5000 points and CloudKit would choke on 5000
 /// records per route.
-struct Coord: Codable, Hashable, Sendable {
+nonisolated struct Coord: Codable, Hashable, Sendable {
     var lat: Double
     var lon: Double
     var alt: Double
