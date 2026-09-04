@@ -41,115 +41,55 @@ enum Routing {
     /// finished rides once there are enough of them.
     static let cruisingSpeed: Double = 5.0
 
-    /// Snap a list of tapped points onto real roads.
+    /// Assemble a ride through the rider's waypoints.
     ///
-    /// MKDirections routes one pair at a time, so a multi-waypoint route is one
-    /// request per leg, stitched together with the step offsets carried forward.
-    // ponytail: mode is captured but unused here — the Phase 2 PCN engine swaps in
-    // behind this signature. See specs/2026-09-04-create-route-experience-design.md §G.
+    /// Fast mode is one BRouter call over the whole line, roads allowed.
+    /// Moderate/leisure stitch the on-PCN A* stretches with BRouter-routed
+    /// gaps at the start/end/holes — see `PCNRouting.stitched`.
     static func plan(through waypoints: [Coord],
                      mode: RideMode = .moderate,
                      fetchElevation: Bool = true) async throws -> RoutePlan {
         guard waypoints.count >= 2 else { return RoutePlan() }
 
         var plan = RoutePlan()
-        var poly: [CLLocationCoordinate2D] = []
+        var poly: [Coord]
 
-        for i in 0..<(waypoints.count - 1) {
-            let req = MKDirections.Request()
-            req.source = MKMapItem(location: waypoints[i].cl.location, address: nil)
-            req.destination = MKMapItem(location: waypoints[i + 1].cl.location, address: nil)
-            req.transportType = transport
-            req.requestsAlternateRoutes = false
-
-            let response = try await MKDirections(request: req).calculate()
-            guard let leg = response.routes.first else { continue }
-
-            var legCoords = leg.polyline.coordinates
-            // The previous leg already ended on this point.
-            if !poly.isEmpty, !legCoords.isEmpty { legCoords.removeFirst() }
-            let offsetBefore = plan.distance
-
-            plan.steps.append(contentsOf: flatten(leg, startingAt: offsetBefore,
-                                                  isFirstLeg: i == 0,
-                                                  isLastLeg: i == waypoints.count - 2))
-            plan.distance += leg.distance
-            plan.expected += leg.expectedTravelTime
-            poly.append(contentsOf: legCoords)
+        switch mode {
+        case .fast:
+            // Quickest cycling route, roads allowed — one BRouter call, no PCN.
+            poly = await BRouter.route(waypoints, profile: BRouterConfig.fastProfile)
+        case .moderate, .leisure:
+            let graph = PCNDataset.graph()
+            let result = await PCNRouting.stitched(
+                waypoints: waypoints, graph: graph,
+                gap: { await BRouter.route([$0, $1], profile: BRouterConfig.gapProfile) })
+            poly = result.poly
+            plan.offConnectorSegments = result.offSegments
+            plan.offConnectorMeters = result.offMeters
         }
 
-        // Recompute the tail step's offset off the real line rather than the sum
-        // of the legs, so the turn list and the snapper agree to the metre.
-        let cum = Geo.cumulative(poly)
-        if let total = cum.last, total > 0 { plan.distance = total }
+        // Nothing came back (offline, empty graph): last-resort MapKit walking so a
+        // route still appears.
+        if poly.count < 2 {
+            poly = await BRouter.route(waypoints, profile: BRouterConfig.gapProfile)
+            plan.offConnectorSegments = poly.isEmpty ? [] : [poly]
+            plan.offConnectorMeters = Geo.cumulative(poly.coordinates).last ?? 0
+        }
+        guard poly.count >= 2 else { return plan }
+
+        let cl = poly.coordinates
+        let cum = Geo.cumulative(cl)
+        plan.distance = cum.last ?? 0
+        plan.steps = PCNRouting.steps(from: poly)
 
         if fetchElevation {
-            plan.elevations = await elevations(along: poly)
+            plan.elevations = await elevations(along: cl)
         }
-
-        // Climbing costs time: 10 m of ascent rides like an extra 100 m of flat.
         plan.expected = (plan.distance + plan.ascent * 10) / cruisingSpeed
-        plan.polyline = zip(poly, plan.elevations.isEmpty ? [] : resample(plan.elevations, to: poly.count))
+        plan.polyline = zip(cl, plan.elevations.isEmpty ? [] : resample(plan.elevations, to: cl.count))
             .map { Coord($0.0, alt: $0.1) }
-        if plan.polyline.isEmpty { plan.polyline = poly.map { Coord($0) } }
+        if plan.polyline.isEmpty { plan.polyline = poly }
         return plan
-    }
-
-    /// Turn a leg's MKRouteSteps into StoredSteps.
-    ///
-    /// Each instruction is pinned to where its step's line begins, and the
-    /// maneuver arrow comes from the angle between the previous step's exit
-    /// heading and this step's entry heading — MKRouteStep gives the sentence
-    /// but never the turn type.
-    private static func flatten(_ route: MKRoute, startingAt offset: Double,
-                                isFirstLeg: Bool, isLastLeg: Bool) -> [StoredStep] {
-        var out: [StoredStep] = []
-        var running = offset
-
-        let entry: [Double?] = route.steps.map { Geo.entryBearing($0.polyline.coordinates) }
-        let exit: [Double?] = route.steps.map { Geo.exitBearing($0.polyline.coordinates) }
-
-        for (i, step) in route.steps.enumerated() {
-            let here = running
-            running += step.distance
-
-            let isLastStep = i == route.steps.count - 1
-            // Every leg ends with a zero-length arrival step. Only the final
-            // one is a real arrival; the rest are just waypoints being passed.
-            let zeroLength = step.distance == 0
-            if zeroLength && !(isFirstLeg && i == 0) && !(isLastLeg && isLastStep) { continue }
-
-            let angle: Double? = {
-                guard let incoming = (exit[safe: i - 1] ?? nil), let outgoing = entry[i] else { return nil }
-                return Geo.turn(from: incoming, to: outgoing)
-            }()
-
-            let maneuver: Maneuver
-            if isFirstLeg && i == 0 {
-                maneuver = .depart
-            } else if isLastLeg && isLastStep {
-                maneuver = .arrive
-            } else if let spoken = Maneuver.read(step.instructions) {
-                maneuver = spoken
-            } else if let angle {
-                maneuver = Maneuver.classify(turn: angle)
-            } else {
-                maneuver = .straight
-            }
-
-            let at = step.polyline.coordinates.first
-            out.append(StoredStep(
-                instruction: step.instructions.isEmpty
-                    ? (maneuver == .arrive ? "Arrive" : "Continue")
-                    : step.instructions,
-                road: step.polyline.title ?? "",
-                distance: step.distance,
-                maneuverOffset: here,
-                maneuverRaw: maneuver.rawValue,
-                lat: at?.latitude ?? 0,
-                lon: at?.longitude ?? 0))
-        }
-        return out
     }
 
     // MARK: - Elevation
