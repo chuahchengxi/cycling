@@ -1,7 +1,7 @@
 # Phase 2 — Hybrid Strict-PCN Routing — Design
 
 Date: 2026-09-04
-Status: design (not yet planned into tasks; not built)
+Status: design — all open items resolved 2026-09-04 (BRouter · scenic deferred · self-hosted updates); ready for an implementation plan; not yet built.
 Builds on: the Phase 1 seam (`Route.mode`, `Routing.plan(through:mode:)`) already shipped.
 
 ## Goal
@@ -29,9 +29,12 @@ the Phase 1 UI, the wizard, and `Route.mode` do not change.
 ## The five components
 
 ### 1. PCN dataset — the map of connectors
-- **Source:** NParks/LTA publish the PCN as GeoJSON (LineString features, each a
-  connector segment) on data.gov.sg. *(Open item: confirm the exact dataset ID +
-  the Singapore Open Data Licence attribution requirement before shipping.)*
+- **Source (confirmed):** NParks "Park Connector Loop" on data.gov.sg, dataset
+  `d_a69ef89737379f231d2ae93fd1c5707f` — a GeoJSON `FeatureCollection` of
+  `LineString` connector alignments. Licence: **Singapore Open Data Licence**
+  (free for personal/commercial use; carry the NParks attribution string in an
+  in-app credits line). *(Access Points + NParks Tracks datasets exist too and can
+  supplement junction/entry data later — not needed for v1.)*
 - **Bundle a seed copy** in the app (`pcn-seed.geojson`) so routing works offline
   on first launch with no network.
 - **Versioned:** a small `pcn-manifest.json` carries `{version, url, sha256}`.
@@ -59,34 +62,44 @@ Parse the LineStrings into a weighted graph:
   (milliseconds). Reuses the same `RoutePlan`/`StoredStep` output shape as today,
   so elevation, the turn list, difficulty, and the map all keep working unchanged.
 
-### 4. Gap stitching + first/last mile — the hosted router
+### 4. Gap stitching + first/last mile — the hosted router (BRouter, confirmed)
 The rider's real start (home) and end are usually **not on** a connector, and the
 PCN itself has gaps where a short road link is unavoidable. For those connective
 bits only:
-- Call a **hosted OSM cycling router** (e.g. BRouter — free/open — or GraphHopper's
-  free tier) to route start→nearest-PCN-entry and PCN-exit→destination, and across
-  any interior gaps.
-- **Offline fallback:** if the hosted router is unreachable, fall back to MapKit
-  `.walking` for the gap (today's behaviour) so a route always returns.
+- Call **BRouter** (free, open-source, cycling-tuned) to route
+  start→nearest-PCN-entry and PCN-exit→destination, and across any interior gaps.
+  REST shape: `GET {host}/brouter?lonlats={lon,lat|lon,lat|…}&profile={p}&format=geojson`
+  → a GeoJSON `LineString` we convert to `[Coord]` (the same shape the graph router
+  emits, so stitching is uniform).
+- **Host:** start against the public instance `https://brouter.de/brouter`
+  (best-effort, no SLA) behind a named `BRouterConfig.baseURL` constant, so swapping
+  to a self-hosted instance later is a one-line change, not a code change. Profiles:
+  `trekking` for gap/leisure links, `fastbike` for fast mode — both named in
+  `BRouterConfig` so the routing knobs live in one place.
+- **Offline fallback:** if BRouter is unreachable, fall back to MapKit `.walking`
+  for the gap (today's behaviour) so a route always returns.
 - Final route = `[road: start → PCN entry] + [strict PCN path] + [road: PCN exit →
   destination]`, stitched into one polyline.
-*(Open item: pick the hosted router and confirm its ToS/rate limits/attribution.)*
 
 ### 5. Mode behaviour (what `plan(mode:)` branches on)
 - **Leisure / Moderate:** maximise PCN usage (component 3), stitch gaps minimally
-  (component 4). Leisure can additionally weight toward scenic connectors and folds
-  in the Phase 1 discovery waypoints.
-- **Fast:** skip the PCN graph entirely — one call to the hosted router with a
-  "fastest" bike profile that allows roads. Faster, more exposed to traffic.
+  (component 4), and fold in the Phase 1 discovery waypoints as intermediate snap
+  targets. *Scenic connector weighting is **deferred** — v1 weights every connector
+  edge by length only; a `sceneryFactor` edge-weight multiplier is the named upgrade
+  seam for when it's built.*
+- **Fast:** skip the PCN graph entirely — one BRouter call with the `fastbike`
+  profile that allows roads. Faster, more exposed to traffic.
 
 ## Periodic dataset updates (the "keep to date" requirement)
-- On launch, **throttled** (e.g. at most once/week), fetch the small
-  `pcn-manifest.json`.
+- **Hosting (confirmed):** you self-host `pcn-manifest.json` + the versioned GeoJSON
+  on a static host (a GitHub repo/release is the zero-cost default) — full control
+  over when riders get a refresh, independent of data.gov.sg API changes. Refreshing
+  = re-export from data.gov.sg, bump `version`, upload. No app release needed.
+- On launch, **throttled** (at most once/week), fetch the small `pcn-manifest.json`.
 - If its `version` is newer than the cached one, download the new GeoJSON, verify
   the `sha256`, write it to the app-support directory, and rebuild the graph.
 - Riders always route on the latest connectors (Singapore opens new PCN links
   regularly) without an app-store update.
-- *(Open item: where the manifest+data are hosted, and the exact cadence.)*
 
 ## Integration — nothing in Phase 1 changes
 ```
@@ -109,13 +122,21 @@ consume `RoutePlan` exactly as they do now.
 - **PCN coverage** — the network doesn't reach everywhere; the honest UX is "as
   much PCN as exists between these points," not "100% PCN always."
 
-## Open items to settle before this becomes a task plan
-1. Exact data.gov.sg PCN dataset ID + licence/attribution.
-2. Hosted cycling router choice (BRouter vs GraphHopper vs other) + ToS.
-3. Update host + cadence for the manifest/dataset.
-4. Leisure scenic-weighting: in scope, or a later refinement?
-5. Offline behaviour spec when both the hosted router AND a cached dataset are
-   unavailable.
+## Open items — all resolved (2026-09-04)
+1. **PCN dataset:** ✅ data.gov.sg `d_a69ef89737379f231d2ae93fd1c5707f` ("Park
+   Connector Loop"), GeoJSON LineStrings, Singapore Open Data Licence (attribution
+   in-app).
+2. **Hosted router:** ✅ **BRouter** — public `brouter.de` to start, behind a
+   swappable `BRouterConfig.baseURL`; `trekking`/`fastbike` profiles.
+3. **Update host + cadence:** ✅ self-hosted manifest+GeoJSON (GitHub); throttled
+   check ≤ once/week.
+4. **Leisure scenic-weighting:** ✅ **deferred** (length-only edges in v1;
+   `sceneryFactor` seam noted).
+5. **Offline (both router AND cached dataset unavailable):** ✅ the bundled
+   `pcn-seed.geojson` guarantees a dataset is *always* present, so the only real
+   offline gap is BRouter — which already falls back to MapKit `.walking`. If even
+   that fails, surface "couldn't build a route — check your connection," never a
+   crash or an empty route.
 
 ## Suggested build order (when this is planned into tasks)
 1. GeoJSON parser + graph builder + spatial index + `selfCheck` on a tiny fixture.
