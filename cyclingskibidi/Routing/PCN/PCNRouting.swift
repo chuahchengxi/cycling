@@ -29,7 +29,10 @@ enum PCNRouting {
 
         func append(_ seg: [Coord], off: Bool) {
             var s = seg
-            if !poly.isEmpty, !s.isEmpty, s.first == poly.last { s.removeFirst() }
+            // Weld the seam: a real gap router won't echo the requested endpoint
+            // to the bit, so match on proximity rather than exact equality.
+            // ponytail: 1 m weld tolerance; a hair above GPS jitter, well under a segment.
+            if let first = s.first, let last = poly.last, Geo.distance(first.cl, last.cl) < 1 { s.removeFirst() }
             guard !s.isEmpty else { return }
             if off { offSegments.append(seg) }
             poly.append(contentsOf: s)

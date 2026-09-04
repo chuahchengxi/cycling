@@ -57,6 +57,10 @@ enum BRouter {
             if coords.count >= 2 { return coords }
         }
         // Fallback: stitch MapKit .walking leg by leg.
+        // ponytail: if one interior leg can't route (MapKit returns []), that leg is
+        // simply skipped, leaving a discontinuity rather than failing the whole route.
+        // Only reachable when BRouter is down AND ≥3 waypoints AND a leg is unroutable;
+        // upgrade to all-or-nothing (return [] so the caller's last-resort fires) if it bites.
         var out: [Coord] = []
         for i in 0..<(waypoints.count - 1) {
             var leg = await walk(from: waypoints[i], to: waypoints[i + 1])

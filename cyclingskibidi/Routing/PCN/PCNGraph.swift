@@ -60,6 +60,8 @@ struct PCNGraph {
 
     /// Nearest connector node to an arbitrary point — scans the query cell and a
     /// small ring of neighbours (covers points just off the network).
+    /// ponytail: ringCells=2 search radius — too small misses a node just across a
+    /// cell boundary, too large wastes the scan. Tune alongside snapTolerance on-device.
     func nearest(to c: Coord, ringCells: Int = 2) -> GridKey? {
         guard !coord.isEmpty else { return nil }
         let centre = Self.key(c, cell: cell)
