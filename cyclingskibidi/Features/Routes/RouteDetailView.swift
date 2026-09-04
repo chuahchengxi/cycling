@@ -19,6 +19,7 @@ struct RouteDetailView: View {
     @Query private var obstacles: [Obstacle]
 
     @State private var sheetShown = true
+    @State private var startPending = false
     @State private var detent: PresentationDetent = .fraction(0.28)
     @State private var camera: MapCameraPosition = .automatic
 
@@ -64,9 +65,15 @@ struct RouteDetailView: View {
             }
         }
         .onAppear(perform: frameRoute)
-        .sheet(isPresented: $sheetShown) {
+        .sheet(isPresented: $sheetShown, onDismiss: {
+            // Begin navigation only once the brief sheet is fully dismissed.
+            // Presenting the navigate cover while this sheet is still up is the
+            // "the current sheet is blocking the next one" failure.
+            if startPending { startPending = false; trip.begin(route) }
+        }) {
             SheetView(route: route, obstacles: nearby, currentDetent: $detent) {
-                trip.begin(route)
+                startPending = true
+                sheetShown = false
             }
             .presentationDetents([.fraction(0.28), .large], selection: $detent)
             .presentationBackgroundInteraction(.enabled)

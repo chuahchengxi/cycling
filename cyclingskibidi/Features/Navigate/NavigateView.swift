@@ -53,7 +53,7 @@ struct NavigateView: View {
                            rerouting: recorder.rerouting)
                 .padding(.horizontal, 12)
         }
-        .overlay(alignment: .trailing) { sideButtons }
+        .overlay(alignment: .bottomTrailing) { sideButtons }
         .ignoresSafeArea(edges: .bottom)
         .onAppear(perform: begin)
         .sheet(isPresented: $showSheet) {
@@ -108,8 +108,10 @@ struct NavigateView: View {
                 camera = .userLocation(followsHeading: true, fallback: .automatic)
             }
         }
+        // Sit just above the collapsed nav sheet (150 pt) rather than floating in
+        // the vertical centre — grouped with the bottom UI.
         .padding(.trailing, 12)
-        .padding(.bottom, 180)
+        .padding(.bottom, 162)
     }
 
     // MARK: Sheet
