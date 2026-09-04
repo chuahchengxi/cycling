@@ -15,6 +15,11 @@ struct RoutePlan: Sendable {
     var distance: Double = 0
     var expected: Double = 0
     var elevations: [Double] = []
+    /// Sub-polylines that leave the PCN onto roads/paths (build-time only, not
+    /// persisted). Drawn distinctly so the rider can reject or redirect them.
+    var offConnectorSegments: [[Coord]] = []
+    /// Total off-connector distance, for the "1.2 km off-connector" summary.
+    var offConnectorMeters: Double = 0
 
     var ascent: Double { Geo.climb(elevations).up }
     var descent: Double { Geo.climb(elevations).down }

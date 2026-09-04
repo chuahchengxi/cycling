@@ -22,6 +22,7 @@ struct cyclingskibidiApp: App {
     init() {
         #if DEBUG
         Geo.selfCheck()
+        GeoJSON.selfCheck()
         RideMode.selfCheck()
         FlowLayout.selfCheck()
         Discovery.selfCheck()
