@@ -61,6 +61,7 @@ final class RideRecorder {
     private var plannedDuration: Double = 0
     private var routeName = ""
     private var destination: Coord?
+    private var mode: RideMode = .moderate
 
     // Internals
     private var task: Task<Void, Never>?
@@ -85,6 +86,7 @@ final class RideRecorder {
         plannedDuration = route.expectedSeconds
         routeName = route.name
         destination = route.waypoints.last ?? route.polyline.last
+        mode = route.mode
         stepIndex = 0
         searchIndex = 0
         distanceAlong = 0
@@ -270,7 +272,7 @@ final class RideRecorder {
         rerouting = true
         Task { [weak self] in
             defer { self?.rerouting = false }
-            guard let plan = try? await Routing.plan(through: [Coord(fix), destination], fetchElevation: false),
+            guard let plan = try? await Routing.plan(through: [Coord(fix), destination], mode: self?.mode ?? .moderate, fetchElevation: false),
                   !plan.polyline.isEmpty, let self else { return }
             self.polyline = plan.polyline.coordinates
             self.cumulative = Geo.cumulative(self.polyline)

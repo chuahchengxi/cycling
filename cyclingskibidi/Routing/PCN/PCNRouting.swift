@@ -73,8 +73,8 @@ enum PCNRouting {
         var out: [StoredStep] = [step(.depart, "Start", at: coords[0], offset: 0)]
         var lastAt = 0.0
         for i in 1..<(coords.count - 1) {
-            let inB = Geo.bearing(from: coords[i - 1], to: coords[i])
-            let outB = Geo.bearing(from: coords[i], to: coords[i + 1])
+            guard let inB = Geo.exitBearing(Array(coords[...i])),
+                  let outB = Geo.entryBearing(Array(coords[i...])) else { continue }
             let angle = Geo.turn(from: inB, to: outB)
             guard abs(angle) >= minTurn, cum[i] - lastAt >= minSpacing else { continue }
             let m = Maneuver.classify(turn: angle)

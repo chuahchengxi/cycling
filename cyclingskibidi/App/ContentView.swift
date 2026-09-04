@@ -43,6 +43,7 @@ struct ContentView: View {
             NavigateView(route: route)
                 .environment(trip)
         }
+        .task { _ = PCNDataset.graph() }
         #if DEBUG
         .task { await openDemoScreen() }
         #endif

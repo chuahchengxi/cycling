@@ -2,8 +2,9 @@
 //  Routing.swift
 //  cyclingskibidi
 //
-//  Road-snapped routing through the rider's waypoints, plus the elevation
-//  profile that feeds the climb figures and the graph on the route sheet.
+//  PCN-graph + BRouter routing through the rider's waypoints, with a MapKit
+//  walking fallback, plus the elevation profile that feeds the climb figures
+//  and the graph on the route sheet.
 //
 
 import Foundation
@@ -26,13 +27,6 @@ struct RoutePlan: Sendable {
 }
 
 enum Routing {
-
-    /// MapKit has no cycling transport type, so routes come back from the
-    /// walking engine: it keeps park connectors and shared paths, which a bike
-    /// wants and the driving engine throws away.
-    /// ponytail: swap in a cycling-aware engine (BRouter, Valhalla, GraphHopper)
-    /// if riders start complaining about stairs or pavements.
-    static let transport: MKDirectionsTransportType = .walking
 
     /// Metres per second, ~18 km/h: an unhurried urban ride once lights and
     /// junctions are averaged in. The walking engine's own expectedTravelTime is

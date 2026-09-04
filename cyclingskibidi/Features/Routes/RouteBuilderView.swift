@@ -57,7 +57,7 @@ struct RouteBuilderView: View {
                 Button("Save", action: save)
                 Button("Cancel", role: .cancel) {}
             }
-            .alert("Couldn't build that leg", isPresented: .constant(error != nil)) {
+            .alert("Couldn't route that leg", isPresented: .constant(error != nil)) {
                 Button("OK") { error = nil }
             } message: { Text(error ?? "") }
         }
@@ -137,11 +137,11 @@ struct RouteBuilderView: View {
             }
 
             if planning {
-                ProgressView("Snapping to roads…").font(.footnote)
+                ProgressView("Finding a route…").font(.footnote)
             } else if plan.polyline.isEmpty {
                 Text(waypoints.count < 2
                      ? "Tap the map to drop pins. Two or more makes a route."
-                     : "No rideable path between those pins.")
+                     : "No route between those pins yet.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
