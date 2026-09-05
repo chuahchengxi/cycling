@@ -16,6 +16,7 @@ struct RouteDetailView: View {
     let route: Route
 
     @Environment(Trip.self) private var trip
+    @Environment(\.modelContext) private var context
     @Query private var obstacles: [Obstacle]
 
     @State private var sheetShown = true
@@ -50,6 +51,11 @@ struct RouteDetailView: View {
                     ObstacleBadge(kind: obstacle.kind)
                 }
             }
+            ForEach(route.sights) { sight in
+                Annotation(sight.name, coordinate: sight.coordinate) {
+                    SightBadge(sight: sight)
+                }
+            }
             UserAnnotation()
         }
         .mapStyle(.standard(elevation: .realistic))
@@ -59,6 +65,15 @@ struct RouteDetailView: View {
         .navigationTitle(route.name)
         .navigationBarTitleDisplayMode(.large)
         .onAppear(perform: frameRoute)
+        .task {
+            // Leisure routes gather the sights along the line once, then reuse
+            // them on every open and during the ride.
+            guard route.mode == .leisure, route.sights.isEmpty, route.polyline.count > 1 else { return }
+            let found = await Discovery.sights(along: route.polyline)
+            guard !found.isEmpty else { return }
+            route.sightData = Blob.encode(found)
+            try? context.save()
+        }
         .sheet(isPresented: $sheetShown, onDismiss: {
             // Begin navigation only once the brief sheet is fully dismissed.
             // Presenting the navigate cover while this sheet is still up is the

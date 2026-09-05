@@ -128,6 +128,24 @@ extension Array where Element == StoredStep {
     }
 }
 
+/// A leisure point of interest sitting near the route line, flattened for
+/// storage. `offsetAlong` is metres from the route start at the sight's closest
+/// approach — it orders the list and fires the pass-by card.
+struct Sight: Codable, Identifiable, Sendable {
+    var id: UUID = UUID()
+    var name: String = ""
+    /// MKPointOfInterestCategory rawValue, or "" when the search gave none.
+    var category: String = ""
+    var lat: Double = 0
+    var lon: Double = 0
+    var offsetAlong: Double = 0
+    var address: String = ""
+    var phone: String = ""
+    var url: String = ""
+
+    var coordinate: CLLocationCoordinate2D { .init(latitude: lat, longitude: lon) }
+}
+
 // MARK: - Geometry
 
 enum Geo {

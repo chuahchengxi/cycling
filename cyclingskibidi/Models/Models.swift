@@ -175,6 +175,9 @@ final class Route {
     var stepData: Data?
     /// Down-sampled elevation profile, as [Double] metres.
     var elevationData: Data?
+    /// Leisure sights within a corridor of the line, as [Sight]. Filled once on
+    /// the route brief and reused by the ride; nil until then.
+    var sightData: Data?
 
     init(name: String = "Untitled route") {
         self.name = name
@@ -192,6 +195,7 @@ final class Route {
     var polyline: [Coord] { Blob.decode([Coord].self, polylineData) ?? [] }
     var steps: [StoredStep] { Blob.decode([StoredStep].self, stepData) ?? [] }
     var elevations: [Double] { Blob.decode([Double].self, elevationData) ?? [] }
+    var sights: [Sight] { Blob.decode([Sight].self, sightData) ?? [] }
 
     var distanceKM: Double { distanceMeters / 1000 }
 }

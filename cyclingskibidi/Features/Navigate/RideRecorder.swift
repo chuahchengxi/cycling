@@ -39,6 +39,11 @@ final class RideRecorder {
     private(set) var offRoute = false
     private(set) var rerouting = false
 
+    // Sights along this route, and the one to surface right now as the rider
+    // reaches it. The view binds a card to `passingSight` and clears it on close.
+    private(set) var sights: [Sight] = []
+    var passingSight: Sight?
+
     var voiceEnabled = true
 
     var currentStep: StoredStep? { steps[safe: stepIndex] }
@@ -70,8 +75,12 @@ final class RideRecorder {
     private var lastRecorded: CLLocation?
     private var searchIndex = 0
     private var offRouteStreak = 0
+    /// True once the rider has snapped onto the line at least once. Until then
+    /// there is no route to be "off" — so no recalculating at the start.
+    private var joinedRoute = false
     private var rollingSpeed: Double = 0
     private var announced: Set<String> = []
+    private var passedSights: Set<UUID> = []
     private let speaker = AVSpeechSynthesizer()
 
     /// Called when the rider has left the route and a new line is needed.
@@ -90,12 +99,17 @@ final class RideRecorder {
         stepIndex = 0
         searchIndex = 0
         distanceAlong = 0
+        joinedRoute = false
         announced.removeAll()
+        sights = route.sights
+        passedSights.removeAll()
+        passingSight = nil
     }
 
     func start() {
         guard phase != .running else { return }
-        if phase == .idle {
+        let fresh = phase == .idle
+        if fresh {
             startedAt = .now
             track = []
             distance = 0
@@ -105,7 +119,9 @@ final class RideRecorder {
         phase = .running
         lastFixAt = nil
         listen()
-        announce("Starting ride. \(currentStep?.instruction ?? "Follow the route.")")
+        // Only the departure direction, and only on a real start — the tiered
+        // guidance handles every turn after, and resume shouldn't re-announce.
+        if fresh { announce(steps.first?.instruction ?? "Follow the route.") }
     }
 
     func pause() {
@@ -138,7 +154,8 @@ final class RideRecorder {
         task?.cancel(); task = nil
         phase = .idle
         track = []; distance = 0; movingSeconds = 0; speed = 0; maxSpeed = 0
-        stepIndex = 0; distanceAlong = 0; offRoute = false; announced.removeAll()
+        stepIndex = 0; distanceAlong = 0; offRoute = false; joinedRoute = false; announced.removeAll()
+        sights = []; passedSights.removeAll(); passingSight = nil
     }
 
     // MARK: - Location stream
@@ -229,12 +246,18 @@ final class RideRecorder {
         course = s.course
 
         advanceSteps(to: s.along)
+        checkSights(at: s.along)
 
-        // One bad fix should never trigger a reroute; a run of them should.
+        // One bad fix should never trigger a reroute; a run of them should —
+        // but only once the rider has actually joined the line. At the start
+        // they sit a few metres off it, and that is not a wrong turn.
         if s.lateral > 40 {
-            offRouteStreak += 1
-            if offRouteStreak >= 3 && !offRoute { markOffRoute(from: fix) }
+            if joinedRoute {
+                offRouteStreak += 1
+                if offRouteStreak >= 3 && !offRoute { markOffRoute(from: fix) }
+            }
         } else {
+            joinedRoute = true
             offRouteStreak = 0
             if offRoute { offRoute = false }
         }
@@ -252,15 +275,42 @@ final class RideRecorder {
         speakGuidance(for: step)
     }
 
-    /// Three tiers, the way every turn-by-turn app does it: a heads-up, a
-    /// get-ready, and the turn itself.
+    /// Trigger points, far to near: a heads-up, a get-ready, and the turn
+    /// itself. They only decide *when* to speak — the distance spoken is the
+    /// rider's actual distance to the maneuver, not the trigger.
+    static let guidanceTiers: [Double] = [400, 150, 40]
+
+    /// The tightest tier the rider is inside of, or nil while still beyond the
+    /// first. The *tightest*, not the farthest un-said one — so a step that
+    /// opens already inside a tier (turns close together, a GPS jump, or the
+    /// very first step) is announced against the distance it is really at.
+    nonisolated static func band(at distance: Double) -> Int? {
+        guidanceTiers.lastIndex { distance <= $0 }
+    }
+
     private func speakGuidance(for step: StoredStep) {
-        let tiers: [(Double, String)] = [(400, "In 400 metres, "), (150, "In 150 metres, "), (40, "")]
-        for (range, prefix) in tiers where distanceToManeuver <= range {
-            let key = "\(stepIndex)-\(Int(range))"
-            guard !announced.contains(key) else { continue }
-            announced.insert(key)
-            announce(prefix + step.instruction)
+        guard let band = Self.band(at: distanceToManeuver) else { return }
+        let key = "\(stepIndex)-\(band)"
+        guard !announced.contains(key) else { return }
+        // Retire this band and every farther one: a heads-up the rider is
+        // already inside of is stale, and must not fire on a later fix.
+        for i in 0...band { announced.insert("\(stepIndex)-\(i)") }
+        // Nearest tier is the turn itself; the rest lead with the actual
+        // distance rounded to a spoken-friendly 10 m, matching the banner.
+        let metres = Int((distanceToManeuver / 10).rounded()) * 10
+        let prefix = band == Self.guidanceTiers.count - 1 ? "" : "In \(metres) metres, "
+        announce(prefix + step.instruction)
+    }
+
+    /// Surface a sight as the rider reaches its closest approach — once each,
+    /// within a 200 m window past it so one already well behind at the start
+    /// doesn't pop, and never stacking a second over one still on screen.
+    private func checkSights(at along: Double) {
+        guard passingSight == nil else { return }
+        for sight in sights where !passedSights.contains(sight.id)
+            && along >= sight.offsetAlong && along <= sight.offsetAlong + 200 {
+            passedSights.insert(sight.id)
+            passingSight = sight
             return
         }
     }
@@ -282,7 +332,13 @@ final class RideRecorder {
             self.distanceAlong = 0
             self.offRoute = false
             self.offRouteStreak = 0
+            self.joinedRoute = false
             self.announced.removeAll()
+            // The stored sights' offsets are along the old line; drop them
+            // rather than fire them at the wrong spot on the new one.
+            self.sights = []
+            self.passedSights.removeAll()
+            self.passingSight = nil
             self.onReroute?(plan)
             self.announce("Route updated. \(plan.steps.first?.instruction ?? "")")
         }
@@ -294,4 +350,15 @@ final class RideRecorder {
         utterance.rate = AVSpeechUtteranceDefaultSpeechRate
         speaker.speak(utterance)
     }
+
+    #if DEBUG
+    nonisolated static func selfCheck() {
+        assert(band(at: 500) == nil, "beyond the first tier, say nothing")
+        assert(band(at: 380) == 0, "heads-up")
+        // The bug this guards: a step that opens 120 m out must say "In 150
+        // metres" — matching the banner — not the farther "In 400 metres" tier.
+        assert(band(at: 120) == 1, "spoke a farther tier than the rider is in")
+        assert(band(at: 30) == 2, "the turn itself")
+    }
+    #endif
 }

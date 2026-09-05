@@ -18,6 +18,8 @@ struct SheetView: View {
     @Binding var currentDetent: PresentationDetent
     var onStart: () -> Void
 
+    @State private var selectedSight: Sight?
+
     private var collapsed: Bool { currentDetent == .fraction(0.28) }
 
     var body: some View {
@@ -33,6 +35,7 @@ struct SheetView: View {
                         climb
                         elevationGraph
                         if !obstacles.isEmpty { obstacleList }
+                        if !route.sights.isEmpty { sightList }
                         turnList
                     }
                     .padding(20)
@@ -43,6 +46,7 @@ struct SheetView: View {
                 }
             }
         }
+        .sheet(item: $selectedSight) { SightSheet(sight: $0) }
     }
 
     // MARK: Pieces
@@ -133,6 +137,30 @@ struct SheetView: View {
                         Text("\(obstacle.confirmations)×").font(.caption).foregroundStyle(.secondary)
                     }
                 }
+            }
+        }
+    }
+
+    /// The sights the ride passes, in the order they come up. Tapping one opens
+    /// its brief; the same content pops up automatically when you ride past it.
+    private var sightList: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Sights along the way").font(.headline)
+            ForEach(route.sights) { sight in
+                Button { selectedSight = sight } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: Discovery.icon(for: sight.category).symbol)
+                            .font(.title3).frame(width: 30).foregroundStyle(.green)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(sight.name).font(.subheadline.weight(.semibold))
+                            Text(Discovery.icon(for: sight.category).label)
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 8)
+                        Text(Fmt.km(sight.offsetAlong)).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+                .buttonStyle(.plain)
             }
         }
     }

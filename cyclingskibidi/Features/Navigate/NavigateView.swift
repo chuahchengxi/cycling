@@ -44,17 +44,27 @@ struct NavigateView: View {
 
     // MARK: Navigating
 
+    /// Collapsed nav-sheet detent. The side buttons clear this plus the home-
+    /// indicator inset the sheet sits on, so the bottom one isn't tucked under it.
+    private static let collapsedSheet: CGFloat = 150
+
     private var navigating: some View {
-        ZStack(alignment: .top) {
-            map
-            GuidanceBanner(step: recorder.currentStep,
-                           distance: recorder.distanceToManeuver,
-                           offRoute: recorder.offRoute,
-                           rerouting: recorder.rerouting)
-                .padding(.horizontal, 12)
+        GeometryReader { geo in
+            ZStack(alignment: .top) {
+                map
+                GuidanceBanner(step: recorder.currentStep,
+                               distance: recorder.distanceToManeuver,
+                               offRoute: recorder.offRoute,
+                               rerouting: recorder.rerouting)
+                    .padding(.horizontal, 12)
+            }
+            .overlay(alignment: .bottomTrailing) {
+                sideButtons.padding(.bottom, geo.safeAreaInsets.bottom + Self.collapsedSheet + 12)
+            }
+            .overlay { passBySight }
+            .animation(.default, value: recorder.passingSight?.id)
+            .ignoresSafeArea(edges: .bottom)
         }
-        .overlay(alignment: .bottomTrailing) { sideButtons }
-        .ignoresSafeArea(edges: .bottom)
         .onAppear(perform: begin)
         .sheet(isPresented: $showSheet) {
             navSheet
@@ -77,6 +87,21 @@ struct NavigateView: View {
         }
     }
 
+    /// The pass-by card: when the ride reaches a sight, its brief pops over the
+    /// map on a dim scrim — tap outside or the close button to dismiss.
+    @ViewBuilder
+    private var passBySight: some View {
+        if let sight = recorder.passingSight {
+            ZStack {
+                Color.black.opacity(0.25).ignoresSafeArea()
+                    .onTapGesture { recorder.passingSight = nil }
+                PassBySightCard(sight: sight) { recorder.passingSight = nil }
+                    .padding(.horizontal, 20)
+            }
+            .transition(.opacity)
+        }
+    }
+
     private var map: some View {
         Map(position: $camera) {
             MapPolyline(coordinates: line)
@@ -91,6 +116,12 @@ struct NavigateView: View {
             ForEach(obstacles) { obstacle in
                 Annotation(obstacle.kind.rawValue, coordinate: obstacle.coordinate) {
                     ObstacleBadge(kind: obstacle.kind)
+                }
+            }
+            ForEach(recorder.sights) { sight in
+                Annotation(sight.name, coordinate: sight.coordinate) {
+                    SightBadge(sight: sight)
+                        .onTapGesture { recorder.passingSight = sight }
                 }
             }
             UserAnnotation()
@@ -108,10 +139,7 @@ struct NavigateView: View {
                 camera = .userLocation(followsHeading: true, fallback: .automatic)
             }
         }
-        // Sit just above the collapsed nav sheet (150 pt) rather than floating in
-        // the vertical centre — grouped with the bottom UI.
         .padding(.trailing, 12)
-        .padding(.bottom, 162)
     }
 
     // MARK: Sheet
@@ -210,6 +238,34 @@ struct NavigateView: View {
         context.insert(ride)
         try? context.save()
         trip.finished = ride
+    }
+}
+
+// MARK: - Pass-by sight
+
+/// The sight brief that pops up as the rider passes it: a title row with a close
+/// button over the shared SightDetail. Wraps the same content the pre-ride list
+/// shows, styled as a floating card rather than a system sheet (the nav screen
+/// already owns a persistent sheet).
+struct PassBySightCard: View {
+    let sight: Sight
+    let onClose: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(sight.name).font(.title3.bold())
+                Spacer(minLength: 8)
+                Button(action: onClose) {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.title2).foregroundStyle(.secondary)
+                }
+            }
+            SightDetail(sight: sight)
+        }
+        .padding(18)
+        .background(.regularMaterial, in: .rect(cornerRadius: 22))
+        .shadow(radius: 8, y: 2)
     }
 }
 
