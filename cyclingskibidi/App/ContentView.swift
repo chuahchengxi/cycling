@@ -32,6 +32,7 @@ final class Trip {
 struct ContentView: View {
     @Environment(\.modelContext) private var context
     @State private var trip = Trip()
+    @State private var obstacles = ObstacleStore()
     @State private var path = NavigationPath()
 
     var body: some View {
@@ -39,9 +40,11 @@ struct ContentView: View {
             RouteListView()
         }
         .environment(trip)
+        .environment(obstacles)
         .fullScreenCover(item: $trip.route) { route in
             NavigateView(route: route)
                 .environment(trip)
+                .environment(obstacles)
         }
         .task { _ = await PCNDataset.graph() }
         #if DEBUG
@@ -69,5 +72,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [Route.self, Obstacle.self, Ride.self], inMemory: true)
+        .modelContainer(for: [Route.self, Ride.self], inMemory: true)
 }

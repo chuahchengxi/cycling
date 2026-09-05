@@ -154,5 +154,5 @@ struct RideRow: View {
 
 #Preview {
     StatsView()
-        .modelContainer(for: [Route.self, Obstacle.self, Ride.self], inMemory: true)
+        .modelContainer(for: [Route.self, Ride.self], inMemory: true)
 }

@@ -200,24 +200,31 @@ final class Route {
     var distanceKM: Double { distanceMeters / 1000 }
 }
 
-@Model
-final class Obstacle {
-    var kindRaw: String = ObstacleKind.pothole.rawValue
-    var latitude: Double = 0
-    var longitude: Double = 0
+/// A hazard shared by *every* rider, so it lives in the CloudKit public
+/// database, not SwiftData — SwiftData only syncs one account's private store.
+/// The store owns the CloudKit mapping; this is just the in-memory value.
+struct Obstacle: Identifiable, Sendable {
+    /// The CKRecord name — a fresh UUID until the record comes back saved.
+    var id: String = UUID().uuidString
+    var kind: ObstacleKind
+    var latitude: Double
+    var longitude: Double
     var note: String = ""
-    var reportedAt: Date = Date.now
+    var reportedAt: Date = .now
     /// Bumped when another rider confirms it is still there.
     var confirmations: Int = 0
 
-    init(kind: ObstacleKind, at c: CLLocationCoordinate2D, note: String = "") {
-        kindRaw = kind.rawValue
-        latitude = c.latitude
-        longitude = c.longitude
+    init(id: String = UUID().uuidString, kind: ObstacleKind, at c: CLLocationCoordinate2D,
+         note: String = "", reportedAt: Date = .now, confirmations: Int = 0) {
+        self.id = id
+        self.kind = kind
+        self.latitude = c.latitude
+        self.longitude = c.longitude
         self.note = note
+        self.reportedAt = reportedAt
+        self.confirmations = confirmations
     }
 
-    var kind: ObstacleKind { ObstacleKind(rawValue: kindRaw) ?? .pothole }
     var coordinate: CLLocationCoordinate2D { .init(latitude: latitude, longitude: longitude) }
 }
 

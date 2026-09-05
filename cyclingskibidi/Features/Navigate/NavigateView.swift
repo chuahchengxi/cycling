@@ -16,9 +16,9 @@ struct NavigateView: View {
     let route: Route
 
     @Environment(Trip.self) private var trip
+    @Environment(ObstacleStore.self) private var obstacleStore
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
-    @Query private var obstacles: [Obstacle]
 
     @State private var camera: MapCameraPosition = .userLocation(followsHeading: true, fallback: .automatic)
     @State private var detent: PresentationDetent = .height(150)
@@ -52,17 +52,23 @@ struct NavigateView: View {
         GeometryReader { geo in
             ZStack(alignment: .top) {
                 map
-                GuidanceBanner(step: recorder.currentStep,
-                               distance: recorder.distanceToManeuver,
-                               offRoute: recorder.offRoute,
-                               rerouting: recorder.rerouting)
-                    .padding(.horizontal, 12)
+                VStack(spacing: 8) {
+                    GuidanceBanner(step: recorder.currentStep,
+                                   distance: recorder.distanceToManeuver,
+                                   offRoute: recorder.offRoute,
+                                   rerouting: recorder.rerouting)
+                    if let message = obstacleStore.errorMessage {
+                        ObstacleErrorBanner(message: message) { obstacleStore.errorMessage = nil }
+                    }
+                }
+                .padding(.horizontal, 12)
             }
             .overlay(alignment: .bottomTrailing) {
                 sideButtons.padding(.bottom, geo.safeAreaInsets.bottom + Self.collapsedSheet + 12)
             }
             .overlay { passBySight }
             .animation(.default, value: recorder.passingSight?.id)
+            .animation(.default, value: obstacleStore.errorMessage)
             .ignoresSafeArea(edges: .bottom)
         }
         .onAppear(perform: begin)
@@ -74,8 +80,10 @@ struct NavigateView: View {
                 .interactiveDismissDisabled()
         }
         .sheet(isPresented: $reporting) {
-            ObstacleReportView(coordinate: recorder.location ?? route.polyline.first?.cl)
-                .presentationDetents([.medium])
+            ObstacleReportView(coordinate: recorder.location ?? route.polyline.first?.cl) { kind, coord, note in
+                Task { await obstacleStore.report(kind: kind, at: coord, note: note) }
+            }
+            .presentationDetents([.medium])
         }
         .alert("Location is off", isPresented: .constant(recorder.authorizationDenied)) {
             Button("Open Settings") {
@@ -113,7 +121,7 @@ struct NavigateView: View {
             if let end = line.last {
                 Marker("Finish", systemImage: "flag.checkered", coordinate: end).tint(.red)
             }
-            ForEach(obstacles) { obstacle in
+            ForEach(obstacleStore.obstacles) { obstacle in
                 Annotation(obstacle.kind.rawValue, coordinate: obstacle.coordinate) {
                     ObstacleBadge(kind: obstacle.kind)
                 }
@@ -231,6 +239,7 @@ struct NavigateView: View {
         line = route.polyline.coordinates
         recorder.onReroute = { plan in line = plan.polyline.coordinates }
         recorder.start()
+        Task { await obstacleStore.load(around: route.polyline) }
     }
 
     private func end() {
@@ -238,6 +247,30 @@ struct NavigateView: View {
         context.insert(ride)
         try? context.save()
         trip.finished = ride
+    }
+}
+
+// MARK: - Shared-hazard error
+
+/// A dismissible notice when the shared-hazard store can't reach CloudKit
+/// (offline, or not signed into iCloud) — so an empty map reads as "couldn't
+/// load", not "no hazards here".
+struct ObstacleErrorBanner: View {
+    let message: String
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "icloud.slash.fill").foregroundStyle(.orange)
+            Text(message).font(.footnote).lineLimit(2)
+            Spacer(minLength: 8)
+            Button(action: onDismiss) {
+                Image(systemName: "xmark").font(.footnote.weight(.bold)).foregroundStyle(.secondary)
+            }
+        }
+        .padding(12)
+        .background(.regularMaterial, in: .rect(cornerRadius: 14))
+        .shadow(radius: 4, y: 1)
     }
 }
 
@@ -335,13 +368,14 @@ struct Stat: View {
 
 // MARK: - Marking an obstacle
 
-/// Marked obstacles are the thing that syncs: drop one here and it is on every
-/// other device signed into the same iCloud account, and on this route's brief
-/// the next time anyone opens it.
+/// Marked obstacles are shared with every rider: the store writes them to the
+/// CloudKit public database, so one dropped here shows on this route's brief and
+/// mid-ride for everyone who passes, not just this account's own devices.
 struct ObstacleReportView: View {
     let coordinate: CLLocationCoordinate2D?
+    /// Handed the mark to post; the parent forwards it to the shared store.
+    var onReport: (ObstacleKind, CLLocationCoordinate2D, String) -> Void
 
-    @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @State private var kind: ObstacleKind = .pothole
     @State private var note = ""
@@ -369,8 +403,7 @@ struct ObstacleReportView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Mark") {
                         guard let coordinate else { return dismiss() }
-                        context.insert(Obstacle(kind: kind, at: coordinate, note: note))
-                        try? context.save()
+                        onReport(kind, coordinate, note)
                         dismiss()
                     }
                     .disabled(coordinate == nil)

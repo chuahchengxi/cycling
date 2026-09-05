@@ -245,5 +245,5 @@ private struct WaypointPin: View {
 
 #Preview {
     RouteBuilderView()
-        .modelContainer(for: [Route.self, Obstacle.self, Ride.self], inMemory: true)
+        .modelContainer(for: [Route.self, Ride.self], inMemory: true)
 }
