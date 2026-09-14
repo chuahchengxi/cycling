@@ -29,6 +29,7 @@ struct cyclingskibidiApp: App {
         Task { await PCNDataset.selfCheck() }
         Task { await PCNRouting.selfCheck() }
         RideMode.selfCheck()
+        Routing.selfCheck()
         RideRecorder.selfCheck()
         FlowLayout.selfCheck()
         Discovery.selfCheck()

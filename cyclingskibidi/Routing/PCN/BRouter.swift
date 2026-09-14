@@ -26,20 +26,35 @@ enum BRouterConfig {
     static let fastProfile = "fastbike"
 }
 
+/// An absolute exclusion circle for BRouter's `nogos` query item — the rider
+/// marked this spot closed, so no route may pass within `radiusMeters` of it.
+struct NoGoCircle: Sendable {
+    var coord: Coord
+    var radiusMeters: Double
+}
+
 enum BRouter {
 
-    /// `…/brouter?lonlats=lon,lat|lon,lat&profile=…&format=geojson`. Built via
-    /// URLComponents so the pipe/comma separators are encoded correctly.
-    static func url(lonlats: [Coord], profile: String) -> URL? {
+    /// `…/brouter?lonlats=lon,lat|lon,lat&profile=…&format=geojson`, plus an
+    /// optional `nogos=lon,lat,radius|…` when the caller has active closures.
+    /// Built via URLComponents so the pipe/comma separators are encoded correctly.
+    static func url(lonlats: [Coord], profile: String, nogos: [NoGoCircle] = []) -> URL? {
         guard lonlats.count >= 2 else { return nil }
         let pairs = lonlats.map { "\($0.lon),\($0.lat)" }.joined(separator: "|")
         var comps = URLComponents(string: BRouterConfig.baseURL)
-        comps?.queryItems = [
-            .init(name: "lonlats", value: pairs),
-            .init(name: "profile", value: profile),
-            .init(name: "alternativeidx", value: "0"),
-            .init(name: "format", value: "geojson"),
+        var items = [
+            URLQueryItem(name: "lonlats", value: pairs),
+            URLQueryItem(name: "profile", value: profile),
+            URLQueryItem(name: "alternativeidx", value: "0"),
+            URLQueryItem(name: "format", value: "geojson"),
         ]
+        if !nogos.isEmpty {
+            let nogoPairs = nogos
+                .map { "\($0.coord.lon),\($0.coord.lat),\(Int($0.radiusMeters.rounded()))" }
+                .joined(separator: "|")
+            items.append(.init(name: "nogos", value: nogoPairs))
+        }
+        comps?.queryItems = items
         return comps?.url
     }
 
@@ -48,14 +63,17 @@ enum BRouter {
     static func decode(_ data: Data) -> [Coord] { GeoJSON.polylines(data).first ?? [] }
 
     /// Route the waypoints via BRouter; fall back to MapKit .walking on any
-    /// failure so a connective segment always resolves.
-    static func route(_ waypoints: [Coord], profile: String) async -> [Coord] {
-        guard let url = url(lonlats: waypoints, profile: profile) else { return [] }
+    /// failure so a connective segment always resolves. When `nogos` is
+    /// non-empty, MapKit can't honor the exclusion, so a failed BRouter
+    /// response returns no route instead of silently ignoring the closure.
+    static func route(_ waypoints: [Coord], profile: String, nogos: [NoGoCircle] = []) async -> [Coord] {
+        guard let url = url(lonlats: waypoints, profile: profile, nogos: nogos) else { return [] }
         if let (data, resp) = try? await URLSession.shared.data(from: url),
            (resp as? HTTPURLResponse)?.statusCode == 200 {
             let coords = decode(data)
             if coords.count >= 2 { return coords }
         }
+        guard nogos.isEmpty else { return [] }
         // Fallback: stitch MapKit .walking leg by leg.
         // ponytail: if one interior leg can't route (MapKit returns []), that leg is
         // simply skipped, leaving a discontinuity rather than failing the whole route.
@@ -96,6 +114,23 @@ extension BRouter {
         assert(s.contains("profile=trekking") && s.contains("format=geojson"), "params missing: \(s)")
         // Fewer than 2 points -> no URL.
         assert(url(lonlats: [Coord(lat: 1.3, lon: 103.8)], profile: "trekking") == nil)
+        // No no-gos passed -> the param is omitted entirely, not sent empty.
+        assert(!s.contains("nogos"), "nogos should be omitted when none are passed: \(s)")
+        // One no-go circle -> absolute lon,lat,radius appended.
+        let withNogo = url(lonlats: [Coord(lat: 1.30, lon: 103.80), Coord(lat: 1.31, lon: 103.81)],
+                           profile: "trekking",
+                           nogos: [NoGoCircle(coord: Coord(lat: 1.305, lon: 103.805), radiusMeters: 25)])!
+        assert(withNogo.absoluteString.contains("nogos=103.805,1.305,25"),
+               "nogo malformed: \(withNogo.absoluteString)")
+        // Two no-go circles -> pipe-joined, same as lonlats.
+        let withTwoNogos = url(lonlats: [Coord(lat: 1.30, lon: 103.80), Coord(lat: 1.31, lon: 103.81)],
+                               profile: "trekking",
+                               nogos: [NoGoCircle(coord: Coord(lat: 1.305, lon: 103.805), radiusMeters: 25),
+                                       NoGoCircle(coord: Coord(lat: 1.315, lon: 103.815), radiusMeters: 40)])!
+        let nogosValue = URLComponents(url: withTwoNogos, resolvingAgainstBaseURL: false)?
+            .queryItems?.first(where: { $0.name == "nogos" })?.value
+        assert(nogosValue == "103.805,1.305,25|103.815,1.315,40",
+               "multiple nogos malformed: \(withTwoNogos.absoluteString)")
         // A BRouter-shaped response decodes (lon,lat order preserved).
         let sample = """
         {"type":"FeatureCollection","features":[{"type":"Feature","geometry":

@@ -38,6 +38,9 @@ final class RideRecorder {
     private(set) var distanceAlong: Double = 0
     private(set) var offRoute = false
     private(set) var rerouting = false
+    /// Set when a manual reroute (e.g. around a marked closure) can't find a
+    /// route; the current route is kept as-is. Cleared by `dismissRerouteFailure()`.
+    private(set) var rerouteFailure: String?
 
     // Sights along this route, and the one to surface right now as the rider
     // reaches it. The view binds a card to `passingSight` and clears it on close.
@@ -104,6 +107,7 @@ final class RideRecorder {
         sights = route.sights
         passedSights.removeAll()
         passingSight = nil
+        rerouteFailure = nil
     }
 
     func start() {
@@ -156,6 +160,7 @@ final class RideRecorder {
         track = []; distance = 0; movingSeconds = 0; speed = 0; maxSpeed = 0
         stepIndex = 0; distanceAlong = 0; offRoute = false; joinedRoute = false; announced.removeAll()
         sights = []; passedSights.removeAll(); passingSight = nil
+        rerouteFailure = nil
     }
 
     // MARK: - Location stream
@@ -324,24 +329,54 @@ final class RideRecorder {
             defer { self?.rerouting = false }
             guard let plan = try? await Routing.plan(through: [Coord(fix), destination], mode: self?.mode ?? .moderate, fetchElevation: false),
                   !plan.polyline.isEmpty, let self else { return }
-            self.polyline = plan.polyline.coordinates
-            self.cumulative = Geo.cumulative(self.polyline)
-            self.steps = plan.steps
-            self.stepIndex = 0
-            self.searchIndex = 0
-            self.distanceAlong = 0
-            self.offRoute = false
-            self.offRouteStreak = 0
-            self.joinedRoute = false
-            self.announced.removeAll()
-            // The stored sights' offsets are along the old line; drop them
-            // rather than fire them at the wrong spot on the new one.
-            self.sights = []
-            self.passedSights.removeAll()
-            self.passingSight = nil
-            self.onReroute?(plan)
-            self.announce("Route updated. \(plan.steps.first?.instruction ?? "")")
+            self.applyReroute(plan)
         }
+    }
+
+    /// Reroute around a coordinate the rider just marked closed, from
+    /// whichever start is best trusted right now — the snapped position, then
+    /// the raw fix, then the route's own start if neither has arrived yet —
+    /// to the existing destination. Keeps the current route on failure.
+    func rerouteAround(closed coordinate: CLLocationCoordinate2D) {
+        guard let destination, let start = snapped ?? location ?? polyline.first, !rerouting else { return }
+        rerouteFailure = nil
+        rerouting = true
+        let nogo = NoGoCircle(coord: Coord(coordinate), radiusMeters: 40)
+        Task { [weak self] in
+            defer { self?.rerouting = false }
+            guard let plan = try? await Routing.plan(through: [Coord(start), destination], mode: self?.mode ?? .moderate,
+                                                      fetchElevation: false, closures: [nogo]),
+                  !plan.polyline.isEmpty, let self else {
+                self?.rerouteFailure = "Couldn't find a way around that closure."
+                return
+            }
+            self.applyReroute(plan)
+        }
+    }
+
+    func dismissRerouteFailure() { rerouteFailure = nil }
+
+    /// Swap in a freshly planned route, resetting the navigation state that
+    /// tracked the old line. Shared by every reroute path so they never drift
+    /// on which fields get reset.
+    private func applyReroute(_ plan: RoutePlan) {
+        polyline = plan.polyline.coordinates
+        cumulative = Geo.cumulative(polyline)
+        steps = plan.steps
+        stepIndex = 0
+        searchIndex = 0
+        distanceAlong = 0
+        offRoute = false
+        offRouteStreak = 0
+        joinedRoute = false
+        announced.removeAll()
+        // The stored sights' offsets are along the old line; drop them
+        // rather than fire them at the wrong spot on the new one.
+        sights = []
+        passedSights.removeAll()
+        passingSight = nil
+        onReroute?(plan)
+        announce("Route updated. \(plan.steps.first?.instruction ?? "")")
     }
 
     private func announce(_ text: String) {

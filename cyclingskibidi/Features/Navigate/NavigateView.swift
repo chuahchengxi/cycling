@@ -58,6 +58,9 @@ struct NavigateView: View {
                                    distance: recorder.distanceToManeuver,
                                    offRoute: recorder.offRoute,
                                    rerouting: recorder.rerouting)
+                    if let failure = recorder.rerouteFailure {
+                        RerouteFailureBanner(message: failure) { recorder.dismissRerouteFailure() }
+                    }
                 }
                 .padding(.horizontal, 12)
             }
@@ -81,7 +84,7 @@ struct NavigateView: View {
         // Presented from the main nav view, never stacked on the persistent nav
         // sheet — that sheet is hidden while placing, so the two never coexist.
         .sheet(item: $pending, onDismiss: { showSheet = true }) { item in
-            ObstacleReportView(coordinate: item.coordinate)
+            ObstacleReportView(coordinate: item.coordinate, onSaveClosed: recorder.rerouteAround)
                 .presentationDetents([.medium])
         }
         .alert("Location is off", isPresented: .constant(recorder.authorizationDenied)) {
@@ -330,12 +333,14 @@ struct GuidanceBanner: View {
 
     var body: some View {
         HStack(spacing: 16) {
-            Image(systemName: offRoute ? "exclamationmark.triangle.fill" : (step?.maneuver.symbol ?? "arrow.up"))
+            Image(systemName: rerouting ? "arrow.triangle.2.circlepath" : (offRoute ? "exclamationmark.triangle.fill" : (step?.maneuver.symbol ?? "arrow.up")))
                 .font(.system(.largeTitle, weight: .semibold))
                 .frame(width: 54)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(offRoute ? (rerouting ? "Recalculating…" : "Off route") : Fmt.km(distance))
+                // Rerouting always wins the headline, whether it was triggered by
+                // drifting off the line or by marking a closure on it.
+                Text(rerouting ? "Recalculating…" : (offRoute ? "Off route" : Fmt.km(distance)))
                     .font(.system(.title, design: .rounded, weight: .bold))
                 Text(step?.instruction ?? "Follow the route")
                     .font(.subheadline)
@@ -344,10 +349,34 @@ struct GuidanceBanner: View {
             }
             Spacer(minLength: 0)
         }
-        .foregroundStyle(offRoute ? Color.orange : Color.primary)
+        .foregroundStyle((rerouting || offRoute) ? Color.orange : Color.primary)
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial, in: .rect(cornerRadius: 22))
+        .shadow(radius: 8, y: 2)
+    }
+}
+
+/// A reroute that couldn't find a way around a closure: shown inline until the
+/// rider explicitly dismisses it, never auto-dismissed and never a modal alert
+/// so it doesn't block the map.
+struct RerouteFailureBanner: View {
+    let message: String
+    let onDismiss: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+            Text(message)
+                .font(.subheadline.weight(.medium))
+            Spacer(minLength: 8)
+            Button("Dismiss", action: onDismiss)
+                .font(.subheadline.bold())
+        }
+        .foregroundStyle(Color.orange)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.regularMaterial, in: .rect(cornerRadius: 18))
         .shadow(radius: 8, y: 2)
     }
 }
@@ -397,6 +426,9 @@ private struct PendingObstacle: Identifiable {
 /// device for later route briefs and rides.
 struct ObstacleReportView: View {
     let coordinate: CLLocationCoordinate2D?
+    /// Fired after persisting a `.closed` obstacle, so the live ride can
+    /// reroute around it. Other kinds only save.
+    var onSaveClosed: (CLLocationCoordinate2D) -> Void = { _ in }
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -428,6 +460,7 @@ struct ObstacleReportView: View {
                         guard let coordinate else { return dismiss() }
                         context.insert(Obstacle(kind: kind, at: coordinate, note: note))
                         try? context.save()
+                        if kind == .closed { onSaveClosed(coordinate) }
                         dismiss()
                     }
                     .disabled(coordinate == nil)

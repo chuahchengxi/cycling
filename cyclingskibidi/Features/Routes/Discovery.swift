@@ -16,16 +16,29 @@ enum Discovery {
         .cafe, .restaurant, .marina, .stadium, .library,
     ]
 
-    /// A local-search request bounded to the visible region. With tastes typed,
-    /// it becomes a natural-language search; empty tastes fall back to a broad
-    /// "points of interest" sweep filtered to the leisure categories.
+    /// A local-search request bounded to the visible region, for the user's
+    /// typed taste query. MKLocalSearch.Request is a text-search API: it ANDs
+    /// `naturalLanguageQuery` against the filter, so this only makes sense once
+    /// there's real text to match against POI names.
     static func request(tastes: String, in region: MKCoordinateRegion) -> MKLocalSearch.Request {
         let trimmed = tastes.trimmingCharacters(in: .whitespacesAndNewlines)
         let request = MKLocalSearch.Request()
         request.region = region
         request.resultTypes = .pointOfInterest
         request.pointOfInterestFilter = MKPointOfInterestFilter(including: leisureCategories)
-        request.naturalLanguageQuery = trimmed.isEmpty ? "points of interest" : trimmed
+        request.naturalLanguageQuery = trimmed.isEmpty ? nil : trimmed
+        return request
+    }
+
+    /// A points-of-interest request bounded to the region, for the automatic
+    /// corridor sweep (no typed text). MKLocalSearch.Request has no "browse by
+    /// category" mode — leaving `naturalLanguageQuery` nil doesn't relax it to
+    /// filter-only, it just has nothing to match and returns zero results every
+    /// time. MKLocalPointsOfInterestRequest is the separate API Apple built for
+    /// exactly this: region + category filter, no query text.
+    static func pointsOfInterestRequest(in region: MKCoordinateRegion) -> MKLocalPointsOfInterestRequest {
+        let request = MKLocalPointsOfInterestRequest(coordinateRegion: region)
+        request.pointOfInterestFilter = MKPointOfInterestFilter(including: leisureCategories)
         return request
     }
 
@@ -68,7 +81,7 @@ enum Discovery {
             let along = total * Double(i) / Double(samples - 1)
             guard let center = Geo.point(at: along, on: coords, cumulative: cumulative) else { continue }
             let region = MKCoordinateRegion(center: center, latitudinalMeters: 2500, longitudinalMeters: 2500)
-            guard let items = try? await MKLocalSearch(request: request(tastes: "", in: region)).start().mapItems
+            guard let items = try? await MKLocalSearch(request: pointsOfInterestRequest(in: region)).start().mapItems
             else { continue }
             for item in items {
                 candidates.append(Sight(
@@ -108,8 +121,17 @@ enum Discovery {
         let typed = request(tastes: "  hawker, temples ", in: region)
         assert(typed.naturalLanguageQuery == "hawker, temples", "tastes should be trimmed, not blanked")
         let empty = request(tastes: "   ", in: region)
-        assert(empty.naturalLanguageQuery == "points of interest", "empty tastes need a fallback query")
+        assert(empty.naturalLanguageQuery == nil, "empty tastes must not set a query MapKit will AND against the filter")
         assert(empty.resultTypes == .pointOfInterest)
+
+        // Automatic corridor sweep: MKLocalPointsOfInterestRequest, not
+        // MKLocalSearch.Request — the latter has no query-free browse mode, it
+        // just returns nothing when naturalLanguageQuery is nil.
+        let poi = pointsOfInterestRequest(in: region)
+        assert(poi.pointOfInterestFilter == MKPointOfInterestFilter(including: leisureCategories),
+               "corridor sweep still relies on the leisure category filter")
+        assert(abs(poi.coordinate.latitude - region.center.latitude) < 0.0001,
+               "sweep request centered on the sample region")
 
         // Corridor filter: a short west→east line; a point ~90 m off it is kept
         // and stamped with its offset, one ~2 km off is dropped, and a duplicate
