@@ -79,12 +79,6 @@ struct NavigateView: View {
                 .presentationDragIndicator(.visible)
                 .interactiveDismissDisabled()
         }
-        .sheet(isPresented: $reporting) {
-            ObstacleReportView(coordinate: recorder.location ?? route.polyline.first?.cl) { kind, coord, note in
-                Task { await obstacleStore.report(kind: kind, at: coord, note: note) }
-            }
-            .presentationDetents([.medium])
-        }
         .alert("Location is off", isPresented: .constant(recorder.authorizationDenied)) {
             Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) { UIApplication.shared.open(url) }
@@ -185,6 +179,14 @@ struct NavigateView: View {
                 turnList
             }
             Spacer(minLength: 0)
+        }
+        // Presented from inside the nav sheet, not beside it: two sibling sheets
+        // on the same presenter is the "only a single sheet is supported" error.
+        .sheet(isPresented: $reporting) {
+            ObstacleReportView(coordinate: recorder.location ?? route.polyline.first?.cl) { kind, coord, note in
+                Task { await obstacleStore.report(kind: kind, at: coord, note: note) }
+            }
+            .presentationDetents([.medium])
         }
     }
 
