@@ -2,9 +2,7 @@
 //  Models.swift
 //  cyclingskibidi
 //
-//  SwiftData models. Every one of these syncs through CloudKit, so they follow
-//  the CloudKit rules: no unique attributes, every stored property has a
-//  default, every relationship is optional.
+//  SwiftData models stored on this device.
 //
 
 import Foundation
@@ -14,7 +12,7 @@ import CoreLocation
 // MARK: - Blob value types
 
 /// A single point on a route. Stored inside a blob rather than as its own
-/// @Model: a 90 km route is ~5000 points and CloudKit would choke on 5000
+/// @Model: a 90 km route is ~5000 points, so one blob avoids 5000 persistence
 /// records per route.
 nonisolated struct Coord: Codable, Hashable, Sendable {
     var lat: Double
@@ -200,33 +198,44 @@ final class Route {
     var distanceKM: Double { distanceMeters / 1000 }
 }
 
-/// A hazard shared by *every* rider, so it lives in the CloudKit public
-/// database, not SwiftData — SwiftData only syncs one account's private store.
-/// The store owns the CloudKit mapping; this is just the in-memory value.
-struct Obstacle: Identifiable, Sendable {
-    /// The CKRecord name — a fresh UUID until the record comes back saved.
-    var id: String = UUID().uuidString
-    var kind: ObstacleKind
-    var latitude: Double
-    var longitude: Double
+/// A hazard saved on this device for offline route briefs and navigation.
+@Model
+final class Obstacle {
+    var kindRaw: String = ObstacleKind.pothole.rawValue
+    var latitude: Double = 0
+    var longitude: Double = 0
     var note: String = ""
-    var reportedAt: Date = .now
-    /// Bumped when another rider confirms it is still there.
+    var reportedAt: Date = Date.now
     var confirmations: Int = 0
 
-    init(id: String = UUID().uuidString, kind: ObstacleKind, at c: CLLocationCoordinate2D,
-         note: String = "", reportedAt: Date = .now, confirmations: Int = 0) {
-        self.id = id
-        self.kind = kind
+    init(kind: ObstacleKind, at c: CLLocationCoordinate2D, note: String = "") {
+        kindRaw = kind.rawValue
         self.latitude = c.latitude
         self.longitude = c.longitude
         self.note = note
-        self.reportedAt = reportedAt
-        self.confirmations = confirmations
     }
 
+    var kind: ObstacleKind { ObstacleKind(rawValue: kindRaw) ?? .pothole }
     var coordinate: CLLocationCoordinate2D { .init(latitude: latitude, longitude: longitude) }
 }
+
+#if DEBUG
+extension Obstacle {
+    static func selfCheck() {
+        let configuration = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try! ModelContainer(for: Obstacle.self, configurations: configuration)
+        let context = ModelContext(container)
+        context.insert(Obstacle(kind: .flooding,
+                                at: .init(latitude: 1.3496, longitude: 103.7494),
+                                note: "ankle-deep"))
+        try! context.save()
+
+        let saved = try! ModelContext(container).fetch(FetchDescriptor<Obstacle>())
+        assert(saved.count == 1, "a reported obstacle should survive a context reload")
+        assert(saved[0].kind == .flooding && saved[0].note == "ankle-deep")
+    }
+}
+#endif
 
 @Model
 final class Ride {
@@ -242,7 +251,7 @@ final class Ride {
     var routeName: String = ""
     /// Set when this ride came from HealthKit / a file, so re-importing is a no-op.
     var externalID: String = ""
-    /// [TrackPoint], JSON. SwiftData promotes anything large to a CKAsset.
+    /// [TrackPoint], JSON.
     var trackData: Data?
 
     init(startedAt: Date = .now, routeName: String = "", source: RideSource = .app) {

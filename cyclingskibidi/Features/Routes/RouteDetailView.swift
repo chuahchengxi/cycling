@@ -16,8 +16,8 @@ struct RouteDetailView: View {
     let route: Route
 
     @Environment(Trip.self) private var trip
-    @Environment(ObstacleStore.self) private var obstacleStore
     @Environment(\.modelContext) private var context
+    @Query private var obstacles: [Obstacle]
 
     @State private var sheetShown = true
     @State private var startPending = false
@@ -29,7 +29,7 @@ struct RouteDetailView: View {
         let poly = route.polyline.coordinates
         guard poly.count > 1 else { return [] }
         let cum = Geo.cumulative(poly)
-        return obstacleStore.obstacles.filter {
+        return obstacles.filter {
             (Geo.snap($0.coordinate, to: poly, cumulative: cum)?.lateral ?? .greatestFiniteMagnitude) < 60
         }
     }
@@ -66,8 +66,6 @@ struct RouteDetailView: View {
         .navigationBarTitleDisplayMode(.large)
         .onAppear(perform: frameRoute)
         .task {
-            // Community hazards from the shared public database, for every route.
-            await obstacleStore.load(around: route.polyline)
             // Leisure routes gather the sights along the line once, then reuse
             // them on every open and during the ride.
             guard route.mode == .leisure, route.sights.isEmpty, route.polyline.count > 1 else { return }
