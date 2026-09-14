@@ -60,10 +60,9 @@ struct RouteDetailView: View {
         }
         .mapStyle(.standard(elevation: .realistic))
         .ignoresSafeArea(edges: .bottom)
-        // A long route name doesn't fit beside the back button (it truncated to
-        // "Bu…"), so show it in full as the large title below the bar instead.
+        // Keep the title inline so the large title bar doesn't cover the map.
         .navigationTitle(route.name)
-        .navigationBarTitleDisplayMode(.large)
+        .navigationBarTitleDisplayMode(.inline)
         .onAppear(perform: frameRoute)
         .task {
             // Leisure routes gather the sights along the line once, then reuse

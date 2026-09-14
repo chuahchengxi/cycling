@@ -118,6 +118,9 @@ struct FinishedView: View {
                 }
                 .chartXAxisLabel("minutes")
                 .chartYAxisLabel("km/h")
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Speed over time")
+                .accessibilityValue("Avg \(Fmt.speed(ride.averageSpeed)), max \(Fmt.speed(ride.maxSpeed))")
             } else {
                 Text("Not enough data for a speed graph.")
                     .font(.footnote).foregroundStyle(.secondary)

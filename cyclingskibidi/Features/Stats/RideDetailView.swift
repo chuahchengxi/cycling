@@ -108,6 +108,9 @@ struct RideDetailView: View {
         }
         .chartXAxisLabel("km")
         .chartYAxisLabel("m")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Elevation profile")
+        .accessibilityValue("Min \(Int(elevation.map(\.alt).min() ?? 0)) m, max \(Int(elevation.map(\.alt).max() ?? 0)) m, \(Int(ride.ascentMeters)) m climbed")
     }
 
     private var speedChart: some View {
@@ -118,5 +121,8 @@ struct RideDetailView: View {
         }
         .chartXAxisLabel("min")
         .chartYAxisLabel("km/h")
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Speed over time")
+        .accessibilityValue("Avg \(Fmt.speed(ride.averageSpeed)), max \(Fmt.speed(ride.maxSpeed))")
     }
 }

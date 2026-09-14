@@ -23,7 +23,8 @@ struct NavigateView: View {
     @State private var camera: MapCameraPosition = .userLocation(followsHeading: true, fallback: .automatic)
     @State private var detent: PresentationDetent = .height(150)
     @State private var line: [CLLocationCoordinate2D] = []
-    @State private var reporting = false
+    @State private var placing = false
+    @State private var pending: PendingObstacle?
     @State private var showSheet = true
 
     private var recorder: RideRecorder { trip.recorder }
@@ -64,7 +65,9 @@ struct NavigateView: View {
                 sideButtons.padding(.bottom, geo.safeAreaInsets.bottom + Self.collapsedSheet + 12)
             }
             .overlay { passBySight }
+            .overlay(alignment: .bottom) { if placing { placementBar } }
             .animation(.default, value: recorder.passingSight?.id)
+            .animation(.default, value: placing)
             .ignoresSafeArea(edges: .bottom)
         }
         .onAppear(perform: begin)
@@ -74,6 +77,12 @@ struct NavigateView: View {
                 .presentationBackgroundInteraction(.enabled)
                 .presentationDragIndicator(.visible)
                 .interactiveDismissDisabled()
+        }
+        // Presented from the main nav view, never stacked on the persistent nav
+        // sheet — that sheet is hidden while placing, so the two never coexist.
+        .sheet(item: $pending, onDismiss: { showSheet = true }) { item in
+            ObstacleReportView(coordinate: item.coordinate)
+                .presentationDetents([.medium])
         }
         .alert("Location is off", isPresented: .constant(recorder.authorizationDenied)) {
             Button("Open Settings") {
@@ -101,43 +110,78 @@ struct NavigateView: View {
     }
 
     private var map: some View {
-        Map(position: $camera) {
-            MapPolyline(coordinates: line)
-                .stroke(.blue, style: .init(lineWidth: 7, lineCap: .round, lineJoin: .round))
+        MapReader { proxy in
+            Map(position: $camera) {
+                MapPolyline(coordinates: line)
+                    .stroke(.blue, style: .init(lineWidth: 7, lineCap: .round, lineJoin: .round))
 
-            if let step = recorder.currentStep {
-                Marker(step.maneuver.glyph, coordinate: step.coordinate).tint(.purple)
-            }
-            if let end = line.last {
-                Marker("Finish", systemImage: "flag.checkered", coordinate: end).tint(.red)
-            }
-            ForEach(obstacles) { obstacle in
-                Annotation(obstacle.kind.rawValue, coordinate: obstacle.coordinate) {
-                    ObstacleBadge(kind: obstacle.kind)
+                if let step = recorder.currentStep {
+                    Marker(step.maneuver.glyph, coordinate: step.coordinate).tint(.purple)
                 }
-            }
-            ForEach(recorder.sights) { sight in
-                Annotation(sight.name, coordinate: sight.coordinate) {
-                    SightBadge(sight: sight)
-                        .onTapGesture { recorder.passingSight = sight }
+                if let end = line.last {
+                    Marker("Finish", systemImage: "flag.checkered", coordinate: end).tint(.red)
                 }
+                ForEach(obstacles) { obstacle in
+                    Annotation(obstacle.kind.rawValue, coordinate: obstacle.coordinate) {
+                        ObstacleBadge(kind: obstacle.kind)
+                    }
+                }
+                if let pending {
+                    Marker("New obstacle", systemImage: "exclamationmark.triangle.fill",
+                           coordinate: pending.coordinate).tint(.orange)
+                }
+                ForEach(recorder.sights) { sight in
+                    Annotation(sight.name, coordinate: sight.coordinate) {
+                        SightBadge(sight: sight)
+                            .onTapGesture { recorder.passingSight = sight }
+                    }
+                }
+                UserAnnotation()
             }
-            UserAnnotation()
+            .mapStyle(.standard(elevation: .realistic))
+            .mapControls { MapUserLocationButton() }
+            // Only intercepts taps while placing; pan/zoom and normal taps are untouched.
+            .onTapGesture { screenPoint in
+                guard placing, let coord = proxy.convert(screenPoint, from: .local) else { return }
+                place(at: coord)
+            }
         }
-        .mapStyle(.standard(elevation: .realistic))
-        .mapControls { MapUserLocationButton() }
     }
 
     private var sideButtons: some View {
         VStack(spacing: 12) {
-            CircleButton(symbol: "exclamationmark.triangle.fill", tint: .orange) { reporting = true }
+            CircleButton(symbol: "exclamationmark.triangle.fill", tint: .orange) {
+                placing = true
+                showSheet = false
+            }
+            .accessibilityLabel("Mark obstacle")
             CircleButton(symbol: recorder.voiceEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill",
                          tint: .secondary) { recorder.voiceEnabled.toggle() }
+            .accessibilityLabel(recorder.voiceEnabled ? "Mute guidance" : "Unmute guidance")
             CircleButton(symbol: "location.north.fill", tint: .blue) {
                 camera = .userLocation(followsHeading: true, fallback: .automatic)
             }
+            .accessibilityLabel("Recenter map")
         }
         .padding(.trailing, 12)
+    }
+
+    /// Compact placement prompt shown while the rider is choosing a hazard spot.
+    private var placementBar: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "hand.tap.fill")
+            Text("Tap the blue route to place the obstacle")
+                .font(.subheadline.weight(.medium))
+            Spacer(minLength: 8)
+            Button("Cancel") { placing = false; pending = nil; showSheet = true }
+                .font(.subheadline.bold())
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(.regularMaterial, in: .capsule)
+        .shadow(radius: 8, y: 2)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 24)
     }
 
     // MARK: Sheet
@@ -176,12 +220,6 @@ struct NavigateView: View {
             }
             Spacer(minLength: 0)
         }
-        // Presented from inside the nav sheet, not beside it: two sibling sheets
-        // on the same presenter is the "only a single sheet is supported" error.
-        .sheet(isPresented: $reporting) {
-            ObstacleReportView(coordinate: recorder.location ?? route.polyline.first?.cl)
-            .presentationDetents([.medium])
-        }
     }
 
     private var controls: some View {
@@ -205,7 +243,7 @@ struct NavigateView: View {
             .buttonBorderShape(.roundedRectangle(radius: 18))
 
             Button(action: end) {
-                Text("END TRIP")
+                Text("End Ride")
                     .font(.title3.bold())
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
@@ -235,6 +273,15 @@ struct NavigateView: View {
         line = route.polyline.coordinates
         recorder.onReroute = { plan in line = plan.polyline.coordinates }
         recorder.start()
+    }
+
+    /// Snap the tapped point onto the displayed route and stage it for the form.
+    /// No GPS or route-start fallback: a tap that can't snap places nothing.
+    private func place(at coord: CLLocationCoordinate2D) {
+        guard let snapped = Geo.snap(coord, to: line, cumulative: Geo.cumulative(line))?.coordinate
+        else { return }
+        placing = false
+        pending = PendingObstacle(coordinate: snapped)
     }
 
     private func end() {
@@ -284,12 +331,12 @@ struct GuidanceBanner: View {
     var body: some View {
         HStack(spacing: 16) {
             Image(systemName: offRoute ? "exclamationmark.triangle.fill" : (step?.maneuver.symbol ?? "arrow.up"))
-                .font(.system(size: 40, weight: .semibold))
+                .font(.system(.largeTitle, weight: .semibold))
                 .frame(width: 54)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(offRoute ? (rerouting ? "Recalculating…" : "Off route") : Fmt.km(distance))
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .font(.system(.title, design: .rounded, weight: .bold))
                 Text(step?.instruction ?? "Follow the route")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -339,6 +386,13 @@ struct Stat: View {
 
 // MARK: - Marking an obstacle
 
+/// The snapped spot awaiting the type/note form. Identifiable so it drives the
+/// form via `.sheet(item:)` and also the orange preview marker on the map.
+private struct PendingObstacle: Identifiable {
+    let id = UUID()
+    let coordinate: CLLocationCoordinate2D
+}
+
 /// Mark an obstacle for the offline Challenge experience and keep it on this
 /// device for later route briefs and rides.
 struct ObstacleReportView: View {
@@ -365,12 +419,12 @@ struct ObstacleReportView: View {
                     TextField("e.g. deep, on the left", text: $note, axis: .vertical)
                 }
             }
-            .navigationTitle("Mark an obstacle")
+            .navigationTitle("Obstacle Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Mark") {
+                    Button("Save") {
                         guard let coordinate else { return dismiss() }
                         context.insert(Obstacle(kind: kind, at: coordinate, note: note))
                         try? context.save()

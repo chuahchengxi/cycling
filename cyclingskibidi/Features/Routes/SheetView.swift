@@ -111,6 +111,9 @@ struct SheetView: View {
                 .chartXAxisLabel("km")
                 .chartYAxisLabel("m")
                 .frame(height: 160)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Elevation profile")
+                .accessibilityValue("Climbs \(Int(route.ascentMeters)) metres, from \(Int(profile.min() ?? 0)) up to \(Int(profile.max() ?? 0)) metres")
             } else {
                 Text("No elevation data for this route.")
                     .font(.footnote).foregroundStyle(.secondary)
@@ -176,7 +179,7 @@ struct SheetView: View {
 
     private var startButton: some View {
         Button(action: onStart) {
-            Text("START")
+            Text("Start Ride")
                 .font(.title2.bold())
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 16)

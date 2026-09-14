@@ -63,7 +63,7 @@ struct StatsView: View {
                     }
                 }
 
-                if daily.count > 1 {
+                if ridingDays > 0 {
                     Section("Distance per day") {
                         Chart(daily, id: \.day) { entry in
                             BarMark(x: .value("Day", entry.day, unit: .day),
@@ -71,6 +71,14 @@ struct StatsView: View {
                                 .foregroundStyle(Color.accentColor)
                         }
                         .frame(height: 180)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("Distance per day")
+                        .accessibilityValue("\(Fmt.km(totalDistance)) over \(ridingDays) riding \(ridingDays == 1 ? "day" : "days")")
+                    }
+                } else if !scoped.isEmpty {
+                    Section("Distance per day") {
+                        Text("No distance recorded in this window.")
+                            .font(.footnote).foregroundStyle(.secondary)
                     }
                 }
 
@@ -89,19 +97,15 @@ struct StatsView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("Sync") { syncNow() }.disabled(importing)
-                }
-                ToolbarItem(placement: .topBarLeading) {
-                    Button { syncNow() } label: {
-                        if importing { ProgressView() }
-                        else { Image(systemName: "arrow.clockwise") }
-                    }
-                    .disabled(importing)
-                    .accessibilityLabel("Refresh")
+                    Button(importing ? "Syncing…" : "Sync") { syncNow() }
+                        .disabled(importing)
                 }
             }
         }
     }
+
+    /// Days that actually cover ground — the bars worth charting.
+    private var ridingDays: Int { daily.filter { $0.km > 0 }.count }
 
     /// Distance summed per calendar day, for the bar chart.
     private var daily: [(day: Date, km: Double)] {
@@ -118,7 +122,7 @@ struct StatsView: View {
     }
 
     /// Pull in cycling workouts from Apple Health / Garmin / COROS. importRides
-    /// skips anything already stored, so Sync and Refresh both just fetch what's new.
+    /// skips anything already stored, so Sync just fetches what's new.
     private func syncNow() {
         guard !importing else { return }
         Task {
