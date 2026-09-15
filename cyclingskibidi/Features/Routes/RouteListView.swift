@@ -66,7 +66,7 @@ struct RouteListView: View {
     private var filtered: [Route] {
         routes.filter { r in
             distance.accepts(r.distanceMeters)
-                && duration.accepts(r.expectedSeconds)
+                && duration.accepts(r.currentExpectedSeconds)
                 && difficulty.accepts(r.difficulty)
                 && (search.isEmpty || r.name.localizedCaseInsensitiveContains(search))
         }
@@ -203,7 +203,7 @@ struct RouteCard: View {
 
             FlowLayout {
                 Pill(text: Fmt.km(route.distanceMeters))
-                Pill(text: Fmt.duration(route.expectedSeconds))
+                Pill(text: Fmt.duration(route.currentExpectedSeconds))
                 Pill(text: route.difficulty.rawValue, tint: route.difficulty.color)
                 Pill(text: route.mode.rawValue, tint: .accentColor)
             }

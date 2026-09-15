@@ -28,12 +28,15 @@ struct RoutePlan: Sendable {
 
 enum Routing {
 
-    /// Metres per second, ~18 km/h: an unhurried urban ride once lights and
-    /// junctions are averaged in. The walking engine's own expectedTravelTime is
-    /// a walking time and would triple every estimate.
-    /// ponytail: one number for every rider. Learn it per rider from their own
-    /// finished rides once there are enough of them.
-    static let cruisingSpeed: Double = 5.0
+    /// Expected ride duration: distance plus a climb penalty (10 m of extra
+    /// distance per metre of ascent), at the mode's planning speed. The
+    /// walking engine's own expectedTravelTime is a walking time and would
+    /// triple every estimate, hence a speed-based estimate of our own.
+    /// ponytail: one speed per mode for every rider. Learn it per rider from
+    /// their own finished rides once there are enough of them.
+    static func duration(distance: Double, ascent: Double, mode: RideMode) -> Double {
+        (distance + ascent * 10) / (mode.planningSpeedKmh * 1000 / 3600)
+    }
 
     /// Assemble a ride through the rider's waypoints.
     ///
@@ -88,7 +91,7 @@ enum Routing {
         if fetchElevation {
             plan.elevations = await elevations(along: cl)
         }
-        plan.expected = (plan.distance + plan.ascent * 10) / cruisingSpeed
+        plan.expected = duration(distance: plan.distance, ascent: plan.ascent, mode: mode)
         plan.polyline = zip(cl, plan.elevations.isEmpty ? [] : resample(plan.elevations, to: cl.count))
             .map { Coord($0.0, alt: $0.1) }
         if plan.polyline.isEmpty { plan.polyline = poly }
@@ -173,6 +176,14 @@ extension Route {
         route.sightData = sights.isEmpty ? nil : Blob.encode(sights)
         return route
     }
+
+    /// The mode's current-speed estimate for this route, recomputed from its
+    /// distance/ascent rather than read from the stored `expectedSeconds` —
+    /// so a route saved under an old speed table never shows a stale ETA.
+    /// `expectedSeconds` itself stays around for compatibility/new saves.
+    var currentExpectedSeconds: Double {
+        Routing.duration(distance: distanceMeters, ascent: ascentMeters, mode: mode)
+    }
 }
 
 extension Routing {
@@ -183,5 +194,26 @@ extension Routing {
                                plan: RoutePlan(), sights: [sight])
         assert(route.sights.count == 1, "a route built for saving should retain its discovered sights")
         assert(route.sights.first?.name == "Cafe", "the retained sight should round-trip its data")
+
+        // A flat 1 km route (no ascent) at each mode's planning speed, in whole
+        // seconds so the maths stays exact: 20 km/h, 18 km/h, 12.5 km/h.
+        assert(duration(distance: 1000, ascent: 0, mode: .fast) == 180,
+               "fast should plan 1 km flat at exactly 20 km/h")
+        assert(duration(distance: 1000, ascent: 0, mode: .moderate) == 200,
+               "moderate should plan 1 km flat at exactly 18 km/h")
+        assert(duration(distance: 1000, ascent: 0, mode: .leisure) == 288,
+               "leisure should plan 1 km flat at exactly 12.5 km/h, the midpoint of 10-15 km/h")
+
+        // A route saved under an old speed table must not show its stale stored
+        // estimate: the mode's current speed always wins for display/filtering.
+        let legacy = Route(name: "Legacy Leisure")
+        legacy.mode = .leisure
+        legacy.distanceMeters = 1000
+        legacy.ascentMeters = 0
+        legacy.expectedSeconds = 999 // deliberately wrong, as if saved under an old formula
+        assert(legacy.currentExpectedSeconds == 288,
+               "a stored route should recompute its estimate at the mode's current speed, not read the stale stored value")
+        assert(legacy.expectedSeconds == 999,
+               "the persisted expectedSeconds should stay untouched for compatibility")
     }
 }

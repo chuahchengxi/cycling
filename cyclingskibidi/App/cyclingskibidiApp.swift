@@ -31,6 +31,7 @@ struct cyclingskibidiApp: App {
         RideMode.selfCheck()
         Routing.selfCheck()
         RideRecorder.selfCheck()
+        RideRecorder.selfCheckState()
         FlowLayout.selfCheck()
         Discovery.selfCheck()
         CreateRouteFlow.selfCheck()

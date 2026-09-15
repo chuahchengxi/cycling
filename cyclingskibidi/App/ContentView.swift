@@ -58,7 +58,7 @@ struct ContentView: View {
         case "finished":
             trip.begin(route)
             let plan = RoutePlan(polyline: route.polyline, steps: route.steps,
-                                 distance: route.distanceMeters, expected: route.expectedSeconds,
+                                 distance: route.distanceMeters, expected: route.currentExpectedSeconds,
                                  elevations: route.elevations)
             trip.finished = Demo.finishedRide(along: plan)
         default: break

@@ -55,7 +55,7 @@ struct SheetView: View {
         HStack(alignment: .firstTextBaseline, spacing: 16) {
             Text(Fmt.km(route.distanceMeters))
             summaryDivider
-            Text(Fmt.duration(route.expectedSeconds))
+            Text(Fmt.duration(route.currentExpectedSeconds))
             summaryDivider
             Text(route.difficulty.rawValue).foregroundStyle(route.difficulty.color)
             Spacer(minLength: 0)

@@ -95,7 +95,7 @@ final class RideRecorder {
         polyline = route.polyline.coordinates
         cumulative = Geo.cumulative(polyline)
         steps = route.steps
-        plannedDuration = route.expectedSeconds
+        plannedDuration = route.currentExpectedSeconds
         routeName = route.name
         destination = route.waypoints.last ?? route.polyline.last
         mode = route.mode
@@ -161,6 +161,8 @@ final class RideRecorder {
         stepIndex = 0; distanceAlong = 0; offRoute = false; joinedRoute = false; announced.removeAll()
         sights = []; passedSights.removeAll(); passingSight = nil
         rerouteFailure = nil
+        // A ride cannot inherit the previous ride's pace or distance.
+        rollingSpeed = 0; lastRecorded = nil; offRouteStreak = 0
     }
 
     // MARK: - Location stream
@@ -363,6 +365,7 @@ final class RideRecorder {
         polyline = plan.polyline.coordinates
         cumulative = Geo.cumulative(polyline)
         steps = plan.steps
+        plannedDuration = plan.expected
         stepIndex = 0
         searchIndex = 0
         distanceAlong = 0
@@ -394,6 +397,29 @@ final class RideRecorder {
         // metres" — matching the banner — not the farther "In 400 metres" tier.
         assert(band(at: 120) == 1, "spoke a farther tier than the rider is in")
         assert(band(at: 30) == 2, "the turn itself")
+    }
+
+    /// The bugs this guards: a reroute mid-ride kept the old route's ETA, and
+    /// a reset between rides kept the old ride's rolling pace and last GPS
+    /// fix — so a new ride could inherit a prior ride's pace or distance.
+    static func selfCheckState() {
+        let r = RideRecorder()
+        r.voiceEnabled = false
+
+        r.rollingSpeed = 8
+        r.lastRecorded = CLLocation(latitude: 1.3, longitude: 103.8)
+        r.offRouteStreak = 2
+        r.reset()
+        assert(r.rollingSpeed == 0, "reset() left a stale rolling speed for the next ride")
+        assert(r.lastRecorded == nil, "reset() left a stale GPS fix for the next ride")
+        assert(r.offRouteStreak == 0, "reset() left a stale off-route streak for the next ride")
+
+        r.plannedDuration = 1000
+        var plan = RoutePlan()
+        plan.polyline = [Coord(lat: 1.3, lon: 103.8), Coord(lat: 1.31, lon: 103.8)]
+        plan.expected = 42
+        r.applyReroute(plan)
+        assert(r.plannedDuration == 42, "applyReroute() did not refresh plannedDuration from the new plan")
     }
     #endif
 }
