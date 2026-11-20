@@ -32,6 +32,7 @@ Places along a route today are **not personalised and not accurate**: some aren'
 - Star ratings. Research found no retrievable crowd reviews; "quality" is reason codes (crowded, dismount, no water, closed) plus notability, not scores.
 - Exact closure geometry. Closures are circles along the stretch.
 - Rest stops on Fast mode.
+- Any download at any time, even optional. The app is fully offline for a challenge; data updates ship only with app releases.
 - Kit-theming system UI. Native iOS controls and Apple Maps stay as they are.
 
 ## Anti-goals (failure even if it "works")
@@ -66,6 +67,7 @@ Guardrails that make B safe: (1) hard filters run in code before the model sees 
 - **Whole app offline.** Decisions per online part are in section 5.
 - **Kit alarms:** full-screen takeovers with looping animation when approaching an obstacle or a no-access stretch.
 - **Fall detection** using the phone's motion sensors, with an alarm that is loud even on silent mode.
+- **After the three-round review (20 Nov 2026):** strictly offline, with no optional download. Ride export (GPX / Apple Health) is optional, for later. Yes to: rest stops on short rides too, offline heat/rain hints, and tourist extras (rental shops, bike parking, preset loops) from researched Singapore data. Rework the screens with every UI fix the review listed (section 7).
 - Approach B with fallback A.
 - Rest stops on rides > 20 km; spacing from **rider level** and choice from **stop quality** ("both").
 - Scenic routing is **rider-controlled** by a Direct ↔ Scenic slider.
@@ -82,7 +84,7 @@ Guardrails that make B safe: (1) hard filters run in code before the model sees 
 
 - **Data:** `closures.json` bundled. Each entry: `id`, `name`, `circles: [{lat, lon, radius_m}]`, `starts`, `valid_until` (nullable), `note` (detour text), `source_url`, `kind` (`closure` | `no_cycling`). `no_cycling` entries never expire.
 - **Seed content** from the research (as of 20 Nov 2026), e.g. Rail Corridor South Henderson Rd→Spooner Rd (to 2027-07-31), Loyang PC (Q3 2029), AMK Ave 6 PC (end 2028), AMK Ave 5 diversion (2028-04-30), Kallang PC near St Michael's (2H 2027), Alexandra–Queensway PC (Q3 2027), two Bedok PC sections (2026-12-31), Gardens by the Bay Waterfront Promenade (no end date), Punggol Point Park (≈2027-12-31). No-cycling: Henderson Waves, Kent Ridge Canopy Walk, Telok Blangah Forest Walk, Labrador/Berlayer/Bukit Chermin boardwalks, West Coast Marsh Garden boardwalk, Punggol Kelong/Wave/Adventure bridges, Pasir Ris & Changi boardwalks, Jurong Lake Gardens no-cycling zones, nature reserves, Botanic Gardens.
-- **Routing:** when `PCNDataset.graph()` builds the graph, edges with either endpoint inside an **active** closure circle are dropped. A* then routes around naturally, offline. Rider-reported hazards (`NoGoCircle`) use the same edge-removal path instead of forcing the whole route through BRouter.
+- **Routing (revised after review):** edges touching an **active** `closure` circle get an *additive* cost (their length + a fixed 1.5 km), and any detour is capped at about +30% of the open route. Closed runs are not ridden. Each closed run is replaced by a gap leg routed around the closure (road network in plan 6, otherwise a straight dashed line). `no_cycling` circles mean **walk your bike**: a small penalty and a warning, not avoidance. A* gets a binary heap and runs off the main actor. Rider-reported hazards (`NoGoCircle`) use the same edge-removal path instead of forcing the whole route through BRouter.
 - **Closure gaps (decided with the user):** keep the route on the connector map wherever possible. If removing a closure leaves no on-PCN path, the gap is shown on the map as a **dashed "off-connector" stretch**. *My call, after the road-network decision in section 5:* the dashed stretch follows the bundled road network so it is a real rideable way; if even that fails, it is a straight dashed line and the rider picks their own way. Kit's Heads-up card names the gap and its length.
 - **Expired** closures don't block; if the route passes through one, show "Was closed until <date> — check status".
 - Kit `Heads-up` card in route detail and during navigation when the route was bent around a closure.
@@ -108,7 +110,7 @@ Guardrails that make B safe: (1) hard filters run in code before the model sees 
 
 ### 3. Rest stops
 
-- Applies to Leisure and Moderate routes > 20 km.
+- Applies to Leisure and Moderate routes of any length (revised: beginners riding 5–15 km still need water and toilets). Under 20 km, show the water and toilet stops along the route without spacing windows.
 - **Spacing by level:** Beginner 5–7 km, Regular 10–15 km, Strong 15–20 km. Starts from the onboarding choice; after 5 finished rides, re-estimated from recorded distance/speed.
 - **Choice by quality** within each window: water > toilet > shade/shelter > food > bike parking; repair station is a bonus. Never closed or no-cycling.
 - **Gap warnings:** if the next window has no water, Kit warns at the previous stop ("No water for 8 km — fill up here").
@@ -146,6 +148,36 @@ Foundation Models runs on device, so it is already offline. After this, the app 
 - **Alarm:** full-screen flashing terracotta/ink "HELP!" for passers-by, with location (place, km, coordinates, time), "Hold to stop alarm", and "Call 995" (a tap, works on cell signal without internet).
 - **Loud on silent:** play the alarm through an audio session in playback mode at full app volume, which ignores the silent switch. Requires adding the `audio` background mode next to the existing `location` one so it keeps ringing with the screen locked. Apple's "Critical Alerts" permission (gets past Focus / Do Not Disturb via a notification) needs Apple to approve the app; apply for it but don't depend on it.
 - iPhone's own Crash Detection is for car crashes and has no app API; Apple Watch fall detection is separate. This feature is the app's own.
+
+### 7. Review follow-ups (decided with the user, 20 Nov 2026)
+
+**Heat and rain (offline):** a static best-time hint ("cooler before 10 am or after 5 pm; 1–4 pm is hottest and storms are common"), sheltered rest stops marked (`shelter`, `covered=yes`), and Kit suggests a shelter when the ride starts in the afternoon. No live weather.
+
+**Tourist extras:** bundle rental shops and bicycle parking from the "Singapore bike parking and rentals" research (LTA, OSM, operator rules; ship only sources whose licence allows bundling, with attribution). Rental shops and parking can be start and end points ("return the bike here"). Add 2–3 preset iconic loops. Spell out "park connector" and "hawker centre" instead of "PC" and "HC" in rider-facing text.
+
+**Alarms and safety UI:**
+- Every obstacle/no-access alarm has a "Not there" button that silences that spot for this ride and records a false alarm. It auto-dismisses once the spot is passed.
+- First warning is a sound and haptic. The full-screen takeover comes only within the last ~100 m.
+- The alarm screens put distance and what it is first, with Kit smaller.
+- Fall detection has a sensitivity setting (Low / Normal / High, default Normal) and can be turned off.
+- The HELP screen:
+  - Call 995 is the main button, with a phone icon.
+  - Stopping the alarm needs a 3 s hold with a visible fill.
+  - Bystander line: "Call 995. Don't move them."
+  - "Help" in English, 中文, Melayu and தமிழ்.
+  - Its own red/ink flash, different from no-access.
+
+**Ride screen UI:**
+- The turn arrow and distance always stay as the large top row of the banner. Kit's message sits under it, and "600 m" never wraps.
+- In the ride panel, next turn and km to go come first and the timer is smaller.
+- Pause and End ride sit above the home indicator. End ride needs a hold.
+- All touch targets are at least 52 pt.
+- Contrast is WCAG AA or better in both themes: ink text on terracotta, cream icons on dark secondary buttons.
+- Map pins carry pixel icons, not colour alone.
+- "Along the way" rows have chevrons and swipe to add or remove a stop.
+- Dynamic Type for DM Sans body text. VoiceOver labels for icons and Kit's mood. The fall countdown is announced every 5 s.
+
+**Later (optional):** export rides as GPX and to Apple Health.
 
 ### When things are decided (my calls)
 
