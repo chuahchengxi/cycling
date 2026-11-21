@@ -20,11 +20,15 @@ def runs_near(lines, ref_lines, within):
             elif cur: out.append(cur); cur = []
         if cur: out.append(cur)
     return out
-def circles(lines, src, spacing=100, r=75):
+# Tight circles: path width plus seed/OSM error. Spacing 1.5r keeps every vertex of the
+# stretch within 0.75r of a centre, so the routing penalty still catches it.
+def circles(lines, src, spacing=30, r=20):
     return [{"lat": round(p[0], 6), "lon": round(p[1], 6), "radius_m": r, "coord_source": src}
             for l in lines for p in (sample(l, spacing) if len(l) > 1 else l)]
 def stretch(lines, A, B):
     p = shortest(lines, A, B); assert p, "no path"; return p
+# Connectors on a road's pavement: small circles, so a car-lane route alongside doesn't match.
+ROADSIDE = dict(spacing=12, r=8)
 PCN = "https://pcn.nparks.gov.sg/notices"; RULES = "https://pcn.nparks.gov.sg/sharingpcn/"
 out = []
 def add(id, name, cs, starts, until, note, url, kind="closure"):
@@ -44,13 +48,13 @@ add("loyang-pc", "Loyang Park Connector beside Loyang Ave",
 ave6 = osm_name('Ang Mo Kio Avenue 6')
 add("amk-ave6-pc", "Ang Mo Kio Park Connector along Ave 6 (C2C)",
     circles([r for r in runs_near(park('Ang Mo Kio Park Connector'), ave6, 40) if len(r) > 1],
-            "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"),
+            "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6", **ROADSIDE),
     "2024-06-09", "2028-12-31", "North-South Corridor and MRT works. Notice says end 2028; 31 Dec 2028 used.", PCN)
 a5 = park('Ang Mo Kio Ave 5 Park Connector')
 j = nearest_vertex(a5, ave6)
 add("amk-ave5-diversion", "Ang Mo Kio Ave 5 Park Connector at Ave 6",
     circles([r for r in runs_near(a5, [[j, j]], 150) if len(r) > 1] or [[j]],
-            "pcn-seed PARK=Ang Mo Kio Ave 5 Park Connector, within 150 m of its nearest point to OSM Ang Mo Kio Avenue 6"),
+            "pcn-seed PARK=Ang Mo Kio Ave 5 Park Connector, within 150 m of its nearest point to OSM Ang Mo Kio Avenue 6", **ROADSIDE),
     "2023-04-25", "2028-04-30", "Diverted to an interim path for North-South Corridor works.", PCN)
 add("kallang-pc-st-michaels", "Kallang Park Connector near St Michael's estate",
     circles([r for r in runs_near(park('Kallang Park Connector'), osm_name("Saint Michael's Road"), 200) if len(r) > 1],
@@ -63,7 +67,7 @@ add("alexandra-queensway-pc", "Alexandra–Queensway Park Connector",
 bd = park('Bedok Park Connector')
 add("bedok-pc-laguna88", "Bedok Park Connector, Laguna88 to Upper East Coast Rd",
     circles([stretch(bd, (1.321762, 103.958573), nearest_vertex(bd, osm_name('Upper East Coast Road')))],
-            "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"),
+            "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road", **ROADSIDE),
     None, "2026-12-31", "Thomson-East Coast Line works; diversion signed.", PCN)
 add("bedok-pc-greenopal", "Bedok Park Connector near Bedok Reservoir View / Tampines GreenOpal",
     circles([[min((v for l in bd for v in l), key=lambda v: dist(v, q)) for q in [(1.336463, 103.937895), (1.336687, 103.939117)]]],
@@ -82,8 +86,12 @@ add("punggol-point-park", "Punggol Point Park",
     "https://pcn.nparks.gov.sg/files/6_Jul_2026_Punggol_Point_Park___park_closure_sign__003_.pdf")
 
 # --- no cycling (walk your bike) ---
+ROADS = [[(p['lat'], p['lon']) for p in e['geometry']] for e in osm
+         if e['tags'].get('highway') in ('primary', 'secondary', 'tertiary', 'residential', 'trunk', 'unclassified')]
 def nc(id, name, lines, src, url=RULES, note="Walk your bike."):
-    add(id, name, circles(lines, src, spacing=80, r=60), None, None, note, url, kind="no_cycling")
+    # A bridge over a road (Henderson Waves) mustn't tell drivers below to walk.
+    cs = [c for c in circles(lines, src) if to_lines(ROADS, (c['lat'], c['lon'])) > c['radius_m']]
+    add(id, name, cs, None, None, note, url, kind="no_cycling")
 for id, name, osmname in [("henderson-waves", "Henderson Waves", "Henderson Waves Bridge"),
                           ("kent-ridge-canopy-walk", "Kent Ridge Canopy Walk", "Canopy walk"),
                           ("telok-blangah-forest-walk", "Telok Blangah Forest Walk", "Forest Walk"),
@@ -95,5 +103,26 @@ for id, name, osmname in [("henderson-waves", "Henderson Waves", "Henderson Wave
     nc(id, name, osm_name(osmname), f"OSM ways name={osmname}")
 nc("changi-boardwalk", "Changi Boardwalk", osm_name('Changi Village Coastal Walk') + osm_name('Changi Village Coastal Walk (Kelong Walk)') + osm_name('Creek Wall Boardwalk'),
    "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk")
+# Junction trim: a closure circle touching another connector would close that connector
+# too (or the crossing). Drop it: better a few metres under-closed than a false closure.
+own = {"loyang-pc": "Loyang Park Connector", "amk-ave6-pc": "Ang Mo Kio Park Connector", "amk-ave5-diversion": "Ang Mo Kio Ave 5 Park Connector",
+       "kallang-pc-st-michaels": "Kallang Park Connector", "alexandra-queensway-pc": "Alexandra Queensway PC",
+       "bedok-pc-laguna88": "Bedok Park Connector", "bedok-pc-greenopal": "Bedok Park Connector", "rail-corridor-south": None}
+for e in out:
+    if e['id'] not in own: continue
+    others = [v for f in seed['features'] if f['properties'].get('PARK', '').strip() != own[e['id']] for l in feat_lines(f) for v in l]
+    keep = [c for c in e['circles'] if all(dist(v, (c['lat'], c['lon'])) > c['radius_m'] + 5 for v in others
+                                           if abs(v[0] - c['lat']) < 0.001)]
+    print(f"  trimmed {e['id']}: {len(e['circles'])} -> {len(keep)}"); assert keep, e['id']; e['circles'] = keep
+
+# False-alarm report: seed vertices of *other* connectors inside each entry's circles.
+for e in out:
+    stray = {}
+    for f in seed['features']:
+        pk = f['properties'].get('PARK', '').strip()
+        if pk == own.get(e['id']): continue
+        n = sum(1 for l in feat_lines(f) for v in l if any(dist(v, (c['lat'], c['lon'])) <= c['radius_m'] for c in e['circles']))
+        if n: stray[pk] = stray.get(pk, 0) + n
+    if stray: print("  other connectors inside", e['id'], stray)
 json.dump(out, open(sys.argv[4], 'w'), indent=1, ensure_ascii=False)
 print(len(out), "entries,", sum(len(e['circles']) for e in out), "circles")

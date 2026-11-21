@@ -29,6 +29,12 @@ nonisolated struct Closure: Codable, Sendable, Identifiable {
         return date < Closures.sg.date(byAdding: .day, value: 1, to: end)!
     }
 
+    /// Past its `validUntil` (no_cycling never ends). Not-yet-started closures are neither active nor ended.
+    func hasEnded(by date: Date) -> Bool {
+        guard kind == .closure, let end = validUntil.flatMap(Closures.day) else { return false }
+        return date >= Closures.sg.date(byAdding: .day, value: 1, to: end)!
+    }
+
     /// `validUntil` as "31 Dec 2026", Singapore time; nil when there's no end date.
     var untilText: String? {
         guard let d = validUntil.flatMap(Closures.day) else { return nil }
@@ -59,7 +65,9 @@ nonisolated enum Closures {
     static func decode(_ data: Data) -> [Closure] {
         let d = JSONDecoder()
         d.keyDecodingStrategy = .convertFromSnakeCase
-        return (try? d.decode([Closure].self, from: data)) ?? []
+        // Per entry, so one bad record (say, a kind a newer file adds) drops only itself.
+        struct Lossy: Decodable { let c: Closure?; init(from d: Decoder) { c = try? Closure(from: d) } }
+        return ((try? d.decode([Lossy].self, from: data)) ?? []).compactMap(\.c)
     }
 
     private static let cached: [Closure] = {
@@ -83,16 +91,27 @@ nonisolated enum Closures {
                 active.filter { $0.kind == .noCycling }.flatMap(\.noGoCircles))
     }
 
-    /// Closures with a circle within its radius of the line, split into active and expired.
+    /// Closures the line rides along, split into active and ended.
     static func hits(_ polyline: [Coord], in closures: [Closure], on date: Date) -> (active: [Closure], expired: [Closure]) {
         let line = polyline.coordinates
         let cum = Geo.cumulative(line)
+        // Cheap box reject first: ~750 circles x ~5000 segments is too much for the main thread.
+        let pad = 200 / PCNGraph.metresPerDegree
+        guard let la0 = polyline.map(\.lat).min(), let la1 = polyline.map(\.lat).max(),
+              let lo0 = polyline.map(\.lon).min(), let lo1 = polyline.map(\.lon).max() else { return ([], []) }
+        let box = { (ci: Closure.Circle) in (la0 - pad...la1 + pad).contains(ci.lat) && (lo0 - pad...lo1 + pad).contains(ci.lon) }
+        // A hit means riding along the closure: at least 3 of its circles (all, if it has fewer).
+        // A road crossing a closed path touches at most 2 neighbouring circles, so it doesn't warn.
         let hit = closures.filter { c in
-            c.circles.contains { ci in
-                (Geo.snap(Coord(lat: ci.lat, lon: ci.lon).cl, to: line, cumulative: cum)?.lateral ?? .infinity) <= ci.radiusM
+            let need = min(3, c.circles.count)
+            var n = 0
+            for ci in c.circles where box(ci) && (Geo.snap(Coord(lat: ci.lat, lon: ci.lon).cl, to: line, cumulative: cum)?.lateral ?? .infinity) <= ci.radiusM {
+                n += 1
+                if n >= need { return true }
             }
+            return false
         }
-        return (hit.filter { $0.isActive(on: date) }, hit.filter { !$0.isActive(on: date) })
+        return (hit.filter { $0.isActive(on: date) }, hit.filter { $0.hasEnded(by: date) })
     }
 }
 
@@ -120,6 +139,21 @@ extension Closures {
         assert(!all[1].isActive(on: day("2027-01-01", 0)), "expired the day after")
         assert(all[2].isActive(on: day("2030-01-01", 12)), "no_cycling never expires")
         assert(decode(Data("not json".utf8)).isEmpty, "bad data must decode to []")
+        // One bad entry (unknown kind) must not drop the good ones.
+        let mixed = "[" + String(data: json, encoding: .utf8)!.dropFirst().dropLast() + #",{"id":"z","kind":"mystery"}]"#
+        assert(decode(Data(mixed.utf8)).count == 3, "one bad entry dropped the rest")
+        // Crossing a closed path is not riding it: 5 circles 30 m apart east-west.
+        let step = 30 / 111_195.0
+        let strip = Closure(id: "s", name: "Strip", circles: (0..<5).map {
+            Closure.Circle(lat: 1.35, lon: 103.8 + Double($0) * step, radiusM: 20, coordSource: "test") },
+            starts: nil, validUntil: nil, note: "", sourceUrl: "x", kind: .closure)
+        let across = [Coord(lat: 1.349, lon: 103.8 + 2.5 * step), Coord(lat: 1.351, lon: 103.8 + 2.5 * step)]
+        let along = [Coord(lat: 1.35, lon: 103.799), Coord(lat: 1.35, lon: 103.801)]
+        assert(hits(across, in: [strip], on: .now).active.isEmpty, "a crossing must not warn")
+        assert(hits(along, in: [strip], on: .now).active.count == 1, "riding along must warn")
+        // Not started yet is neither active nor "was closed".
+        let early = hits([Coord(lat: 1.299, lon: 103.8), Coord(lat: 1.301, lon: 103.8)], in: all, on: day("2026-05-01", 12))
+        assert(early.active.isEmpty && early.expired.isEmpty, "future closure read as expired: \(early)")
         // A line through b's centre, checked after b expired: expired hit, not active.
         let line = [Coord(lat: 1.309, lon: 103.8), Coord(lat: 1.311, lon: 103.8)]
         let h = hits(line, in: all, on: day("2027-02-01", 12))

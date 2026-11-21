@@ -27,6 +27,8 @@ struct RouteDetailView: View {
     @State private var closureHits: (active: [Closure], expired: [Closure]) = ([], [])
     @State private var replanning = false
     @State private var confirmClosedStart = false
+    /// The last re-plan still crossed a closure (offline, or no way round).
+    @State private var replanFailed = false
 
     private var blockingClosures: [Closure] { closureHits.active.filter { $0.kind == .closure } }
 
@@ -98,12 +100,11 @@ struct RouteDetailView: View {
                       currentDetent: $detent, onStart: {
                 // Saved routes are rechecked at ride start too: a closure may have begun since opening.
                 checkClosures()
+                replanFailed = false
                 if blockingClosures.isEmpty { start() } else { confirmClosedStart = true }
             }, onReplan: { replan() })
-            .confirmationDialog(blockingClosures.count == 1 ? "\(blockingClosures[0].name) is closed on this route"
-                                                            : "\(blockingClosures.count) closures on this route",
-                                isPresented: $confirmClosedStart, titleVisibility: .visible) {
-                Button("Re-plan around it") { replan(thenStart: true) }
+            .confirmationDialog(closedStartTitle, isPresented: $confirmClosedStart, titleVisibility: .visible) {
+                if !replanFailed { Button(blockingClosures.count == 1 ? "Re-plan around it" : "Re-plan around them") { replan(thenStart: true) } }
                 Button("Ride anyway") { start() }
                 Button("Cancel", role: .cancel) {}
             }
@@ -112,6 +113,11 @@ struct RouteDetailView: View {
             .presentationDragIndicator(.visible)
             .interactiveDismissDisabled()
         }
+    }
+
+    private var closedStartTitle: String {
+        let what = blockingClosures.count == 1 ? blockingClosures[0].name : "\(blockingClosures.count) closures"
+        return replanFailed ? "Couldn't find a way round \(what)" : "\(what) \(blockingClosures.count == 1 ? "is" : "are") closed on this route"
     }
 
     private func start() {
@@ -136,7 +142,10 @@ struct RouteDetailView: View {
                 checkClosures()
                 frameRoute()
             }
-            if thenStart { start() }
+            guard thenStart else { return }
+            // Only start if the new line is actually clear; otherwise ask again, honestly.
+            checkClosures()
+            if blockingClosures.isEmpty { start() } else { replanFailed = true; confirmClosedStart = true }
         }
     }
 

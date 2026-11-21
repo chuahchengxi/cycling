@@ -48,13 +48,7 @@ enum BRouter {
             URLQueryItem(name: "alternativeidx", value: "0"),
             URLQueryItem(name: "format", value: "geojson"),
         ]
-        // Only no-gos within 2 km of the request's box; the bundled closures cover the island.
-        let pad = 2000 / PCNGraph.metresPerDegree
-        let lats = lonlats.map(\.lat), lons = lonlats.map(\.lon)
-        let near = nogos.filter {
-            $0.coord.lat >= lats.min()! - pad && $0.coord.lat <= lats.max()! + pad &&
-            $0.coord.lon >= lons.min()! - pad && $0.coord.lon <= lons.max()! + pad
-        }
+        let near = nearby(nogos, lonlats)
         if !near.isEmpty {
             let nogoPairs = near
                 .map { "\($0.coord.lon),\($0.coord.lat),\(Int($0.radiusMeters.rounded()))" }
@@ -63,6 +57,14 @@ enum BRouter {
         }
         comps?.queryItems = items
         return comps?.url
+    }
+
+    /// Only no-gos within 2 km of the waypoints' box; the bundled closures cover the island.
+    static func nearby(_ nogos: [NoGoCircle], _ pts: [Coord]) -> [NoGoCircle] {
+        guard let la0 = pts.map(\.lat).min(), let la1 = pts.map(\.lat).max(),
+              let lo0 = pts.map(\.lon).min(), let lo1 = pts.map(\.lon).max() else { return [] }
+        let pad = 2000 / PCNGraph.metresPerDegree
+        return nogos.filter { (la0 - pad...la1 + pad).contains($0.coord.lat) && (lo0 - pad...lo1 + pad).contains($0.coord.lon) }
     }
 
     /// BRouter returns a GeoJSON FeatureCollection with a single LineString —
@@ -74,6 +76,8 @@ enum BRouter {
     /// non-empty, MapKit can't honor the exclusion, so a failed BRouter
     /// response returns no route instead of silently ignoring the closure.
     static func route(_ waypoints: [Coord], profile: String, nogos: [NoGoCircle] = []) async -> [Coord] {
+        // Filter once: a closure 10 km away mustn't block the MapKit fallback below.
+        let nogos = nearby(nogos, waypoints)
         guard let url = url(lonlats: waypoints, profile: profile, nogos: nogos) else { return [] }
         if let (data, resp) = try? await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 8)),
            (resp as? HTTPURLResponse)?.statusCode == 200 {

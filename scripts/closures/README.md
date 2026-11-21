@@ -10,4 +10,5 @@ python3 -I build.py ../../cyclingskibidi/pcn-seed.geojson /tmp/geom.json /tmp/pp
 ```
 
 Dates, notes and the few OneMap points (Laguna 88, 772 Bedok Reservoir View, 965D Tampines St 96) are in `build.py`.
+Circles are 20 m (8 m for roadside connectors, 150 m for Punggol Point Park), and closure circles touching another connector are dropped. The build prints any other connectors still inside a circle.
 Every circle's `coord_source` says where it came from. OSM data © OpenStreetMap contributors, ODbL.

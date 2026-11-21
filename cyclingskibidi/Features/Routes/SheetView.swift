@@ -143,7 +143,10 @@ struct SheetView: View {
             }
             if closures.active.contains(where: { $0.kind == .closure }) {
                 Button(action: onReplan) {
-                    if replanning { ProgressView() } else { Label("Re-plan around it", systemImage: "arrow.triangle.branch") }
+                    if replanning { ProgressView("Re-planning") } else {
+                        Label(closures.active.filter { $0.kind == .closure }.count == 1 ? "Re-plan around it" : "Re-plan around them",
+                              systemImage: "arrow.triangle.branch")
+                    }
                 }
                 .buttonStyle(.bordered)
                 .disabled(replanning)
@@ -222,7 +225,7 @@ struct SheetView: View {
         }
         .buttonStyle(.borderedProminent)
         .buttonBorderShape(.roundedRectangle(radius: 18))
-        .disabled(route.polyline.count < 2)
+        .disabled(route.polyline.count < 2 || replanning)
     }
 }
 

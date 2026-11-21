@@ -62,8 +62,9 @@ enum PCNRouting {
                base.pathLength(avoid) <= PCNGraph.maxDetourRatio * base.pathLength(open) {
                 onPCN = avoid
             }
-            // start -> entry node (gap), unless already essentially on it.
-            if Geo.distance(a.cl, entryC.cl) > gapEpsilon { append(await gap(a, entryC), off: true) }
+            // start -> entry node (gap), unless already essentially on it. A closed entry
+            // node is never visited: the closed run below gaps straight from `a`.
+            if Geo.distance(a.cl, entryC.cl) > gapEpsilon, !isClosed(entryC) { append(await gap(a, entryC), off: true) }
             else { append([a], off: false) }
             // entry -> exit along the PCN, each closed run swapped for a gap leg round it.
             var k = 0
@@ -78,7 +79,8 @@ enum PCNRouting {
                 let from = poly.last ?? a, to = j < onPCN.count ? onPCN[j] : b
                 append(await gap(from, to), off: true); k = j
             }
-            // exit node -> destination (gap).
+            // exit node -> destination (gap). A closed exit node already gapped to `b` above.
+            if isClosed(exitC) { continue }
             if Geo.distance(exitC.cl, b.cl) > gapEpsilon { append(await gap(exitC, b), off: true) }
             else { append([b], off: false) }
         }
@@ -183,5 +185,13 @@ extension PCNRouting {
         let r4 = await stitched(waypoints: [west, north], graph: g1.penalised(closed: [], walk: [shut]), base: g1,
                                 closed: [], gap: { [$0, $1] })
         assert(r4.poly.contains { $0 == corner } && r4.offSegments.isEmpty, "walk zones are passed through")
+        // 5. Destination / start just off a closed node: no spur into the closure and back.
+        let nearCorner = Coord(lat: 1.300 - 30 / PCNGraph.metresPerDegree, lon: 103.802)
+        let r5 = await stitched(waypoints: [west, nearCorner], graph: g1.penalised(closed: [shut], walk: []), base: g1,
+                                closed: [shut], gap: { [$0, $1] })
+        assert(!r5.poly.contains { $0 == corner } && r5.poly.last == nearCorner, "exit spur into closure: \(r5.poly)")
+        let r6 = await stitched(waypoints: [nearCorner, west], graph: g1.penalised(closed: [shut], walk: []), base: g1,
+                                closed: [shut], gap: { [$0, $1] })
+        assert(!r6.poly.contains { $0 == corner } && r6.poly.first == nearCorner, "entry spur into closure: \(r6.poly)")
     }
 }
