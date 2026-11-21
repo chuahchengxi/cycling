@@ -28,7 +28,7 @@ enum BRouterConfig {
 
 /// An absolute exclusion circle for BRouter's `nogos` query item — the rider
 /// marked this spot closed, so no route may pass within `radiusMeters` of it.
-struct NoGoCircle: Sendable {
+nonisolated struct NoGoCircle: Sendable {
     var coord: Coord
     var radiusMeters: Double
 }

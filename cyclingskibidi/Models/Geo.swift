@@ -162,7 +162,7 @@ enum Geo {
     /// Flat local frame in metres, east/north of `origin`. Good to a centimetre
     /// over the few hundred metres a snap ever spans, and it turns the snap into
     /// plain 2D vector maths.
-    static func project(_ c: CLLocationCoordinate2D, origin: CLLocationCoordinate2D) -> (x: Double, y: Double) {
+    nonisolated static func project(_ c: CLLocationCoordinate2D, origin: CLLocationCoordinate2D) -> (x: Double, y: Double) {
         let lat0 = origin.latitude * .pi / 180
         let x = (c.longitude - origin.longitude) * .pi / 180 * earthRadius * cos(lat0)
         let y = (c.latitude - origin.latitude) * .pi / 180 * earthRadius
@@ -170,7 +170,7 @@ enum Geo {
     }
 
     /// Compass bearing in degrees, 0 = north, clockwise.
-    static func bearing(from a: CLLocationCoordinate2D, to b: CLLocationCoordinate2D) -> Double {
+    nonisolated static func bearing(from a: CLLocationCoordinate2D, to b: CLLocationCoordinate2D) -> Double {
         let la1 = a.latitude * .pi / 180, la2 = b.latitude * .pi / 180
         let dLon = (b.longitude - a.longitude) * .pi / 180
         let y = sin(dLon) * cos(la2)
@@ -215,7 +215,7 @@ enum Geo {
 
     /// Running distance to each vertex. `cumulative[i]` is the distance from the
     /// start of the line to `poly[i]`, so `cumulative.last` is the route length.
-    static func cumulative(_ poly: [CLLocationCoordinate2D]) -> [Double] {
+    nonisolated static func cumulative(_ poly: [CLLocationCoordinate2D]) -> [Double] {
         guard !poly.isEmpty else { return [] }
         var out = [0.0]
         out.reserveCapacity(poly.count)
@@ -223,7 +223,7 @@ enum Geo {
         return out
     }
 
-    struct Snap: Sendable {
+    nonisolated struct Snap: Sendable {
         /// Index of the segment the fix landed on.
         var index: Int
         /// Where along that segment, 0...1.
@@ -244,7 +244,7 @@ enum Geo {
     /// that loops back on itself would otherwise snap a rider on lap two onto
     /// lap one. Callers pass the last matched segment as `from`; a full rescan
     /// is the caller's job when the result comes back far off the line.
-    static func snap(_ p: CLLocationCoordinate2D,
+    nonisolated static func snap(_ p: CLLocationCoordinate2D,
                      to poly: [CLLocationCoordinate2D],
                      cumulative cum: [Double],
                      from: Int = 0,
