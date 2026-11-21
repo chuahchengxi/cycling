@@ -15,8 +15,11 @@ import Charts
 struct SheetView: View {
     let route: Route
     var obstacles: [Obstacle] = []
+    var closures: (active: [Closure], expired: [Closure]) = ([], [])
+    var replanning = false
     @Binding var currentDetent: PresentationDetent
     var onStart: () -> Void
+    var onReplan: () -> Void = {}
 
     @State private var selectedSight: Sight?
 
@@ -34,6 +37,7 @@ struct SheetView: View {
                         summary
                         climb
                         elevationGraph
+                        if !closures.active.isEmpty || !closures.expired.isEmpty { closureList }
                         if !obstacles.isEmpty { obstacleList }
                         if !route.sights.isEmpty { sightList }
                         turnList
@@ -118,6 +122,38 @@ struct SheetView: View {
                 Text("No elevation data for this route.")
                     .font(.footnote).foregroundStyle(.secondary)
                     .frame(height: 60)
+            }
+        }
+    }
+
+    private var closureList: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Closures on this route").font(.headline)
+            ForEach(closures.active) { c in
+                HStack(spacing: 12) {
+                    Image(systemName: c.kind == .closure ? "nosign" : "figure.walk")
+                        .foregroundStyle(c.kind == .closure ? .red : .orange)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading) {
+                        Text(c.kind == .closure ? "\(c.name) is closed" : "No cycling: \(c.name)")
+                            .font(.subheadline.weight(.semibold))
+                        Text(c.note).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            if closures.active.contains(where: { $0.kind == .closure }) {
+                Button(action: onReplan) {
+                    if replanning { ProgressView() } else { Label("Re-plan around it", systemImage: "arrow.triangle.branch") }
+                }
+                .buttonStyle(.bordered)
+                .disabled(replanning)
+            }
+            ForEach(closures.expired) { c in
+                Link(destination: URL(string: c.sourceUrl) ?? URL(string: "https://pcn.nparks.gov.sg/notices")!) {
+                    Label("\(c.name): was closed until \(c.untilText ?? "recently"), check status",
+                          systemImage: "clock.arrow.circlepath")
+                        .font(.subheadline)
+                }
             }
         }
     }

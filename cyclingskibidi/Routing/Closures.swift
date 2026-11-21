@@ -29,6 +29,14 @@ nonisolated struct Closure: Codable, Sendable, Identifiable {
         return date < Closures.sg.date(byAdding: .day, value: 1, to: end)!
     }
 
+    /// `validUntil` as "31 Dec 2026", Singapore time; nil when there's no end date.
+    var untilText: String? {
+        guard let d = validUntil.flatMap(Closures.day) else { return nil }
+        let f = DateFormatter()
+        f.dateFormat = "d MMM yyyy"; f.timeZone = Closures.sg.timeZone; f.locale = Locale(identifier: "en_SG")
+        return f.string(from: d)
+    }
+
     var noGoCircles: [NoGoCircle] {
         circles.map { NoGoCircle(coord: Coord(lat: $0.lat, lon: $0.lon), radiusMeters: $0.radiusM) }
     }
@@ -116,6 +124,16 @@ extension Closures {
         let line = [Coord(lat: 1.309, lon: 103.8), Coord(lat: 1.311, lon: 103.8)]
         let h = hits(line, in: all, on: day("2027-02-01", 12))
         assert(h.active.isEmpty && h.expired.map(\.id) == ["b"], "expired hit wrong: \(h)")
+        assert(all[1].untilText == "31 Dec 2026" && all[0].untilText == nil, "until text wrong: \(String(describing: all[1].untilText))")
         assert(!bundled().isEmpty, "closures.json missing from bundle")
+        // Saved route along the real Bedok closure: warned now, "was closed" after 31 Dec 2026.
+        if let bedok = bundled().first(where: { $0.id == "bedok-pc-laguna88" }) {
+            let line = bedok.circles.map { Coord(lat: $0.lat, lon: $0.lon) }
+            let before = hits(line, in: bundled(), on: day("2026-11-21", 12))
+            let after = hits(line, in: bundled(), on: day("2027-01-02", 12))
+            assert(before.active.contains { $0.id == bedok.id }, "Bedok closure not flagged on a saved route")
+            assert(after.expired.contains { $0.id == bedok.id } && !after.active.contains { $0.id == bedok.id },
+                   "Bedok closure should read as expired in 2027")
+        } else { assertionFailure("bedok-pc-laguna88 missing") }
     }
 }

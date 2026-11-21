@@ -339,6 +339,8 @@ final class RideRecorder {
     /// whichever start is best trusted right now — the snapped position, then
     /// the raw fix, then the route's own start if neither has arrived yet —
     /// to the existing destination. Keeps the current route on failure.
+    /// Works offline in moderate/leisure: the hazard becomes a closed circle on
+    /// the PCN graph (see `PCNRouting.stitched`). Fast mode still needs BRouter.
     func rerouteAround(closed coordinate: CLLocationCoordinate2D) {
         guard let destination, let start = snapped ?? location ?? polyline.first, !rerouting else { return }
         rerouteFailure = nil

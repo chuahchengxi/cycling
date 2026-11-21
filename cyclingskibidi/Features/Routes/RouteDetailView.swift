@@ -23,6 +23,12 @@ struct RouteDetailView: View {
     @State private var startPending = false
     @State private var detent: PresentationDetent = .fraction(0.28)
     @State private var camera: MapCameraPosition = .automatic
+    /// Bundled closures this route crosses — checked when the route is opened.
+    @State private var closureHits: (active: [Closure], expired: [Closure]) = ([], [])
+    @State private var replanning = false
+    @State private var confirmClosedStart = false
+
+    private var blockingClosures: [Closure] { closureHits.active.filter { $0.kind == .closure } }
 
     /// Obstacles within 60 m of the line — the ones that will actually be ridden past.
     private var nearby: [Obstacle] {
@@ -46,6 +52,12 @@ struct RouteDetailView: View {
             if let end = route.polyline.last {
                 Marker("Finish", systemImage: "flag.checkered", coordinate: end.cl).tint(.red)
             }
+            ForEach(closureHits.active) { c in
+                ForEach(Array(c.circles.enumerated()), id: \.offset) { _, ci in
+                    MapCircle(center: .init(latitude: ci.lat, longitude: ci.lon), radius: ci.radiusM)
+                        .foregroundStyle(.red.opacity(c.kind == .closure ? 0.3 : 0.15))
+                }
+            }
             ForEach(nearby) { obstacle in
                 Annotation(obstacle.kind.rawValue, coordinate: obstacle.coordinate) {
                     ObstacleBadge(kind: obstacle.kind)
@@ -63,7 +75,10 @@ struct RouteDetailView: View {
         // Keep the title inline so the large title bar doesn't cover the map.
         .navigationTitle(route.name)
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear(perform: frameRoute)
+        .onAppear {
+            frameRoute()
+            checkClosures()
+        }
         .task {
             // Leisure routes gather the sights along the line once, then reuse
             // them on every open and during the ride.
@@ -79,14 +94,49 @@ struct RouteDetailView: View {
             // "the current sheet is blocking the next one" failure.
             if startPending { startPending = false; trip.begin(route) }
         }) {
-            SheetView(route: route, obstacles: nearby, currentDetent: $detent) {
-                startPending = true
-                sheetShown = false
+            SheetView(route: route, obstacles: nearby, closures: closureHits, replanning: replanning,
+                      currentDetent: $detent, onStart: {
+                // Saved routes are rechecked at ride start too: a closure may have begun since opening.
+                checkClosures()
+                if blockingClosures.isEmpty { start() } else { confirmClosedStart = true }
+            }, onReplan: { replan() })
+            .confirmationDialog(blockingClosures.count == 1 ? "\(blockingClosures[0].name) is closed on this route"
+                                                            : "\(blockingClosures.count) closures on this route",
+                                isPresented: $confirmClosedStart, titleVisibility: .visible) {
+                Button("Re-plan around it") { replan(thenStart: true) }
+                Button("Ride anyway") { start() }
+                Button("Cancel", role: .cancel) {}
             }
             .presentationDetents([.fraction(0.28), .large], selection: $detent)
             .presentationBackgroundInteraction(.enabled)
             .presentationDragIndicator(.visible)
             .interactiveDismissDisabled()
+        }
+    }
+
+    private func start() {
+        startPending = true
+        sheetShown = false
+    }
+
+    private func checkClosures() {
+        closureHits = Closures.hits(route.polyline, in: Closures.bundled(), on: Closures.now)
+    }
+
+    /// Re-plan the saved route through its waypoints; routing now bends round active closures.
+    private func replan(thenStart: Bool = false) {
+        guard !replanning else { return }
+        replanning = true
+        Task {
+            defer { replanning = false }
+            if let plan = try? await Routing.plan(through: route.waypoints, mode: route.mode), plan.polyline.count > 1 {
+                route.apply(plan)
+                route.sightData = nil
+                try? context.save()
+                checkClosures()
+                frameRoute()
+            }
+            if thenStart { start() }
         }
     }
 

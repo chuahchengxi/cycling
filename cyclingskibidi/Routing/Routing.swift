@@ -166,16 +166,24 @@ extension Route {
         let route = Route(name: name)
         route.mode = mode
         route.waypointData = Blob.encode(waypoints)
-        route.polylineData = Blob.encode(plan.polyline)
-        route.stepData = Blob.encode(plan.steps)
-        route.elevationData = Blob.encode(plan.elevations)
-        route.distanceMeters = plan.distance
-        route.expectedSeconds = plan.expected
-        route.ascentMeters = plan.ascent
-        route.descentMeters = plan.descent
-        route.difficulty = .rated(distanceMeters: plan.distance, ascentMeters: plan.ascent)
+        route.apply(plan)
         route.sightData = sights.isEmpty ? nil : Blob.encode(sights)
         return route
+    }
+
+    /// Write a plan's line, turns and figures onto this route. A plan with no
+    /// elevations (offline) keeps the route's existing climb data.
+    func apply(_ plan: RoutePlan) {
+        polylineData = Blob.encode(plan.polyline)
+        stepData = Blob.encode(plan.steps)
+        distanceMeters = plan.distance
+        if !plan.elevations.isEmpty {
+            elevationData = Blob.encode(plan.elevations)
+            ascentMeters = plan.ascent
+            descentMeters = plan.descent
+        }
+        expectedSeconds = Routing.duration(distance: distanceMeters, ascent: ascentMeters, mode: mode)
+        difficulty = .rated(distanceMeters: distanceMeters, ascentMeters: ascentMeters)
     }
 
     /// The mode's current-speed estimate for this route, recomputed from its
@@ -195,6 +203,14 @@ extension Routing {
                                plan: RoutePlan(), sights: [sight])
         assert(route.sights.count == 1, "a route built for saving should retain its discovered sights")
         assert(route.sights.first?.name == "Cafe", "the retained sight should round-trip its data")
+
+        // Re-planning a saved route offline (no elevations) keeps its old climb data.
+        var hilly = RoutePlan(); hilly.distance = 1000; hilly.elevations = [0, 20, 0]
+        let saved = Route.make(name: "Hill", mode: .moderate, waypoints: [], plan: hilly)
+        var flat = RoutePlan(); flat.distance = 1200; flat.polyline = [Coord(lat: 1.3, lon: 103.8)]
+        saved.apply(flat)
+        assert(saved.distanceMeters == 1200 && saved.polyline.count == 1, "re-plan must replace the line")
+        assert(saved.ascentMeters == 20 && saved.elevations == [0, 20, 0], "offline re-plan must keep old elevations")
 
         // A flat 1 km route (no ascent) at each mode's planning speed, in whole
         // seconds so the maths stays exact: 20 km/h, 18 km/h, 12.5 km/h.
