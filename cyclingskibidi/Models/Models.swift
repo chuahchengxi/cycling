@@ -42,7 +42,7 @@ struct TrackPoint: Codable, Sendable {
 }
 
 extension Array where Element == Coord {
-    var coordinates: [CLLocationCoordinate2D] { map(\.cl) }
+    nonisolated var coordinates: [CLLocationCoordinate2D] { map(\.cl) }
 }
 
 /// Codable <-> Data, so blobs are one line at the call site.

@@ -9,7 +9,7 @@
 
 import Foundation
 
-extension PCNGraph {
+nonisolated extension PCNGraph {
 
     /// On-PCN path between two graph nodes, as their vertex coords. nil if the
     /// nodes are in disconnected components.

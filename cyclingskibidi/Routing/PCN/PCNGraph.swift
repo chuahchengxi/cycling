@@ -99,10 +99,13 @@ nonisolated struct PCNGraph: Sendable {
     /// circle. Split long edges at graph build if that shows up.
     func penalised(closed: [NoGoCircle], walk: [NoGoCircle]) -> PCNGraph {
         guard !closed.isEmpty || !walk.isEmpty else { return self }
+        func inside(_ c: Coord, _ n: NoGoCircle) -> Bool {   // cheap latitude reject before the haversine
+            abs(c.lat - n.coord.lat) * Self.metresPerDegree <= n.radiusMeters && Geo.distance(c.cl, n.coord.cl) <= n.radiusMeters
+        }
         func extra(_ k: GridKey) -> Double {
-            let c = coord[k]!.cl
-            if closed.contains(where: { Geo.distance(c, $0.coord.cl) <= $0.radiusMeters }) { return Self.closedExtraMeters }
-            if walk.contains(where: { Geo.distance(c, $0.coord.cl) <= $0.radiusMeters }) { return Self.walkExtraMeters }
+            let c = coord[k]!
+            if closed.contains(where: { inside(c, $0) }) { return Self.closedExtraMeters }
+            if walk.contains(where: { inside(c, $0) }) { return Self.walkExtraMeters }
             return 0
         }
         let extras = coord.keys.reduce(into: [GridKey: Double]()) { if case let e = extra($1), e > 0 { $0[$1] = e } }

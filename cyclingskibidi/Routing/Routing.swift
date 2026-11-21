@@ -64,8 +64,10 @@ enum Routing {
         case .moderate, .leisure:
             let base = await PCNDataset.graph()
             let gapNogos = closed
+            // Penalising touches every node; keep it off the main actor like A*.
+            let graph = await Task.detached { base.penalised(closed: gapNogos, walk: walk) }.value
             let result = await PCNRouting.stitched(
-                waypoints: waypoints, graph: base.penalised(closed: closed, walk: walk), base: base, closed: closed,
+                waypoints: waypoints, graph: graph, base: base, closed: closed,
                 gap: { a, b in
                     let r = await BRouter.route([a, b], profile: BRouterConfig.gapProfile, nogos: gapNogos)
                     return r.count >= 2 ? r : [a, b]
@@ -76,8 +78,9 @@ enum Routing {
         }
 
         // Nothing came back (offline, empty graph): last-resort MapKit walking so a
-        // route still appears.
-        if poly.count < 2 {
+        // route still appears. Not for a fast route round a rider's hazard: MapKit
+        // can't avoid it, so no route beats one through the closure.
+        if poly.count < 2, mode != .fast || closures.isEmpty {
             poly = await BRouter.route(waypoints, profile: BRouterConfig.gapProfile)
             plan.offConnectorSegments = poly.isEmpty ? [] : [poly]
             plan.offConnectorMeters = Geo.cumulative(poly.coordinates).last ?? 0

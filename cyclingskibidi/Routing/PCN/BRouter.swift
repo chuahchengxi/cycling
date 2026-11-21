@@ -48,8 +48,15 @@ enum BRouter {
             URLQueryItem(name: "alternativeidx", value: "0"),
             URLQueryItem(name: "format", value: "geojson"),
         ]
-        if !nogos.isEmpty {
-            let nogoPairs = nogos
+        // Only no-gos within 2 km of the request's box; the bundled closures cover the island.
+        let pad = 2000 / PCNGraph.metresPerDegree
+        let lats = lonlats.map(\.lat), lons = lonlats.map(\.lon)
+        let near = nogos.filter {
+            $0.coord.lat >= lats.min()! - pad && $0.coord.lat <= lats.max()! + pad &&
+            $0.coord.lon >= lons.min()! - pad && $0.coord.lon <= lons.max()! + pad
+        }
+        if !near.isEmpty {
+            let nogoPairs = near
                 .map { "\($0.coord.lon),\($0.coord.lat),\(Int($0.radiusMeters.rounded()))" }
                 .joined(separator: "|")
             items.append(.init(name: "nogos", value: nogoPairs))
@@ -131,6 +138,10 @@ extension BRouter {
             .queryItems?.first(where: { $0.name == "nogos" })?.value
         assert(nogosValue == "103.805,1.305,25|103.815,1.315,40",
                "multiple nogos malformed: \(withTwoNogos.absoluteString)")
+        // No-gos far from the request are dropped so the URL stays short.
+        let farNogo = url(lonlats: [Coord(lat: 1.30, lon: 103.80), Coord(lat: 1.31, lon: 103.81)], profile: "trekking",
+                          nogos: [NoGoCircle(coord: Coord(lat: 1.45, lon: 103.80), radiusMeters: 50)])!
+        assert(!farNogo.absoluteString.contains("nogos"), "far no-go should be dropped: \(farNogo.absoluteString)")
         // A BRouter-shaped response decodes (lon,lat order preserved).
         let sample = """
         {"type":"FeatureCollection","features":[{"type":"Feature","geometry":
