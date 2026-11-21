@@ -134,7 +134,7 @@ extension Array where Element == StoredStep {
 struct Sight: Codable, Identifiable, Sendable {
     var id: UUID = UUID()
     var name: String = ""
-    /// MKPointOfInterestCategory rawValue, or "" when the search gave none.
+    /// A places.json category ("park", "hawker"…); older saves hold an MKPointOfInterestCategory rawValue.
     var category: String = ""
     var lat: Double = 0
     var lon: Double = 0

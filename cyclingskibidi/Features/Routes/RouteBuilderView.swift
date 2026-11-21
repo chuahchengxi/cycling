@@ -41,9 +41,9 @@ struct RouteBuilderView: View {
     @State private var sightsLoading = false
     @State private var selectedSight: Sight?
 
-    /// Search, so a route can start from an address instead of a lucky tap.
+    /// Search the bundled places, so a route can start from a name instead of a lucky tap.
     @State private var query = ""
-    @State private var results: [MKMapItem] = []
+    @State private var results: [Sight] = []
 
     init(mode: RideMode = .moderate, onSaved: (() -> Void)? = nil) {
         _mode = State(initialValue: mode)
@@ -68,7 +68,8 @@ struct RouteBuilderView: View {
                 }
             }
             .searchable(text: $query, prompt: "Search for a place")
-            .onSubmit(of: .search) { Task { await runSearch() } }
+            .onSubmit(of: .search, runSearch)
+            .onChange(of: query) { if query.isEmpty { results = [] } }
             .overlay(alignment: .top) { searchResults }
             .alert("Name this route", isPresented: $naming) {
                 TextField("Route name", text: $name)
@@ -128,9 +129,9 @@ struct RouteBuilderView: View {
     private var searchResults: some View {
         Group {
             if !results.isEmpty {
-                List(results, id: \.self) { item in
+                List(results) { item in
                     Button {
-                        let c = item.location.coordinate
+                        let c = item.coordinate
                         waypoints.append(Coord(c))
                         camera = .region(.init(center: c, latitudinalMeters: 1500, longitudinalMeters: 1500))
                         replan()
@@ -138,8 +139,9 @@ struct RouteBuilderView: View {
                         query = ""
                     } label: {
                         VStack(alignment: .leading) {
-                            Text(item.name ?? "Place").font(.body)
-                            Text(item.address?.fullAddress ?? "").font(.caption).foregroundStyle(.secondary)
+                            Text(item.name).font(.body)
+                            Text([Discovery.icon(for: item.category).label, item.address].filter { !$0.isEmpty }.joined(separator: " · "))
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -278,7 +280,7 @@ struct RouteBuilderView: View {
     /// Re-routes on every pin/mode change. `generation` guards two async
     /// stages — the plan itself and, for leisure, the sights search that
     /// follows it — so a superseded request can never overwrite a newer one,
-    /// even if its network call is still in flight when the next starts.
+    /// even if it is still in flight when the next starts.
     private func replan() {
         planTask?.cancel()
         generation += 1
@@ -297,8 +299,7 @@ struct RouteBuilderView: View {
                 if currentMode == .leisure, !fresh.polyline.isEmpty {
                     sights = nil
                     sightsLoading = true
-                    let found = await Discovery.sights(along: fresh.polyline)
-                    guard gen == generation else { return }
+                    let found = Discovery.sights(along: fresh.polyline)
                     sights = found
                     sightsLoading = false
                 }
@@ -319,12 +320,9 @@ struct RouteBuilderView: View {
         (onSaved ?? { dismiss() })()
     }
 
-    private func runSearch() async {
-        guard !query.isEmpty else { results = []; return }
-        let request = MKLocalSearch.Request()
-        request.naturalLanguageQuery = query
-        if let region = camera.region { request.region = region }
-        results = (try? await MKLocalSearch(request: request).start())?.mapItems ?? []
+    private func runSearch() {
+        let centre = (mapRegion ?? camera.region)?.center ?? .init(latitude: 1.3521, longitude: 103.8198)
+        results = Discovery.search(query, near: centre)
     }
 }
 

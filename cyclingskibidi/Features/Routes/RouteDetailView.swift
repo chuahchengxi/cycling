@@ -23,11 +23,11 @@ struct RouteDetailView: View {
     @State private var startPending = false
     @State private var detent: PresentationDetent = .fraction(0.28)
     @State private var camera: MapCameraPosition = .automatic
-    /// Bundled closures this route crosses — checked when the route is opened.
+    /// Bundled closures and the rider's own closed marks this route rides — checked when opened.
     @State private var closureHits: (active: [Closure], expired: [Closure]) = ([], [])
     @State private var replanning = false
     @State private var confirmClosedStart = false
-    /// The last re-plan still crossed a closure (offline, or no way round).
+    /// The last re-plan still crossed a closure (no way round).
     @State private var replanFailed = false
 
     private var blockingClosures: [Closure] { closureHits.active.filter { $0.kind == .closure } }
@@ -85,7 +85,7 @@ struct RouteDetailView: View {
             // Leisure routes gather the sights along the line once, then reuse
             // them on every open and during the ride.
             guard route.mode == .leisure, route.sights.isEmpty, route.polyline.count > 1 else { return }
-            let found = await Discovery.sights(along: route.polyline)
+            let found = Discovery.sights(along: route.polyline)
             guard !found.isEmpty else { return }
             route.sightData = Blob.encode(found)
             try? context.save()
@@ -126,7 +126,7 @@ struct RouteDetailView: View {
     }
 
     private func checkClosures() {
-        closureHits = Closures.hits(route.polyline, in: Closures.bundled(), on: Closures.now)
+        closureHits = Closures.hits(route.polyline, in: Closures.bundled() + Closures.marked, on: Closures.now)
     }
 
     /// Re-plan the saved route through its waypoints; routing now bends round active closures.
@@ -136,8 +136,10 @@ struct RouteDetailView: View {
         Task {
             defer { replanning = false }
             if let plan = try? await Routing.plan(through: route.waypoints, mode: route.mode), plan.polyline.count > 1 {
-                route.apply(plan)
-                route.sightData = nil
+                route.apply(plan)   // new line, turns and climb chart together
+                // Sights follow the new line: found afresh for Leisure, offline.
+                let sights = route.mode == .leisure ? Discovery.sights(along: route.polyline) : route.sights
+                route.sightData = sights.isEmpty ? nil : Blob.encode(sights)
                 try? context.save()
                 checkClosures()
                 frameRoute()

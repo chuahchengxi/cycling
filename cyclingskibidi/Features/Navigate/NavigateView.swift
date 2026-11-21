@@ -61,6 +61,9 @@ struct NavigateView: View {
                     if let failure = recorder.rerouteFailure {
                         RerouteFailureBanner(message: failure) { recorder.dismissRerouteFailure() }
                     }
+                    if let hazard = recorder.nearHazard {
+                        HazardBanner(alert: hazard).transition(.move(edge: .top).combined(with: .opacity))
+                    }
                 }
                 .padding(.horizontal, 12)
             }
@@ -71,9 +74,12 @@ struct NavigateView: View {
             .overlay(alignment: .bottom) { if placing { placementBar } }
             .animation(.default, value: recorder.passingSight?.id)
             .animation(.default, value: placing)
+            .animation(.default, value: recorder.nearHazard == nil)
             .ignoresSafeArea(edges: .bottom)
         }
         .onAppear(perform: begin)
+        // Every marked hazard warns on approach, whatever route is being ridden.
+        .onChange(of: obstacles, initial: true) { recorder.hazards = obstacles }
         .sheet(isPresented: $showSheet) {
             navSheet
                 .presentationDetents([.height(150), .fraction(0.45), .large], selection: $detent)
@@ -381,6 +387,31 @@ struct RerouteFailureBanner: View {
     }
 }
 
+/// A marked hazard close by: what it is, how far, and the rider's note.
+struct HazardBanner: View {
+    let alert: HazardAlert
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: alert.kind.symbol).font(.title2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(alert.kind.rawValue) · \(Fmt.km(alert.distance))").font(.headline)
+                if !alert.note.isEmpty {
+                    Text(alert.note).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .foregroundStyle(Color.orange)
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.regularMaterial, in: .rect(cornerRadius: 18))
+        .shadow(radius: 8, y: 2)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Caution: \(alert.kind.rawValue), \(Fmt.km(alert.distance)) away. \(alert.note)")
+    }
+}
+
 // MARK: - Bits
 
 struct CircleButton: View {
@@ -422,8 +453,8 @@ private struct PendingObstacle: Identifiable {
     let coordinate: CLLocationCoordinate2D
 }
 
-/// Mark an obstacle for the offline Challenge experience and keep it on this
-/// device for later route briefs and rides.
+/// Mark an obstacle and keep it on this device: it warns on every later ride,
+/// and a "Path closed" mark is avoided by every route from now on.
 struct ObstacleReportView: View {
     let coordinate: CLLocationCoordinate2D?
     /// Fired after persisting a `.closed` obstacle, so the live ride can

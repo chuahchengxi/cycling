@@ -8,6 +8,12 @@
 
 import Foundation
 
+/// An exclusion circle: no route may ride within `radiusMeters` of `coord`.
+nonisolated struct NoGoCircle: Sendable {
+    var coord: Coord
+    var radiusMeters: Double
+}
+
 nonisolated struct Closure: Codable, Sendable, Identifiable {
     struct Circle: Codable, Sendable { var lat, lon, radiusM: Double; var coordSource: String }
     enum Kind: String, Codable, Sendable { case closure; case noCycling = "no_cycling" }
@@ -76,6 +82,19 @@ nonisolated enum Closures {
         return decode(data)
     }()
     static func bundled() -> [Closure] { cached }
+
+    /// The rider's own "Path closed" marks, kept in step with the store by
+    /// ContentView. Every plan avoids them and every saved route is checked
+    /// against them, so a mark is never forgotten on the next route.
+    @MainActor static var marked: [Closure] = []
+    static let markedRadius: Double = 40
+
+    /// A rider's mark as a one-circle, open-ended closure.
+    static func marked(id: String, lat: Double, lon: Double, note: String) -> Closure {
+        Closure(id: "marked-\(id)", name: "Path you marked closed",
+                circles: [Closure.Circle(lat: lat, lon: lon, radiusM: markedRadius, coordSource: "rider")],
+                starts: nil, validUntil: nil, note: note, sourceUrl: "", kind: .closure)
+    }
 
     /// Now, or in DEBUG the `-closuresDate yyyy-MM-dd` launch argument.
     static var now: Date {
@@ -169,5 +188,10 @@ extension Closures {
             assert(after.expired.contains { $0.id == bedok.id } && !after.active.contains { $0.id == bedok.id },
                    "Bedok closure should read as expired in 2027")
         } else { assertionFailure("bedok-pc-laguna88 missing") }
+        // A rider's mark warns on a saved route that rides past it, and never expires.
+        let mark = marked(id: "t", lat: 1.35, lon: 103.8, note: "")
+        assert(hits(along, in: [mark], on: day("2040-01-01", 12)).active.count == 1, "a marked closure must warn")
+        assert(hits(across.map { Coord(lat: $0.lat, lon: $0.lon + 0.01) }, in: [mark], on: .now).active.isEmpty,
+               "a mark 1 km away must not warn")
     }
 }

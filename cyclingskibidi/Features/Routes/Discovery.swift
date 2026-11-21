@@ -2,50 +2,32 @@
 //  Discovery.swift
 //  cyclingskibidi
 //
-//  Leisure landmark discovery: Apple Maps POI around the map, filtered to
-//  interesting categories, plus a free-text taste query. Pure query building is
-//  separated from the view so it can be self-checked without the network.
+//  Leisure sights and place search, both from the bundled places.json (named
+//  OpenStreetMap places in Singapore, see scripts/places/build.py) — offline.
 //
 
 import SwiftUI
 import MapKit
 
 enum Discovery {
-    static let leisureCategories: [MKPointOfInterestCategory] = [
-        .park, .nationalPark, .beach, .museum, .aquarium, .zoo, .amusementPark,
-        .cafe, .restaurant, .marina, .stadium, .library,
+    /// Categories that count as a Leisure sight; stations and malls are for search only.
+    static let leisureCategories: Set<String> = [
+        "park", "nationalPark", "beach", "museum", "aquarium", "zoo", "amusementPark", "cafe",
+        "marina", "stadium", "library", "attraction", "viewpoint", "hawker", "worship",
     ]
 
-    /// A local-search request bounded to the visible region, for the user's
-    /// typed taste query. MKLocalSearch.Request is a text-search API: it ANDs
-    /// `naturalLanguageQuery` against the filter, so this only makes sense once
-    /// there's real text to match against POI names.
-    static func request(tastes: String, in region: MKCoordinateRegion) -> MKLocalSearch.Request {
-        let trimmed = tastes.trimmingCharacters(in: .whitespacesAndNewlines)
-        let request = MKLocalSearch.Request()
-        request.region = region
-        request.resultTypes = .pointOfInterest
-        request.pointOfInterestFilter = MKPointOfInterestFilter(including: leisureCategories)
-        request.naturalLanguageQuery = trimmed.isEmpty ? nil : trimmed
-        return request
-    }
-
-    /// A points-of-interest request bounded to the region, for the automatic
-    /// corridor sweep (no typed text). MKLocalSearch.Request has no "browse by
-    /// category" mode — leaving `naturalLanguageQuery` nil doesn't relax it to
-    /// filter-only, it just has nothing to match and returns zero results every
-    /// time. MKLocalPointsOfInterestRequest is the separate API Apple built for
-    /// exactly this: region + category filter, no query text.
-    static func pointsOfInterestRequest(in region: MKCoordinateRegion) -> MKLocalPointsOfInterestRequest {
-        let request = MKLocalPointsOfInterestRequest(coordinateRegion: region)
-        request.pointOfInterestFilter = MKPointOfInterestFilter(including: leisureCategories)
-        return request
-    }
+    /// Every bundled place, decoded once.
+    static let places: [Sight] = {
+        struct P: Decodable { let name, category: String; let lat, lon: Double; let address: String }
+        guard let url = Bundle.main.url(forResource: "places", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let list = try? JSONDecoder().decode([P].self, from: data) else { return [] }
+        return list.map { Sight(name: $0.name, category: $0.category, lat: $0.lat, lon: $0.lon, address: $0.address) }
+    }()
 
     /// Pure corridor filter: keep only candidates within `corridor` metres of the
     /// line, stamp each with how far along the route it sits, drop duplicates
-    /// (same name at the same spot), and order by that distance. Split out from
-    /// the network so it can be self-checked.
+    /// (same name at the same spot), and order by that distance.
     static func sightsAlong(_ candidates: [Sight], polyline: [CLLocationCoordinate2D],
                             cumulative: [Double], corridor: Double = 150) -> [Sight] {
         guard polyline.count >= 2 else { return [] }
@@ -63,89 +45,111 @@ enum Discovery {
         return kept.sorted { $0.offsetAlong < $1.offsetAlong }
     }
 
-    /// Leisure POIs within a corridor of the route line. Samples the line into a
-    /// few regions, runs the leisure search in each, and keeps what lands near
-    /// the line. Network; call off the main actor.
-    /// ponytail: ~6 sample regions, ~20 sights kept. Raise if long leisure
-    /// routes come back sparse.
-    static func sights(along polyline: [Coord]) async -> [Sight] {
-        let coords = polyline.map(\.cl)
-        guard coords.count >= 2 else { return [] }
-        let cumulative = Geo.cumulative(coords)
-        let total = cumulative.last ?? 0
-        guard total > 0 else { return [] }
-
-        let samples = min(6, max(2, Int(total / 2000) + 1))
-        var candidates: [Sight] = []
-        for i in 0..<samples {
-            let along = total * Double(i) / Double(samples - 1)
-            guard let center = Geo.point(at: along, on: coords, cumulative: cumulative) else { continue }
-            let region = MKCoordinateRegion(center: center, latitudinalMeters: 2500, longitudinalMeters: 2500)
-            guard let items = try? await MKLocalSearch(request: pointsOfInterestRequest(in: region)).start().mapItems
-            else { continue }
-            for item in items {
-                candidates.append(Sight(
-                    name: item.name ?? "",
-                    category: item.pointOfInterestCategory?.rawValue ?? "",
-                    lat: item.location.coordinate.latitude,
-                    lon: item.location.coordinate.longitude,
-                    address: item.address?.fullAddress ?? "",
-                    phone: item.phoneNumber ?? "",
-                    url: item.url?.absoluteString ?? ""))
-            }
-        }
-        return Array(sightsAlong(candidates, polyline: coords, cumulative: cumulative).prefix(20))
+    /// Leisure places within a corridor of the route line, first 20 along it.
+    /// ponytail: 20 kept, ordered by offset; spread them along the route if long
+    /// leisure rides end up with every sight in the first few km.
+    static func sights(along polyline: [Coord], in places: [Sight] = Discovery.places) -> [Sight] {
+        // A thinned line is plenty for a 150 m corridor and keeps the snap cheap.
+        let coords = Geo.sample(polyline.map(\.cl), count: 400)
+        guard coords.count >= 2, let box = box(coords, pad: 150) else { return [] }
+        let candidates = places.filter { leisureCategories.contains($0.category) && box($0) }
+        return Array(sightsAlong(candidates, polyline: coords, cumulative: Geo.cumulative(coords)).prefix(20))
     }
 
-    /// A display symbol and label for a stored category rawValue.
+    /// Places whose name or category matches every word of `query`, nearest `center` first.
+    /// `leisureOnly` limits it to sights (the taste panel); place search uses everything.
+    static func search(_ query: String, near center: CLLocationCoordinate2D, within metres: Double = .infinity,
+                       leisureOnly: Bool = false, in places: [Sight] = Discovery.places, limit: Int = 20) -> [Sight] {
+        let words = query.lowercased().split { !$0.isLetter && !$0.isNumber }.map { w in
+            w.count > 3 && w.hasSuffix("s") ? String(w.dropLast()) : String(w)   // "temples" finds "temple"
+        }
+        let fold = { (s: String) in s.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil) }
+        return places
+            .filter { p in
+                guard !leisureOnly || leisureCategories.contains(p.category) else { return false }
+                let hay = fold(p.name + " " + icon(for: p.category).label + " " + keywords(p.category))
+                return words.allSatisfy { hay.contains(fold($0)) }
+            }
+            .map { ($0, Geo.distance(center, $0.coordinate)) }
+            .filter { $0.1 <= metres }
+            .sorted { $0.1 < $1.1 }
+            .prefix(limit).map(\.0)
+    }
+
+    /// Lat/lon box round a line, padded by `pad` metres.
+    private static func box(_ line: [CLLocationCoordinate2D], pad: Double) -> ((Sight) -> Bool)? {
+        guard let la0 = line.map(\.latitude).min(), let la1 = line.map(\.latitude).max(),
+              let lo0 = line.map(\.longitude).min(), let lo1 = line.map(\.longitude).max() else { return nil }
+        let p = pad / PCNGraph.metresPerDegree
+        return { (la0 - p...la1 + p).contains($0.lat) && (lo0 - p...lo1 + p).contains($0.lon) }
+    }
+
+    /// Extra words a category answers to, beyond its label.
+    private static func keywords(_ category: String) -> String {
+        switch category {
+        case "worship": return "temple church mosque"
+        case "hawker":  return "food court"
+        case "cafe":    return "coffee"
+        case "station": return "mrt lrt"
+        default:        return ""
+        }
+    }
+
+    /// A display symbol and label for a stored category (places.json, or an old MapKit rawValue).
     static func icon(for category: String) -> (symbol: String, label: String) {
-        switch category.isEmpty ? nil : MKPointOfInterestCategory(rawValue: category) {
-        case .park, .nationalPark: return ("tree.fill", "Park")
-        case .beach:               return ("beach.umbrella.fill", "Beach")
-        case .museum:              return ("building.columns.fill", "Museum")
-        case .aquarium:            return ("fish.fill", "Aquarium")
-        case .zoo:                 return ("pawprint.fill", "Zoo")
-        case .amusementPark:       return ("sparkles", "Amusement park")
-        case .cafe:                return ("cup.and.saucer.fill", "Café")
-        case .restaurant:          return ("fork.knife", "Restaurant")
-        case .marina:              return ("sailboat.fill", "Marina")
-        case .stadium:             return ("sportscourt.fill", "Stadium")
-        case .library:             return ("books.vertical.fill", "Library")
-        default:                   return ("mappin.and.ellipse", "Point of interest")
+        var key = category
+        if key.hasPrefix("MKPOICategory") { key = String(key.dropFirst(13)); key = key.prefix(1).lowercased() + key.dropFirst() }
+        switch key {
+        case "park", "nationalPark": return ("tree.fill", "Park")
+        case "beach":               return ("beach.umbrella.fill", "Beach")
+        case "museum":              return ("building.columns.fill", "Museum")
+        case "aquarium":            return ("fish.fill", "Aquarium")
+        case "zoo":                 return ("pawprint.fill", "Zoo")
+        case "amusementPark":       return ("sparkles", "Amusement park")
+        case "cafe":                return ("cup.and.saucer.fill", "Café")
+        case "restaurant":          return ("fork.knife", "Restaurant")
+        case "hawker":              return ("fork.knife", "Hawker centre")
+        case "marina":              return ("sailboat.fill", "Marina")
+        case "stadium":             return ("sportscourt.fill", "Stadium")
+        case "library":             return ("books.vertical.fill", "Library")
+        case "attraction":          return ("star.fill", "Attraction")
+        case "viewpoint":           return ("binoculars.fill", "Viewpoint")
+        case "worship":             return ("building.fill", "Place of worship")
+        case "station":             return ("tram.fill", "Station")
+        case "mall":                return ("bag.fill", "Mall")
+        default:                    return ("mappin.and.ellipse", "Point of interest")
         }
     }
 
     static func selfCheck() {
-        let region = MKCoordinateRegion(center: .init(latitude: 1.30, longitude: 103.80),
-                                        latitudinalMeters: 2000, longitudinalMeters: 2000)
-        let typed = request(tastes: "  hawker, temples ", in: region)
-        assert(typed.naturalLanguageQuery == "hawker, temples", "tastes should be trimmed, not blanked")
-        let empty = request(tastes: "   ", in: region)
-        assert(empty.naturalLanguageQuery == nil, "empty tastes must not set a query MapKit will AND against the filter")
-        assert(empty.resultTypes == .pointOfInterest)
-
-        // Automatic corridor sweep: MKLocalPointsOfInterestRequest, not
-        // MKLocalSearch.Request — the latter has no query-free browse mode, it
-        // just returns nothing when naturalLanguageQuery is nil.
-        let poi = pointsOfInterestRequest(in: region)
-        assert(poi.pointOfInterestFilter == MKPointOfInterestFilter(including: leisureCategories),
-               "corridor sweep still relies on the leisure category filter")
-        assert(abs(poi.coordinate.latitude - region.center.latitude) < 0.0001,
-               "sweep request centered on the sample region")
-
+        assert(places.count > 1000, "places.json missing from the bundle: \(places.count)")
         // Corridor filter: a short west→east line; a point ~90 m off it is kept
         // and stamped with its offset, one ~2 km off is dropped, and a duplicate
         // at the same spot collapses.
         let line = [CLLocationCoordinate2D(latitude: 1.30, longitude: 103.80),
                     CLLocationCoordinate2D(latitude: 1.30, longitude: 103.81)]
         let cum = Geo.cumulative(line)
-        let near = Sight(name: "Park", lat: 1.3008, lon: 103.805)
-        let far  = Sight(name: "Mall", lat: 1.320, lon: 103.805)
-        let dupe = Sight(name: "Park", lat: 1.3008, lon: 103.805)
+        let near = Sight(name: "Park", category: "park", lat: 1.3008, lon: 103.805)
+        let far  = Sight(name: "Mall", category: "park", lat: 1.320, lon: 103.805)
+        let dupe = Sight(name: "Park", category: "park", lat: 1.3008, lon: 103.805)
         let out = sightsAlong([far, near, dupe], polyline: line, cumulative: cum)
         assert(out.count == 1, "far dropped, dup collapsed: \(out.count)")
         assert(out.first?.name == "Park", "kept the near one")
         assert(out.first.map { $0.offsetAlong > 0 } == true, "offset stamped from the line")
+        // Corridor sweep over a given list: only leisure categories near the line.
+        let station = Sight(name: "Somewhere MRT", category: "station", lat: 1.3002, lon: 103.805)
+        let found = sights(along: line.map { Coord($0) }, in: [far, near, station])
+        assert(found.map(\.name) == ["Park"], "sweep must keep near leisure places only: \(found.map(\.name))")
+        // Search: every word must match, plurals and keywords count, nearest first.
+        let temple = Sight(name: "Thian Hock Keng", category: "worship", lat: 1.281, lon: 103.847)
+        let cafe = Sight(name: "Café Kopi", category: "cafe", lat: 1.30, lon: 103.80)
+        let hits = search("temples", near: line[0], in: [temple, cafe, station])
+        assert(hits.map(\.name) == ["Thian Hock Keng"], "keyword search wrong: \(hits.map(\.name))")
+        assert(search("cafe kopi", near: line[0], in: [temple, cafe]).first?.name == "Café Kopi", "diacritics must fold")
+        assert(search("mrt", near: line[0], leisureOnly: true, in: [station]).isEmpty, "stations aren't sights")
+        assert(icon(for: "MKPOICategoryPark").label == "Park", "old MapKit categories must still map")
+        // Real data: the bundle knows Gardens by the Bay.
+        assert(!search("gardens by the bay", near: line[0]).isEmpty, "Gardens by the Bay missing from places.json")
     }
 }
 
@@ -154,8 +158,7 @@ struct DiscoveryPanel: View {
     let onPick: (CLLocationCoordinate2D) -> Void
 
     @AppStorage("leisureTastes") private var tastes = ""
-    @State private var results: [MKMapItem] = []
-    @State private var searching = false
+    @State private var results: [Sight] = []
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -163,19 +166,18 @@ struct DiscoveryPanel: View {
                 Image(systemName: "leaf.fill").foregroundStyle(.green)
                 TextField("What do you feel like? (hawker, temples…)", text: $tastes)
                     .textFieldStyle(.roundedBorder)
-                    .onSubmit { Task { await search() } }
-                Button { Task { await search() } } label: { Image(systemName: "magnifyingglass") }
+                    .onSubmit(search)
+                Button(action: search) { Image(systemName: "magnifyingglass") }
+                    .accessibilityLabel("Search places")
             }
-            if searching {
-                ProgressView().frame(maxWidth: .infinity)
-            } else if !results.isEmpty {
+            if !results.isEmpty {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
-                        ForEach(results, id: \.self) { item in
+                        ForEach(results) { place in
                             Button {
-                                onPick(item.location.coordinate)
+                                onPick(place.coordinate)
                             } label: {
-                                Text(item.name ?? "Place")
+                                Text(place.name)
                                     .font(.footnote.weight(.medium))
                                     .lineLimit(1)
                                     .padding(.horizontal, 12).padding(.vertical, 8)
@@ -187,14 +189,13 @@ struct DiscoveryPanel: View {
                 }
             }
         }
-        .task { await search() }   // auto-search on first show
+        .onAppear(perform: search)   // auto-search on first show
     }
 
-    private func search() async {
-        searching = true
-        defer { searching = false }
-        let response = try? await MKLocalSearch(request: Discovery.request(tastes: tastes, in: region)).start()
-        results = response?.mapItems ?? []
+    /// Leisure places on screen, matching the tastes typed (all of them when blank).
+    private func search() {
+        let radius = max(region.span.latitudeDelta, region.span.longitudeDelta) * PCNGraph.metresPerDegree / 2
+        results = Discovery.search(tastes, near: region.center, within: max(radius, 1000), leisureOnly: true)
     }
 }
 
@@ -213,20 +214,14 @@ struct SightBadge: View {
     }
 }
 
-/// The "what it's about" content, from MapKit only: a Look Around preview when
-/// one exists, the category, the address, and quick actions. Shared by the
-/// pre-ride list sheet and the pass-by card.
+/// The "what it's about" content, all from the bundled data: the category, the
+/// address, and a call button when a number is known. Shared by the pre-ride
+/// list sheet and the pass-by card.
 struct SightDetail: View {
     let sight: Sight
-    @State private var scene: MKLookAroundScene?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if let scene {
-                LookAroundPreview(initialScene: scene)
-                    .frame(height: 180)
-                    .clipShape(.rect(cornerRadius: 16))
-            }
             let icon = Discovery.icon(for: sight.category)
             Label(icon.label, systemImage: icon.symbol)
                 .font(.subheadline.weight(.semibold))
@@ -234,32 +229,17 @@ struct SightDetail: View {
             if !sight.address.isEmpty {
                 Text(sight.address).font(.body)
             }
-            HStack(spacing: 10) {
-                if let url = URL(string: sight.url), !sight.url.isEmpty {
-                    Link(destination: url) { Label("Website", systemImage: "safari") }
-                }
-                if let tel = telURL {
-                    Link(destination: tel) { Label("Call", systemImage: "phone") }
-                }
-                Button { openInMaps() } label: { Label("Maps", systemImage: "map") }
+            if let tel = telURL {
+                Link(destination: tel) { Label("Call", systemImage: "phone") }
+                    .font(.subheadline)
+                    .buttonStyle(.bordered)
             }
-            .font(.subheadline)
-            .buttonStyle(.bordered)
-        }
-        .task(id: sight.id) {
-            scene = try? await MKLookAroundSceneRequest(coordinate: sight.coordinate).scene
         }
     }
 
     private var telURL: URL? {
         let digits = sight.phone.filter { $0.isNumber || $0 == "+" }
         return digits.isEmpty ? nil : URL(string: "tel://\(digits)")
-    }
-
-    private func openInMaps() {
-        let item = MKMapItem(location: CLLocation(latitude: sight.lat, longitude: sight.lon), address: nil)
-        item.name = sight.name
-        item.openInMaps()
     }
 }
 

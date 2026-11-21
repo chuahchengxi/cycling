@@ -2,8 +2,7 @@
 //  GeoJSON.swift
 //  cyclingskibidi
 //
-//  Turning a GeoJSON FeatureCollection into connector polylines. Shared by the
-//  bundled PCN dataset and the BRouter response — both hand back the same shape.
+//  Turning the bundled PCN GeoJSON FeatureCollection into connector polylines.
 //  GeoJSON positions are [longitude, latitude, (elevation)] — never lat first.
 //
 

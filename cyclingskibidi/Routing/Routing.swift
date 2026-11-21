@@ -2,9 +2,9 @@
 //  Routing.swift
 //  cyclingskibidi
 //
-//  PCN-graph + BRouter routing through the rider's waypoints, with a MapKit
-//  walking fallback, plus the elevation profile that feeds the climb figures
-//  and the graph on the route sheet.
+//  Offline routing through the rider's waypoints on the bundled PCN graph, plus
+//  the elevation profile (bundled grid) that feeds the climb figures and the
+//  graph on the route sheet.
 //
 
 import Foundation
@@ -38,96 +38,47 @@ enum Routing {
         (distance + ascent * 10) / (mode.planningSpeedKmh * 1000 / 3600)
     }
 
-    /// Assemble a ride through the rider's waypoints.
+    /// Assemble a ride through the rider's waypoints, entirely offline.
     ///
-    /// Fast mode is one BRouter call over the whole line, roads allowed.
-    /// Moderate/leisure stitch the on-PCN A* stretches with BRouter-routed
-    /// gaps at the start/end/holes and round closures — see `PCNRouting.stitched`.
-    /// `closures` are the rider's own marked hazards, added to the bundled ones.
+    /// Every mode stitches on-PCN A* stretches with straight off-connector legs
+    /// at the start/end/holes and round closures — see `PCNRouting.stitched`.
+    /// Modes differ only in planning speed: there's no road graph on the device.
+    /// Bundled closures and every "Path closed" the rider has marked are always
+    /// avoided; `closures` adds any not yet saved (a mark made a moment ago).
     static func plan(through waypoints: [Coord],
                      mode: RideMode = .moderate,
-                     fetchElevation: Bool = true,
                      closures: [NoGoCircle] = []) async throws -> RoutePlan {
         guard waypoints.count >= 2 else { return RoutePlan() }
 
         var plan = RoutePlan()
-        var poly: [Coord]
-
-        // Bundled closures plus the rider's own hazards. Moderate/leisure route round
-        // them on the PCN graph offline; fast keeps BRouter's no-gos until plan 6.
         var (closed, walk) = Closures.activeCircles()
-        closed += closures
-        switch mode {
-        case .fast:
-            // Quickest cycling route, roads allowed — one BRouter call, no PCN.
-            poly = await BRouter.route(waypoints, profile: BRouterConfig.fastProfile, nogos: closed)
-        case .moderate, .leisure:
-            let base = await PCNDataset.graph()
-            let gapNogos = closed
-            // Penalising touches every node; keep it off the main actor like A*.
-            let graph = await Task.detached { base.penalised(closed: gapNogos, walk: walk) }.value
-            let result = await PCNRouting.stitched(
-                waypoints: waypoints, graph: graph, base: base, closed: closed,
-                gap: { a, b in
-                    let r = await BRouter.route([a, b], profile: BRouterConfig.gapProfile, nogos: gapNogos)
-                    return r.count >= 2 ? r : [a, b]
-                })
-            poly = result.poly
-            plan.offConnectorSegments = result.offSegments
-            plan.offConnectorMeters = result.offMeters
-        }
+        closed += Closures.marked.flatMap(\.noGoCircles) + closures
+        let base = await PCNDataset.graph()
+        // Penalising touches every node; keep it off the main actor like A*.
+        let graph = await Task.detached { [closed, walk] in base.penalised(closed: closed, walk: walk) }.value
+        let result = await PCNRouting.stitched(waypoints: waypoints, graph: graph, base: base,
+                                               closed: closed, gap: { [$0, $1] })
+        var poly = result.poly
+        plan.offConnectorSegments = result.offSegments
+        plan.offConnectorMeters = result.offMeters
 
-        // Nothing came back (offline, empty graph): last-resort MapKit walking so a
-        // route still appears. Not for a fast route round a rider's hazard: MapKit
-        // can't avoid it, so no route beats one through the closure.
-        if poly.count < 2, mode != .fast || closures.isEmpty {
-            poly = await BRouter.route(waypoints, profile: BRouterConfig.gapProfile)
-            plan.offConnectorSegments = poly.isEmpty ? [] : [poly]
+        // Empty graph: straight legs between the pins, all off-connector, so a route still appears.
+        if poly.count < 2 {
+            poly = waypoints
+            plan.offConnectorSegments = [poly]
             plan.offConnectorMeters = Geo.cumulative(poly.coordinates).last ?? 0
         }
-        guard poly.count >= 2 else { return plan }
 
         let cl = poly.coordinates
-        let cum = Geo.cumulative(cl)
-        plan.distance = cum.last ?? 0
+        plan.distance = Geo.cumulative(cl).last ?? 0
         plan.steps = PCNRouting.steps(from: poly)
-
-        if fetchElevation {
-            plan.elevations = await elevations(along: cl)
-        }
+        plan.elevations = Elevation.profile(along: cl)
         plan.expected = duration(distance: plan.distance, ascent: plan.ascent, mode: mode)
         plan.polyline = zip(cl, plan.elevations.isEmpty ? [] : resample(plan.elevations, to: cl.count))
             .map { Coord($0.0, alt: $0.1) }
         if plan.polyline.isEmpty { plan.polyline = poly }
         return plan
     }
-
-    // MARK: - Elevation
-
-    /// Open-Meteo's elevation endpoint: no key, no billing, 100 points a call.
-    /// Returns [] on any failure — a missing profile flattens the graph, it does
-    /// not break the ride.
-    static func elevations(along poly: [CLLocationCoordinate2D], samples: Int = 300) async -> [Double] {
-        let points = Geo.sample(poly, count: min(samples, max(poly.count, 2)))
-        guard points.count >= 2 else { return [] }
-
-        var out: [Double] = []
-        for chunk in points.chunked(into: 100) {
-            let lats = chunk.map { String(format: "%.5f", $0.latitude) }.joined(separator: ",")
-            let lons = chunk.map { String(format: "%.5f", $0.longitude) }.joined(separator: ",")
-            guard let url = URL(string: "https://api.open-meteo.com/v1/elevation?latitude=\(lats)&longitude=\(lons)") else { return [] }
-            do {
-                let (data, _) = try await URLSession.shared.data(from: url)
-                let decoded = try JSONDecoder().decode(ElevationResponse.self, from: data)
-                out.append(contentsOf: decoded.elevation)
-            } catch {
-                return []
-            }
-        }
-        return out
-    }
-
-    private struct ElevationResponse: Decodable { let elevation: [Double] }
 
     /// Stretch a short profile back over every vertex, linearly.
     static func resample(_ values: [Double], to count: Int) -> [Double] {
@@ -156,10 +107,6 @@ extension MKPolyline {
 
 extension Array {
     subscript(safe i: Int) -> Element? { indices.contains(i) ? self[i] : nil }
-
-    func chunked(into size: Int) -> [[Element]] {
-        stride(from: 0, to: count, by: size).map { Array(self[$0..<Swift.min($0 + size, count)]) }
-    }
 }
 
 extension Route {
@@ -174,17 +121,15 @@ extension Route {
         return route
     }
 
-    /// Write a plan's line, turns and figures onto this route. A plan with no
-    /// elevations (offline) keeps the route's existing climb data.
+    /// Write a plan's line, turns and figures onto this route. The climb data
+    /// always follows the new line, never the old one.
     func apply(_ plan: RoutePlan) {
         polylineData = Blob.encode(plan.polyline)
         stepData = Blob.encode(plan.steps)
         distanceMeters = plan.distance
-        if !plan.elevations.isEmpty {
-            elevationData = Blob.encode(plan.elevations)
-            ascentMeters = plan.ascent
-            descentMeters = plan.descent
-        }
+        elevationData = Blob.encode(plan.elevations)
+        ascentMeters = plan.ascent
+        descentMeters = plan.descent
         expectedSeconds = Routing.duration(distance: distanceMeters, ascent: ascentMeters, mode: mode)
         difficulty = .rated(distanceMeters: distanceMeters, ascentMeters: ascentMeters)
     }
@@ -207,13 +152,13 @@ extension Routing {
         assert(route.sights.count == 1, "a route built for saving should retain its discovered sights")
         assert(route.sights.first?.name == "Cafe", "the retained sight should round-trip its data")
 
-        // Re-planning a saved route offline (no elevations) keeps its old climb data.
+        // Re-planning a saved route replaces its climb data with the new line's.
         var hilly = RoutePlan(); hilly.distance = 1000; hilly.elevations = [0, 20, 0]
         let saved = Route.make(name: "Hill", mode: .moderate, waypoints: [], plan: hilly)
-        var flat = RoutePlan(); flat.distance = 1200; flat.polyline = [Coord(lat: 1.3, lon: 103.8)]
+        var flat = RoutePlan(); flat.distance = 1200; flat.polyline = [Coord(lat: 1.3, lon: 103.8)]; flat.elevations = [5, 15, 5]
         saved.apply(flat)
         assert(saved.distanceMeters == 1200 && saved.polyline.count == 1, "re-plan must replace the line")
-        assert(saved.ascentMeters == 20 && saved.elevations == [0, 20, 0], "offline re-plan must keep old elevations")
+        assert(saved.ascentMeters == 10 && saved.elevations == [5, 15, 5], "re-plan kept the old climb chart: \(saved.elevations)")
 
         // A flat 1 km route (no ascent) at each mode's planning speed, in whole
         // seconds so the maths stays exact: 20 km/h, 18 km/h, 12.5 km/h.

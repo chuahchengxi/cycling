@@ -4,7 +4,7 @@
 //
 //  Assembling a ride: snap the rider's points to the connector network, run A*
 //  for the on-PCN stretches, and route the unavoidable gaps (start/end/holes)
-//  with the injected gap router — walkable paths first, roads only when forced.
+//  with the injected gap leg (a straight off-connector line in the app).
 //  Off-connector stretches are tracked so the builder can flag them.
 //
 
@@ -139,7 +139,7 @@ enum PCNRouting {
 
 extension PCNRouting {
     static func selfCheck() async {
-        // Stitch with a straight-line gap stub (no network). Start 30 m south of
+        // Stitch with a straight-line gap stub. Start 30 m south of
         // the fixture's west end, end exactly on the north node.
         let g = PCNGraph.fixture()
         let start = Coord(lat: 1.30 - 30 / PCNGraph.metresPerDegree, lon: 103.800)

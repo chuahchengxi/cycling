@@ -152,11 +152,9 @@ struct SheetView: View {
                 .disabled(replanning)
             }
             ForEach(closures.expired) { c in
-                Link(destination: URL(string: c.sourceUrl) ?? URL(string: "https://pcn.nparks.gov.sg/notices")!) {
-                    Label("\(c.name): was closed until \(c.untilText ?? "recently"), check status",
-                          systemImage: "clock.arrow.circlepath")
-                        .font(.subheadline)
-                }
+                Label("\(c.name): was closed until \(c.untilText ?? "recently")", systemImage: "clock.arrow.circlepath")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
         }
     }

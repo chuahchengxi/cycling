@@ -227,6 +227,11 @@ final class Obstacle {
 
     var kind: ObstacleKind { ObstacleKind(rawValue: kindRaw) ?? .pothole }
     var coordinate: CLLocationCoordinate2D { .init(latitude: latitude, longitude: longitude) }
+
+    /// A "Path closed" mark as a closure every route avoids; nil for other kinds.
+    var asClosure: Closure? {
+        kind == .closed ? Closures.marked(id: "\(reportedAt.timeIntervalSince1970)", lat: latitude, lon: longitude, note: note) : nil
+    }
 }
 
 #if DEBUG
