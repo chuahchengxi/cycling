@@ -15,14 +15,23 @@ enum PCNRouting {
 
     /// Distance under which a gap is treated as already-on-network noise (skip
     /// the gap router). ponytail: 15 m; tune with the real snap tolerance on-device.
-    static let gapEpsilon: Double = 15
+    nonisolated static let gapEpsilon: Double = 15
 
-    static func stitched(
+    /// `graph` may carry closure penalties (see `PCNGraph.penalised`); `base` is the
+    /// same network without them (nil = `graph`). Per waypoint pair the penalised path
+    /// is used when it avoids every `closed` circle within `maxDetourRatio` of the
+    /// open path; otherwise the open path is ridden and each run of closed vertices
+    /// becomes an off-connector `gap` leg round it. Runs off the main actor.
+    @concurrent nonisolated static func stitched(
         waypoints: [Coord],
         graph: PCNGraph,
-        gap: (Coord, Coord) async -> [Coord]
+        base: PCNGraph? = nil,
+        closed: [NoGoCircle] = [],
+        gap: @Sendable (Coord, Coord) async -> [Coord]
     ) async -> (poly: [Coord], offSegments: [[Coord]], offMeters: Double) {
         guard waypoints.count >= 2 else { return ([], [], 0) }
+        let base = base ?? graph
+        func isClosed(_ c: Coord) -> Bool { closed.contains { Geo.distance(c.cl, $0.coord.cl) <= $0.radiusMeters } }
 
         var poly: [Coord] = []
         var offSegments: [[Coord]] = []
@@ -40,18 +49,35 @@ enum PCNRouting {
 
         for i in 0..<(waypoints.count - 1) {
             let a = waypoints[i], b = waypoints[i + 1]
-            guard let entry = graph.nearest(to: a), let exit = graph.nearest(to: b),
-                  let onPCN = graph.path(from: entry, to: exit), onPCN.count >= 1,
-                  let entryC = graph.coord(of: entry), let exitC = graph.coord(of: exit) else {
+            guard let entry = base.nearest(to: a), let exit = base.nearest(to: b),
+                  let open = base.path(from: entry, to: exit), open.count >= 1,
+                  let entryC = base.coord(of: entry), let exitC = base.coord(of: exit) else {
                 // No usable PCN between these points — bridge the whole pair.
                 append(await gap(a, b), off: true)
                 continue
             }
+            var onPCN = open
+            if !closed.isEmpty, let avoid = graph.path(from: entry, to: exit),
+               !avoid.contains(where: isClosed),
+               base.pathLength(avoid) <= PCNGraph.maxDetourRatio * base.pathLength(open) {
+                onPCN = avoid
+            }
             // start -> entry node (gap), unless already essentially on it.
             if Geo.distance(a.cl, entryC.cl) > gapEpsilon { append(await gap(a, entryC), off: true) }
             else { append([a], off: false) }
-            // entry -> exit along the PCN (on-connector).
-            append(onPCN, off: false)
+            // entry -> exit along the PCN, each closed run swapped for a gap leg round it.
+            var k = 0
+            while k < onPCN.count {
+                guard isClosed(onPCN[k]) else {
+                    var j = k
+                    while j < onPCN.count, !isClosed(onPCN[j]) { j += 1 }
+                    append(Array(onPCN[k..<j]), off: false); k = j; continue
+                }
+                var j = k
+                while j < onPCN.count, isClosed(onPCN[j]) { j += 1 }
+                let from = poly.last ?? a, to = j < onPCN.count ? onPCN[j] : b
+                append(await gap(from, to), off: true); k = j
+            }
             // exit node -> destination (gap).
             if Geo.distance(exitC.cl, b.cl) > gapEpsilon { append(await gap(exitC, b), off: true) }
             else { append([b], off: false) }
@@ -129,5 +155,33 @@ extension PCNRouting {
                                  Coord(lat: 1.302, lon: 103.802)])
         assert(steps.first?.maneuver == .depart && steps.last?.maneuver == .arrive)
         assert(steps.contains { $0.maneuver == .left }, "left turn not detected")
+
+        // Closures.
+        let west = Coord(lat: 1.300, lon: 103.800), corner = Coord(lat: 1.300, lon: 103.802), north = Coord(lat: 1.302, lon: 103.802)
+        let shut = NoGoCircle(coord: corner, radiusMeters: 20)
+        func inside(_ c: Coord) -> Bool { Geo.distance(c.cl, shut.coord.cl) <= 20 }
+        // 1. Only path is closed: still arrives, closed vertex not ridden, one off-connector gap leg.
+        let g1 = PCNGraph.fixture()
+        let r1 = await stitched(waypoints: [west, north], graph: g1.penalised(closed: [shut], walk: []), base: g1,
+                                closed: [shut], gap: { [$0, $1] })
+        assert(abs(r1.poly.last!.lat - 1.302) < 1e-6, "closure must not stop the route")
+        assert(!r1.poly.contains { $0 == corner }, "closed vertex must not be ridden")
+        assert(r1.offSegments.count == 1, "expected one gap leg round the closure")
+        // 2. Short open detour (square, other side ~444 m vs 444 m): detour wins, no gap leg.
+        let other = Coord(lat: 1.302, lon: 103.800)
+        let sq = PCNGraph(polylines: [[west, corner, north], [west, other, north]])
+        let r2 = await stitched(waypoints: [west, north], graph: sq.penalised(closed: [shut], walk: []), base: sq,
+                                closed: [shut], gap: { [$0, $1] })
+        assert(r2.offSegments.isEmpty && !r2.poly.contains(where: inside), "should take the open side")
+        // 3. Detour far longer than +30%: direct route with a gap leg, not the detour.
+        let far = [west, Coord(lat: 1.296, lon: 103.800), Coord(lat: 1.296, lon: 103.806), Coord(lat: 1.302, lon: 103.806), north]
+        let lg = PCNGraph(polylines: [[west, corner, north], far])
+        let r3 = await stitched(waypoints: [west, north], graph: lg.penalised(closed: [shut], walk: []), base: lg,
+                                closed: [shut], gap: { [$0, $1] })
+        assert(r3.offSegments.count == 1 && r3.poly.count <= 4, "long detour must lose to a dashed gap leg")
+        // 4. No-cycling zone on the only path: ridden (walked), no gap leg.
+        let r4 = await stitched(waypoints: [west, north], graph: g1.penalised(closed: [], walk: [shut]), base: g1,
+                                closed: [], gap: { [$0, $1] })
+        assert(r4.poly.contains { $0 == corner } && r4.offSegments.isEmpty, "walk zones are passed through")
     }
 }

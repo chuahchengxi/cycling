@@ -42,7 +42,8 @@ enum Routing {
     ///
     /// Fast mode is one BRouter call over the whole line, roads allowed.
     /// Moderate/leisure stitch the on-PCN A* stretches with BRouter-routed
-    /// gaps at the start/end/holes — see `PCNRouting.stitched`.
+    /// gaps at the start/end/holes and round closures — see `PCNRouting.stitched`.
+    /// `closures` are the rider's own marked hazards, added to the bundled ones.
     static func plan(through waypoints: [Coord],
                      mode: RideMode = .moderate,
                      fetchElevation: Bool = true,
@@ -52,34 +53,34 @@ enum Routing {
         var plan = RoutePlan()
         var poly: [Coord]
 
-        if !closures.isEmpty {
-            // A closure must hold end-to-end, and the PCN graph has no notion of
-            // no-gos — so route the whole line through BRouter with the absolute
-            // exclusion, never the graph, and never MapKit (see BRouter.route).
-            let profile = mode == .fast ? BRouterConfig.fastProfile : BRouterConfig.gapProfile
-            poly = await BRouter.route(waypoints, profile: profile, nogos: closures)
-        } else {
-            switch mode {
-            case .fast:
-                // Quickest cycling route, roads allowed — one BRouter call, no PCN.
-                poly = await BRouter.route(waypoints, profile: BRouterConfig.fastProfile)
-            case .moderate, .leisure:
-                let graph = await PCNDataset.graph()
-                let result = await PCNRouting.stitched(
-                    waypoints: waypoints, graph: graph,
-                    gap: { await BRouter.route([$0, $1], profile: BRouterConfig.gapProfile) })
-                poly = result.poly
-                plan.offConnectorSegments = result.offSegments
-                plan.offConnectorMeters = result.offMeters
-            }
+        // Bundled closures plus the rider's own hazards. Moderate/leisure route round
+        // them on the PCN graph offline; fast keeps BRouter's no-gos until plan 6.
+        var (closed, walk) = Closures.activeCircles()
+        closed += closures
+        switch mode {
+        case .fast:
+            // Quickest cycling route, roads allowed — one BRouter call, no PCN.
+            poly = await BRouter.route(waypoints, profile: BRouterConfig.fastProfile, nogos: closed)
+        case .moderate, .leisure:
+            let base = await PCNDataset.graph()
+            let gapNogos = closed
+            let result = await PCNRouting.stitched(
+                waypoints: waypoints, graph: base.penalised(closed: closed, walk: walk), base: base, closed: closed,
+                gap: { a, b in
+                    let r = await BRouter.route([a, b], profile: BRouterConfig.gapProfile, nogos: gapNogos)
+                    return r.count >= 2 ? r : [a, b]
+                })
+            poly = result.poly
+            plan.offConnectorSegments = result.offSegments
+            plan.offConnectorMeters = result.offMeters
+        }
 
-            // Nothing came back (offline, empty graph): last-resort MapKit walking so a
-            // route still appears.
-            if poly.count < 2 {
-                poly = await BRouter.route(waypoints, profile: BRouterConfig.gapProfile)
-                plan.offConnectorSegments = poly.isEmpty ? [] : [poly]
-                plan.offConnectorMeters = Geo.cumulative(poly.coordinates).last ?? 0
-            }
+        // Nothing came back (offline, empty graph): last-resort MapKit walking so a
+        // route still appears.
+        if poly.count < 2 {
+            poly = await BRouter.route(waypoints, profile: BRouterConfig.gapProfile)
+            plan.offConnectorSegments = poly.isEmpty ? [] : [poly]
+            plan.offConnectorMeters = Geo.cumulative(poly.coordinates).last ?? 0
         }
         guard poly.count >= 2 else { return plan }
 

@@ -68,7 +68,7 @@ enum BRouter {
     /// response returns no route instead of silently ignoring the closure.
     static func route(_ waypoints: [Coord], profile: String, nogos: [NoGoCircle] = []) async -> [Coord] {
         guard let url = url(lonlats: waypoints, profile: profile, nogos: nogos) else { return [] }
-        if let (data, resp) = try? await URLSession.shared.data(from: url),
+        if let (data, resp) = try? await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 8)),
            (resp as? HTTPURLResponse)?.statusCode == 200 {
             let coords = decode(data)
             if coords.count >= 2 { return coords }

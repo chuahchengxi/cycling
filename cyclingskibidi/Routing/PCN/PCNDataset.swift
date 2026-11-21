@@ -116,5 +116,26 @@ extension PCNDataset {
         // ponytail: comment out if running before the seed file is added.
         let g = await graph()
         assert(!g.isEmpty, "pcn-seed.geojson missing or empty — is it in the bundle?")
+
+        // Real data: a ride along Bedok Park Connector past its Laguna88 closure, 250 m
+        // beyond each end, never rides a closed vertex, and plans quickly.
+        guard let bedok = Closures.bundled().first(where: { $0.id == "bedok-pc-laguna88" }),
+              let c0 = bedok.circles.first, let c1 = bedok.circles.last else {
+            assertionFailure("bedok-pc-laguna88 missing from closures.json"); return
+        }
+        let shut = bedok.noGoCircles
+        let len = Geo.distance(Coord(lat: c0.lat, lon: c0.lon).cl, Coord(lat: c1.lat, lon: c1.lon).cl)
+        func beyond(_ p: Closure.Circle, _ q: Closure.Circle) -> Coord {   // 250 m past p, away from q
+            let k = 250 / len
+            return Coord(lat: p.lat + (p.lat - q.lat) * k, lon: p.lon + (p.lon - q.lon) * k)
+        }
+        let t0 = Date.now
+        let r = await PCNRouting.stitched(waypoints: [beyond(c0, c1), beyond(c1, c0)],
+                                          graph: g.penalised(closed: shut, walk: []), base: g,
+                                          closed: shut, gap: { [$0, $1] })
+        let inside = r.poly.filter { c in shut.contains { Geo.distance(c.cl, $0.coord.cl) <= $0.radiusMeters } }
+        assert(inside.isEmpty, "Bedok route rides \(inside.count) closed vertices")
+        assert(Date.now.timeIntervalSince(t0) < 2, "closure routing too slow")
+        print("Bedok closure check: \(Int(Geo.cumulative(r.poly.coordinates).last ?? 0)) m, \(r.offSegments.count) gap legs")
     }
 }
