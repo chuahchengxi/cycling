@@ -40,9 +40,11 @@ enum Routing {
 
     /// Assemble a ride through the rider's waypoints, entirely offline.
     ///
-    /// Every mode stitches on-PCN A* stretches with straight off-connector legs
-    /// at the start/end/holes and round closures — see `PCNRouting.stitched`.
-    /// Modes differ only in planning speed: there's no road graph on the device.
+    /// Fast routes on the bundled road network end to end, roads allowed.
+    /// Moderate/leisure stitch on-PCN A* stretches with road-network legs (paths
+    /// and quiet streets first) at the start/end/holes and round closures — see
+    /// `PCNRouting.stitched`. A leg the road network can't make is a straight
+    /// off-connector line, so a route always appears.
     /// Bundled closures and every "Path closed" the rider has marked are always
     /// avoided; `closures` adds any not yet saved (a mark made a moment ago).
     static func plan(through waypoints: [Coord],
@@ -52,15 +54,35 @@ enum Routing {
 
         var plan = RoutePlan()
         var (closed, walk) = Closures.activeCircles()
-        closed += Closures.marked.flatMap(\.noGoCircles) + closures
-        let base = await PCNDataset.graph()
-        // Penalising touches every node; keep it off the main actor like A*.
-        let graph = await Task.detached { [closed, walk] in base.penalised(closed: closed, walk: walk) }.value
-        let result = await PCNRouting.stitched(waypoints: waypoints, graph: graph, base: base,
-                                               closed: closed, gap: { [$0, $1] })
-        var poly = result.poly
-        plan.offConnectorSegments = result.offSegments
-        plan.offConnectorMeters = result.offMeters
+        closed += Closures.marked.filter { $0.isActive(on: Closures.now) }.flatMap(\.noGoCircles) + closures
+        let roads = await RoadNetwork.graph()
+        var poly: [Coord]
+        switch mode {
+        case .fast:
+            let (line, off) = await Task.detached { [closed, walk] in
+                var line: [Coord] = [], off: [[Coord]] = []
+                for (a, b) in zip(waypoints, waypoints.dropFirst()) {
+                    var leg = roads?.route(a, b, profile: .fast, closed: closed, walk: walk) ?? []
+                    if leg.count < 2 { leg = [a, b]; off.append(leg) }
+                    if !line.isEmpty { leg.removeFirst() }
+                    line += leg
+                }
+                return (line, off)
+            }.value
+            poly = line
+            plan.offConnectorSegments = off
+            plan.offConnectorMeters = off.reduce(0) { $0 + (Geo.cumulative($1.coordinates).last ?? 0) }
+        case .moderate, .leisure:
+            let base = await PCNDataset.graph()
+            // Penalising touches every node; keep it off the main actor like A*.
+            let graph = await Task.detached { [closed, walk] in base.penalised(closed: closed, walk: walk) }.value
+            let result = await PCNRouting.stitched(
+                waypoints: waypoints, graph: graph, base: base, closed: closed,
+                gap: { [closed, walk] a, b in roads?.route(a, b, profile: .quiet, closed: closed, walk: walk) ?? [a, b] })
+            poly = result.poly
+            plan.offConnectorSegments = result.offSegments
+            plan.offConnectorMeters = result.offMeters
+        }
 
         // Empty graph: straight legs between the pins, all off-connector, so a route still appears.
         if poly.count < 2 {

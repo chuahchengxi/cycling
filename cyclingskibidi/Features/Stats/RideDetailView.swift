@@ -83,17 +83,8 @@ struct RideDetailView: View {
     // MARK: Pieces
 
     private var map: some View {
-        Map(initialPosition: .region(region)) {
-            MapPolyline(coordinates: coords)
-                .stroke(.blue, style: .init(lineWidth: 5, lineCap: .round, lineJoin: .round))
-            if let start = coords.first {
-                Marker("Start", systemImage: "flag.fill", coordinate: start).tint(.green)
-            }
-            if let end = coords.last {
-                Marker("End", systemImage: "flag.checkered", coordinate: end).tint(.red)
-            }
-        }
-        .mapStyle(.standard(elevation: .realistic))
+        OfflineMap(lines: [MapLine(coords: coords, color: .systemBlue, width: 5)],
+                   pins: endPins(coords), initialRegion: region)
     }
 
     private var elevationChart: some View {

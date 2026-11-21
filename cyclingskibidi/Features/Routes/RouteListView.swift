@@ -62,6 +62,8 @@ struct RouteListView: View {
 
     @State private var creating = false
     @State private var showingStats = false
+    @State private var showingMarks = false
+    @State private var showingCredits = false
 
     private var filtered: [Route] {
         routes.filter { r in
@@ -98,6 +100,8 @@ struct RouteListView: View {
         .onAppear { if Demo.screen == "build" { creating = true } }
         #endif
         .sheet(isPresented: $showingStats) { StatsView() }
+        .sheet(isPresented: $showingMarks) { MarksView() }
+        .sheet(isPresented: $showingCredits) { CreditsView() }
     }
 
     // MARK: Pieces
@@ -135,6 +139,12 @@ struct RouteListView: View {
                 Label("Statistics", systemImage: "chart.bar.xaxis")
             }
             .badge(rides.count)
+        }
+        ToolbarItem(placement: .topBarTrailing) {
+            Menu {
+                Button { showingMarks = true } label: { Label("Your marks", systemImage: "exclamationmark.triangle") }
+                Button { showingCredits = true } label: { Label("Credits", systemImage: "info.circle") }
+            } label: { Label("More", systemImage: "ellipsis.circle") }
         }
         ToolbarItem(placement: .topBarTrailing) {
             Button { creating = true } label: { Label("Create route", systemImage: "plus") }

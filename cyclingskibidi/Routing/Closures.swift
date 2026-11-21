@@ -89,11 +89,17 @@ nonisolated enum Closures {
     @MainActor static var marked: [Closure] = []
     static let markedRadius: Double = 40
 
-    /// A rider's mark as a one-circle, open-ended closure.
-    static func marked(id: String, lat: Double, lon: Double, note: String) -> Closure {
+    /// A rider's mark as a one-circle closure, ending after `until` (`yyyy-MM-dd`) or never.
+    static func marked(id: String, lat: Double, lon: Double, note: String, until: String? = nil) -> Closure {
         Closure(id: "marked-\(id)", name: "Path you marked closed",
                 circles: [Closure.Circle(lat: lat, lon: lon, radiusM: markedRadius, coordSource: "rider")],
-                starts: nil, validUntil: nil, note: note, sourceUrl: "", kind: .closure)
+                starts: nil, validUntil: until, note: note, sourceUrl: "", kind: .closure)
+    }
+
+    /// `yyyy-MM-dd` of a date, Singapore time.
+    static func dayString(_ d: Date) -> String {
+        let c = sg.dateComponents([.year, .month, .day], from: d)
+        return String(format: "%04d-%02d-%02d", c.year!, c.month!, c.day!)
     }
 
     /// Now, or in DEBUG the `-closuresDate yyyy-MM-dd` launch argument.

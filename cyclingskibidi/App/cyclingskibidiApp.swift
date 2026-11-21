@@ -29,6 +29,8 @@ struct cyclingskibidiApp: App {
         Closures.selfCheck()
         Task { await PCNDataset.selfCheck() }
         Task { await PCNRouting.selfCheck() }
+        Task { await RoadNetwork.selfCheck() }
+        TilePack.selfCheck()
         RideMode.selfCheck()
         Routing.selfCheck()
         RideRecorder.selfCheck()

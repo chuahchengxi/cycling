@@ -20,7 +20,7 @@ struct NavigateView: View {
     @Environment(\.dismiss) private var dismiss
     @Query private var obstacles: [Obstacle]
 
-    @State private var camera: MapCameraPosition = .userLocation(followsHeading: true, fallback: .automatic)
+    @State private var focus: MapFocus? = .user(heading: true)
     @State private var detent: PresentationDetent = .height(150)
     @State private var line: [CLLocationCoordinate2D] = []
     @State private var placing = false
@@ -79,7 +79,7 @@ struct NavigateView: View {
         }
         .onAppear(perform: begin)
         // Every marked hazard warns on approach, whatever route is being ridden.
-        .onChange(of: obstacles, initial: true) { recorder.hazards = obstacles }
+        .onChange(of: obstacles, initial: true) { recorder.hazards = obstacles.filter(\.isActive) }
         .sheet(isPresented: $showSheet) {
             navSheet
                 .presentationDetents([.height(150), .fraction(0.45), .large], selection: $detent)
@@ -119,42 +119,33 @@ struct NavigateView: View {
     }
 
     private var map: some View {
-        MapReader { proxy in
-            Map(position: $camera) {
-                MapPolyline(coordinates: line)
-                    .stroke(.blue, style: .init(lineWidth: 7, lineCap: .round, lineJoin: .round))
+        // Only taps while placing do anything; pan/zoom are untouched.
+        OfflineMap(lines: [MapLine(coords: line, color: .systemBlue, width: 7)],
+                   pins: mapPins, focus: focus, showsUser: true,
+                   onTap: { coord in if placing { place(at: coord) } })
+    }
 
-                if let step = recorder.currentStep {
-                    Marker(step.maneuver.glyph, coordinate: step.coordinate).tint(.purple)
-                }
-                if let end = line.last {
-                    Marker("Finish", systemImage: "flag.checkered", coordinate: end).tint(.red)
-                }
-                ForEach(obstacles) { obstacle in
-                    Annotation(obstacle.kind.rawValue, coordinate: obstacle.coordinate) {
-                        ObstacleBadge(kind: obstacle.kind)
-                    }
-                }
-                if let pending {
-                    Marker("New obstacle", systemImage: "exclamationmark.triangle.fill",
-                           coordinate: pending.coordinate).tint(.orange)
-                }
-                ForEach(recorder.sights) { sight in
-                    Annotation(sight.name, coordinate: sight.coordinate) {
-                        SightBadge(sight: sight)
-                            .onTapGesture { recorder.passingSight = sight }
-                    }
-                }
-                UserAnnotation()
-            }
-            .mapStyle(.standard(elevation: .realistic))
-            .mapControls { MapUserLocationButton() }
-            // Only intercepts taps while placing; pan/zoom and normal taps are untouched.
-            .onTapGesture { screenPoint in
-                guard placing, let coord = proxy.convert(screenPoint, from: .local) else { return }
-                place(at: coord)
-            }
+    private var mapPins: [MapPin] {
+        var pins: [MapPin] = []
+        if let step = recorder.currentStep {
+            pins.append(MapPin(id: "step", coordinate: step.coordinate, title: step.instruction,
+                               look: .marker(symbol: step.maneuver.symbol, tint: .systemPurple)))
         }
+        if let end = line.last {
+            pins.append(MapPin(id: "finish", coordinate: end, title: "Finish", look: .marker(symbol: "flag.checkered", tint: .systemRed)))
+        }
+        pins += obstacles.filter(\.isActive).map { o in
+            MapPin(id: o.pinID, coordinate: o.coordinate, title: o.kind.rawValue, look: .view(AnyView(ObstacleBadge(kind: o.kind))))
+        }
+        if let pending {
+            pins.append(MapPin(id: "pending", coordinate: pending.coordinate, title: "New obstacle",
+                               look: .marker(symbol: "exclamationmark.triangle.fill", tint: .systemOrange)))
+        }
+        pins += recorder.sights.map { sight in
+            MapPin(id: sight.id.uuidString, coordinate: sight.coordinate, title: sight.name,
+                   look: .view(AnyView(SightBadge(sight: sight))), onTap: { recorder.passingSight = sight })
+        }
+        return pins
     }
 
     private var sideButtons: some View {
@@ -168,7 +159,7 @@ struct NavigateView: View {
                          tint: .secondary) { recorder.voiceEnabled.toggle() }
             .accessibilityLabel(recorder.voiceEnabled ? "Mute guidance" : "Unmute guidance")
             CircleButton(symbol: "location.north.fill", tint: .blue) {
-                camera = .userLocation(followsHeading: true, fallback: .automatic)
+                focus = .user(heading: true)
             }
             .accessibilityLabel("Recenter map")
         }
@@ -465,6 +456,25 @@ struct ObstacleReportView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var kind: ObstacleKind = .pothole
     @State private var note = ""
+    @State private var keep: Keep = .week
+
+    /// How long the mark lasts: through the last day, or until the rider removes it.
+    enum Keep: Int, CaseIterable, Identifiable {
+        case today = 0, threeDays = 2, week = 7, month = 30, untilRemoved = -1
+        var id: Int { rawValue }
+        var label: String {
+            switch self {
+            case .today: return "Today"
+            case .threeDays: return "3 days"
+            case .week: return "1 week"
+            case .month: return "1 month"
+            case .untilRemoved: return "Until I remove it"
+            }
+        }
+        var lastDay: Date? {
+            self == .untilRemoved ? nil : Closures.sg.date(byAdding: .day, value: rawValue, to: Closures.now)
+        }
+    }
 
     var body: some View {
         NavigationStack {
@@ -481,6 +491,13 @@ struct ObstacleReportView: View {
                 Section("Note (optional)") {
                     TextField("e.g. deep, on the left", text: $note, axis: .vertical)
                 }
+                Section {
+                    Picker("Keep it", selection: $keep) {
+                        ForEach(Keep.allCases) { Text($0.label).tag($0) }
+                    }
+                } footer: {
+                    Text("Remove it sooner from Your marks once it's cleared.")
+                }
             }
             .navigationTitle("Obstacle Details")
             .navigationBarTitleDisplayMode(.inline)
@@ -489,7 +506,9 @@ struct ObstacleReportView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") {
                         guard let coordinate else { return dismiss() }
-                        context.insert(Obstacle(kind: kind, at: coordinate, note: note))
+                        let mark = Obstacle(kind: kind, at: coordinate, note: note)
+                        mark.expiresAt = keep.lastDay
+                        context.insert(mark)
                         try? context.save()
                         if kind == .closed { onSaveClosed(coordinate) }
                         dismiss()
