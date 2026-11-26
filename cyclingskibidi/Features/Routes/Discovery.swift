@@ -135,7 +135,8 @@ nonisolated enum Discovery {
     /// `closed`/`walk` nil = the bundled closures active at `start`.
     static func sights(along polyline: [Coord], mode: RideMode = .leisure, start: Date = .now,
                        in places: [Sight] = Discovery.places, facts: [String: PlaceFacts] = Discovery.facts,
-                       closed: [NoGoCircle]? = nil, walk: [NoGoCircle]? = nil, limit: Int? = 20) -> [Sight] {
+                       closed: [NoGoCircle]? = nil, walk: [NoGoCircle]? = nil, limit: Int? = 20,
+                       categories: Set<String> = leisureCategories) -> [Sight] {
         // A thinned line is plenty for a 100-300 m corridor and keeps the snap cheap.
         let coords = Geo.sample(polyline.map(\.cl), count: 400)
         guard coords.count >= 2, let inBox = box(coords, pad: largeCorridor) else { return [] }
@@ -144,7 +145,7 @@ nonisolated enum Discovery {
         let candidates = places.filter { p in
             // An unnamed playground is named "Playground" at build: fine to search, too vague to visit.
             // (It's the only leisure category that gets a made-up name; see scripts/places/build.py NAMELESS.)
-            leisureCategories.contains(p.category) && !(p.category == "playground" && p.name == "Playground")
+            categories.contains(p.category) && !(p.category == "playground" && p.name == "Playground")
                 && (inBox(p.coordinate) || (p.osmID.flatMap { facts[$0] }?.shape.contains { inBox($0.cl) } ?? false))
         }
         let cumulative = Geo.cumulative(coords)
