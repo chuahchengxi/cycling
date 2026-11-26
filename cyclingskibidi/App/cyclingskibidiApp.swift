@@ -54,6 +54,7 @@ struct cyclingskibidiApp: App {
         Task { await Routing.selfCheckNoBike() }
         Task { await RestStops.selfCheckReal() }
         Task { await Routing.selfCheckScenic() }
+        Task { await PresetLoops.selfCheck() }
         #endif
     }
 

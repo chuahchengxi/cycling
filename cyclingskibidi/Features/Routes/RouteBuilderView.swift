@@ -129,23 +129,24 @@ struct RouteBuilderView: View {
         Group {
             if !results.isEmpty {
                 List(results) { item in
-                    Button {
-                        let c = item.coordinate
-                        waypoints.append(Coord(c))
-                        focus = .region(.init(center: c, latitudinalMeters: 1500, longitudinalMeters: 1500))
-                        replan()
-                        results = []
-                        query = ""
-                    } label: {
-                        VStack(alignment: .leading) {
-                            Text(item.name).font(.body)
-                            Text([Discovery.icon(for: item.category).label, item.address].filter { !$0.isEmpty }.joined(separator: " · "))
-                                .font(.caption).foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(item.name).font(.body)
+                        Text([Discovery.icon(for: item.category).label, item.address].filter { !$0.isEmpty }.joined(separator: " · "))
+                            .font(.caption).foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            if PresetLoops.isBikePlace(item) {
+                                actionButton("Start here") { addWaypoint(item.coordinate, atStart: true) }
+                                actionButton("Return the bike here") { addWaypoint(item.coordinate) }
+                            } else {
+                                actionButton("Add as a stop") { addWaypoint(item.coordinate) }
+                            }
                         }
+                        .buttonStyle(.bordered)
                     }
+                    .padding(.vertical, 4)
                 }
                 .listStyle(.plain)
-                .frame(maxHeight: 260)
+                .frame(maxHeight: 300)
                 .background(.regularMaterial)
             }
         }
@@ -227,6 +228,7 @@ struct RouteBuilderView: View {
 
             if mode != .fast, let sights, !sights.isEmpty, !sightsLoading { KitCard(count: sights.count, byModel: kitByModel) }
             if mode != .fast { placesSection }
+            loopsSection
 
             HStack {
                 Button(role: .destructive) {
@@ -306,6 +308,57 @@ struct RouteBuilderView: View {
                 }
             }
         }
+    }
+
+    /// Three ready-made park connector circuits; picking one replaces the pins
+    /// and switches the map to Leisure so the whole line follows connectors.
+    private var loopsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Loops").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(PresetLoops.all) { loop in
+                        Button { use(loop) } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(loop.name).font(.footnote.weight(.semibold)).lineLimit(1)
+                                Text(loop.blurb).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+                            }
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 44, alignment: .leading)
+                            .background(.quaternary, in: .rect(cornerRadius: 12))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(loop.name). \(loop.blurb)")
+                    }
+                }
+            }
+        }
+    }
+
+    private func actionButton(_ title: String, _ action: @escaping () -> Void) -> some View {
+        Button(title, action: action).frame(minHeight: 44)
+    }
+
+    private func addWaypoint(_ c: CLLocationCoordinate2D, atStart: Bool = false) {
+        if atStart { waypoints.insert(Coord(c), at: 0) } else { waypoints.append(Coord(c)) }
+        focus = .region(.init(center: c, latitudinalMeters: 1500, longitudinalMeters: 1500))
+        replan()
+        results = []
+        query = ""
+    }
+
+    private func use(_ loop: PresetLoop) {
+        waypoints = loop.waypoints
+        mode = .leisure
+        if let first = waypoints.first {
+            focus = .region(.init(center: first.cl, latitudinalMeters: 12_000, longitudinalMeters: 12_000))
+        }
+        sights = nil
+        sightsLoading = false
+        direct = nil
+        results = []
+        query = ""
+        replan()
     }
 
     // MARK: Actions

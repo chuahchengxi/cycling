@@ -39,6 +39,7 @@ struct SheetView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
                         summary
+                        returnBikeLine
                         heatHint
                         climb
                         elevationGraph
@@ -93,6 +94,18 @@ struct SheetView: View {
         .minimumScaleFactor(0.75)   // shrink to fit rather than wrap ("Leisure"/"Moderate")
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, collapsed ? 20 : 0)
+    }
+
+    /// When the ride ends at a bike place, say so: the rider knows where to
+    /// put the bike back before they start looking for a rack.
+    @ViewBuilder
+    private var returnBikeLine: some View {
+        if let last = route.waypoints.last,
+           let line = PresetLoops.returnLine(for: last, in: Discovery.places) {
+            Label(line, systemImage: "parkingsign")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.green)
+        }
     }
 
     /// Afternoon heat and storms matter on the slower, scenic rides; a Fast
