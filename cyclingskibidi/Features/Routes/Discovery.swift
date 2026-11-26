@@ -96,17 +96,26 @@ enum Discovery {
         return (places, facts)
     }()
 
-    /// Pure corridor filter: keep only candidates within `corridor` metres of the
-    /// line, stamp each with how far along the route it sits, drop duplicates
-    /// (same name at the same spot), and order by that distance.
-    static func sightsAlong(_ candidates: [Sight], polyline: [CLLocationCoordinate2D],
-                            cumulative: [Double], corridor: Double = 150) -> [Sight] {
+    /// A place counts as on the route within this many metres of the line,
+    /// measured to its nearest point (pin or outline). Spec values.
+    static let smallCorridor: Double = 100
+    static let largeCorridor: Double = 300
+
+    /// Pure corridor filter: keep candidates whose nearest point is within the
+    /// corridor (300 m for large places, 100 m otherwise), stamp each with how far
+    /// along the route that point sits, drop duplicates (same name at the same
+    /// spot), and order by that distance.
+    static func sightsAlong(_ candidates: [Sight], polyline: [CLLocationCoordinate2D], cumulative: [Double],
+                            facts: [String: PlaceFacts] = Discovery.facts) -> [Sight] {
         guard polyline.count >= 2 else { return [] }
         var kept: [Sight] = []
         var seen: Set<String> = []
         for var c in candidates {
-            guard !c.name.isEmpty,
-                  let s = Geo.snap(c.coordinate, to: polyline, cumulative: cumulative),
+            guard !c.name.isEmpty else { continue }
+            let f = c.osmID.flatMap { facts[$0] }
+            let corridor = f?.isLarge == true ? largeCorridor : smallCorridor
+            let points = [c.coordinate] + (f?.shape ?? []).map(\.cl)
+            guard let s = points.compactMap({ Geo.snap($0, to: polyline, cumulative: cumulative) }).min(by: { $0.lateral < $1.lateral }),
                   s.lateral <= corridor else { continue }
             let key = "\(c.name.lowercased())|\(Int(c.lat * 1000))|\(Int(c.lon * 1000))"
             guard seen.insert(key).inserted else { continue }
@@ -116,15 +125,60 @@ enum Discovery {
         return kept.sorted { $0.offsetAlong < $1.offsetAlong }
     }
 
-    /// Leisure places within a corridor of the route line, first 20 along it.
-    /// ponytail: 20 kept, ordered by offset; spread them along the route if long
-    /// leisure rides end up with every sight in the first few km.
-    static func sights(along polyline: [Coord], in places: [Sight] = Discovery.places) -> [Sight] {
-        // A thinned line is plenty for a 150 m corridor and keeps the snap cheap.
+    /// Leisure places a rider on this line really passes: near it (see `sightsAlong`),
+    /// open when they get there at the mode's planning speed from `start`, not inside an
+    /// active closure, not inside a no-cycling zone unless it's a park-and-walk place,
+    /// and at most `limit` of them spread along the whole route.
+    /// `closed`/`walk` nil = the bundled closures active at `start`.
+    static func sights(along polyline: [Coord], mode: RideMode = .leisure, start: Date = .now,
+                       in places: [Sight] = Discovery.places, facts: [String: PlaceFacts] = Discovery.facts,
+                       closed: [NoGoCircle]? = nil, walk: [NoGoCircle]? = nil, limit: Int = 20) -> [Sight] {
+        // A thinned line is plenty for a 100-300 m corridor and keeps the snap cheap.
         let coords = Geo.sample(polyline.map(\.cl), count: 400)
-        guard coords.count >= 2, let box = box(coords, pad: 150) else { return [] }
-        let candidates = places.filter { leisureCategories.contains($0.category) && box($0) }
-        return Array(sightsAlong(candidates, polyline: coords, cumulative: Geo.cumulative(coords)).prefix(20))
+        guard coords.count >= 2, let inBox = box(coords, pad: largeCorridor) else { return [] }
+        let active: (closed: [NoGoCircle], walk: [NoGoCircle]) = closed == nil || walk == nil ? Closures.activeCircles(on: start) : ([], [])
+        let closed = closed ?? active.closed, walk = walk ?? active.walk
+        let candidates = places.filter { p in
+            // An unnamed playground is named "Playground" at build: fine to search, too vague to visit.
+            // (It's the only leisure category that gets a made-up name; see scripts/places/build.py NAMELESS.)
+            leisureCategories.contains(p.category) && !(p.category == "playground" && p.name == "Playground")
+                && (inBox(p.coordinate) || (p.osmID.flatMap { facts[$0] }?.shape.contains { inBox($0.cl) } ?? false))
+        }
+        let cumulative = Geo.cumulative(coords)
+        let metresPerSecond = mode.planningSpeedKmh / 3.6
+        func inside(_ c: CLLocationCoordinate2D, _ circles: [NoGoCircle]) -> Bool {
+            circles.contains { Geo.distance(c, $0.coord.cl) <= $0.radiusMeters }
+        }
+        let kept = sightsAlong(candidates, polyline: coords, cumulative: cumulative, facts: facts).filter { s in
+            let f = s.osmID.flatMap { facts[$0] }
+            if let f, !f.isOpen(at: start.addingTimeInterval(s.offsetAlong / metresPerSecond)) { return false }
+            if inside(s.coordinate, closed) { return false }
+            if inside(s.coordinate, walk), f?.note?.reasons?.contains("park_and_walk") != true { return false }
+            return true
+        }
+        return spread(kept, polyline: coords, cumulative: cumulative, facts: facts, limit: limit)
+    }
+
+    /// At most `limit` sights, spread along the line: the route is cut into `limit`
+    /// equal stretches and each gives its most notable sight (a research note 2,
+    /// Wikipedia 1, else 0; ties to the one nearer the line); slots left over go to
+    /// the most notable of the rest. Returned in route order.
+    static func spread(_ sights: [Sight], polyline: [CLLocationCoordinate2D], cumulative: [Double],
+                       facts: [String: PlaceFacts], limit: Int) -> [Sight] {
+        guard sights.count > limit, limit > 0, let length = cumulative.last, length > 0 else { return sights }
+        func notability(_ s: Sight) -> Int {
+            let f = s.osmID.flatMap { facts[$0] }
+            return f?.note != nil ? 2 : f?.wiki == true ? 1 : 0
+        }
+        let lateral = sights.map { Geo.snap($0.coordinate, to: polyline, cumulative: cumulative)?.lateral ?? .infinity }
+        let ranked = sights.indices.sorted { (notability(sights[$0]), -lateral[$0]) > (notability(sights[$1]), -lateral[$1]) }
+        var picked: [Int] = [], used = Set<Int>()
+        for i in ranked {
+            let bin = min(limit - 1, Int(sights[i].offsetAlong / (length / Double(limit))))
+            if used.insert(bin).inserted { picked.append(i) }
+        }
+        for i in ranked where picked.count < limit && !picked.contains(i) { picked.append(i) }
+        return picked.map { sights[$0] }.sorted { $0.offsetAlong < $1.offsetAlong }
     }
 
     /// Places whose name or category matches every word of `query`, nearest `center` first.
@@ -148,11 +202,11 @@ enum Discovery {
     }
 
     /// Lat/lon box round a line, padded by `pad` metres.
-    private static func box(_ line: [CLLocationCoordinate2D], pad: Double) -> ((Sight) -> Bool)? {
+    private static func box(_ line: [CLLocationCoordinate2D], pad: Double) -> ((CLLocationCoordinate2D) -> Bool)? {
         guard let la0 = line.map(\.latitude).min(), let la1 = line.map(\.latitude).max(),
               let lo0 = line.map(\.longitude).min(), let lo1 = line.map(\.longitude).max() else { return nil }
         let p = pad / PCNGraph.metresPerDegree
-        return { (la0 - p...la1 + p).contains($0.lat) && (lo0 - p...lo1 + p).contains($0.lon) }
+        return { (la0 - p...la1 + p).contains($0.latitude) && (lo0 - p...lo1 + p).contains($0.longitude) }
     }
 
     /// Extra words a category answers to, beyond its label.
@@ -259,6 +313,41 @@ enum Discovery {
         assert(places.contains { $0.category == "toilets" } && places.contains { $0.category == "drinkingWater" }, "rest-stop amenities missing")
         assert(facts.values.contains { $0.note?.dishes?.isEmpty == false }, "overlay missing or not joined")
         assert(!search("toilets", near: line[0]).isEmpty, "amenities must be searchable")
+
+        // Places a rider really passes. 10 km west→east line at lat 1.30.
+        let long = [Coord(lat: 1.30, lon: 103.80), Coord(lat: 1.30, lon: 103.8899)]
+        func p(_ id: String, _ lon: Double, _ dLat: Double = 0, cat: String = "park") -> Sight {
+            var s = Sight(name: id, category: cat, lat: 1.30 + dLat, lon: lon); s.osmID = id; return s
+        }
+        let none = PlaceFacts(hours: nil, area: 0, shape: [], wiki: false, note: nil)
+        // Proximity: 90 m off kept, 200 m off dropped, a large park whose centre is 500 m off but whose edge touches the line kept.
+        let big = PlaceFacts(hours: nil, area: 50_000, shape: [Coord(lat: 1.30, lon: 103.85)], wiki: false, note: nil)
+        let near2 = sights(along: long, in: [p("a", 103.81, 0.0008), p("b", 103.82, 0.0018), p("c", 103.85, 0.0045)],
+                           facts: ["a": none, "b": none, "c": big], closed: [], walk: [])
+        assert(near2.map(\.name) == ["a", "c"], "proximity: \(near2.map(\.name))")
+        // Closed when passed: hours Mon 08-09 only, ridden Monday 10:00 -> dropped.
+        let early = PlaceFacts(hours: [[0, 480, 540]], area: 0, shape: [], wiki: false, note: nil)
+        assert(sights(along: long, start: mon10, in: [p("h", 103.81)], facts: ["h": early], closed: [], walk: []).isEmpty,
+               "closed at pass time kept")
+        // No-cycling zone: dropped unless park_and_walk.
+        let zone = [NoGoCircle(coord: Coord(lat: 1.30, lon: 103.81), radiusMeters: 50)]
+        var walkNote = PlaceNote(); walkNote.reasons = ["park_and_walk"]
+        let walked = sights(along: long, in: [p("z", 103.81), p("w", 103.8101)],
+                            facts: ["z": none, "w": PlaceFacts(hours: nil, area: 0, shape: [], wiki: false, note: walkNote)],
+                            closed: [], walk: zone)
+        assert(walked.map(\.name) == ["w"], "no-cycling rule: \(walked.map(\.name))")
+        // Inside an active closure: always dropped.
+        assert(sights(along: long, in: [p("x", 103.81)], facts: ["x": none], closed: zone, walk: []).isEmpty, "closure kept")
+        // Spread: 30 places in the first km plus one at km 9; limit 5 -> the km-9 one survives, 5 total, in order.
+        let bunch = (0..<30).map { p("s\($0)", 103.80 + Double($0) * 0.0003) } + [p("end", 103.881)]
+        let spread = sights(along: long, in: bunch, facts: Dictionary(uniqueKeysWithValues: bunch.map { ($0.osmID!, none) }),
+                            closed: [], walk: [], limit: 5)
+        assert(spread.count == 5 && spread.last?.name == "end", "spread: \(spread.map(\.name))")
+        assert(spread.map(\.offsetAlong) == spread.map(\.offsetAlong).sorted(), "spread must stay in route order")
+        // An unnamed playground ("Playground", the label it was given at build) is not a sight; a named one is.
+        let unnamed = sights(along: long, in: [p("Playground", 103.81, cat: "playground"), p("Kidztopia", 103.82, cat: "playground")],
+                             facts: [:], closed: [], walk: [])
+        assert(unnamed.map(\.name) == ["Kidztopia"], "unnamed places must not be sights: \(unnamed.map(\.name))")
     }
 }
 

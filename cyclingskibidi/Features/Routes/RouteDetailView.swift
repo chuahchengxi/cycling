@@ -61,7 +61,7 @@ struct RouteDetailView: View {
             // Leisure routes gather the sights along the line once, then reuse
             // them on every open and during the ride.
             guard route.mode == .leisure, route.sights.isEmpty, route.polyline.count > 1 else { return }
-            let found = Discovery.sights(along: route.polyline)
+            let found = Discovery.sights(along: route.polyline, mode: route.mode)
             guard !found.isEmpty else { return }
             route.sightData = Blob.encode(found)
             try? context.save()
@@ -131,7 +131,7 @@ struct RouteDetailView: View {
             if let plan = try? await Routing.plan(through: route.waypoints, mode: route.mode), plan.polyline.count > 1 {
                 route.apply(plan)   // new line, turns and climb chart together
                 // Sights follow the new line: found afresh for Leisure, offline.
-                let sights = route.mode == .leisure ? Discovery.sights(along: route.polyline) : route.sights
+                let sights = route.mode == .leisure ? Discovery.sights(along: route.polyline, mode: route.mode) : route.sights
                 route.sightData = sights.isEmpty ? nil : Blob.encode(sights)
                 try? context.save()
                 checkClosures()

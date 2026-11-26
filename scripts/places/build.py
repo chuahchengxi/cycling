@@ -42,7 +42,8 @@ def category(t):
     if t.get("railway") == "station" and t.get("station") in ("subway", "light_rail"): return "station"
     if t.get("shop") == "mall": return "mall"
     if amenity in ("marketplace", "restaurant") and HAWKER_NAME.search(name): return "hawker"
-    if t.get("man_made") == "bridge": return "bridge"
+    if t.get("man_made") == "bridge":   # road overpasses aren't sights
+        return None if re.search(r"flyover|viaduct|interchange", name, re.I) else "bridge"
     if t.get("waterway") in ("river", "canal"): return "waterway"
     if t.get("landuse") in ("reservoir", "basin") or t.get("natural") in ("water", "wetland"): return "reservoir"
     if "historic" in t: return "heritage"
@@ -147,6 +148,9 @@ if "--check" in sys.argv:
     assert category({"amenity": "restaurant", "name": "Swensen's"}) is None
     assert category({"amenity": "shelter", "shelter_type": "public_transport"}) is None
     assert category({"amenity": "toilets"}) == "toilets"
+    assert category({"man_made": "bridge", "name": "Bedok Reservoir Flyover"}) is None          # road overpasses aren't sights
+    assert category({"man_made": "bridge", "name": "Labrador Viaduct"}) is None
+    assert category({"man_made": "bridge", "name": "Jubilee Bridge"}) == "bridge"
     assert thin([(i, i) for i in range(100)], 16)[-1] == (99, 99) and len(thin([(i, i) for i in range(100)], 16)) <= 16
     recs = [{"id": "w1", "name": "Tiong Bahru Market", "category": "hawker"},
             {"id": "w2", "name": "Ang Mo Kio Park", "category": "park"},

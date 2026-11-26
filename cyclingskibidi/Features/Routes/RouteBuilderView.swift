@@ -284,7 +284,7 @@ struct RouteBuilderView: View {
                 if currentMode == .leisure, !fresh.polyline.isEmpty {
                     sights = nil
                     sightsLoading = true
-                    let found = Discovery.sights(along: fresh.polyline)
+                    let found = Discovery.sights(along: fresh.polyline, mode: currentMode)
                     sights = found
                     sightsLoading = false
                 }
