@@ -41,6 +41,7 @@ struct cyclingskibidiApp: App {
         Obstacle.selfCheck()
         RiderProfile.selfCheck()
         Kit.selfCheck()
+        Task { await KitModel.selfCheck() }
         #endif
     }
 

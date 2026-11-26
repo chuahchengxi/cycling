@@ -17,6 +17,7 @@ struct SheetView: View {
     var obstacles: [Obstacle] = []
     var closures: (active: [Closure], expired: [Closure]) = ([], [])
     var replanning = false
+    var kitByModel = false
     @Binding var currentDetent: PresentationDetent
     var onStart: () -> Void
     var onReplan: () -> Void = {}
@@ -39,7 +40,10 @@ struct SheetView: View {
                         elevationGraph
                         if !closures.active.isEmpty || !closures.expired.isEmpty { closureList }
                         if !obstacles.isEmpty { obstacleList }
-                        if !route.sights.isEmpty { sightList }
+                        if !route.sights.isEmpty {
+                            KitCard(count: route.sights.count, byModel: kitByModel)
+                            sightList
+                        }
                         turnList
                     }
                     .padding(20)

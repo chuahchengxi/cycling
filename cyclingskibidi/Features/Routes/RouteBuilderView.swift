@@ -41,6 +41,8 @@ struct RouteBuilderView: View {
     @State private var sightsLoading = false
     @State private var selectedSight: Sight?
     @State private var editingInterests = false
+    /// The model's picks replaced the quick ones for the current line.
+    @State private var kitByModel = false
     @AppStorage(RiderProfile.storageKey) private var profileRaw = ""
 
     /// Search the bundled places, so a route can start from a name instead of a lucky tap.
@@ -188,6 +190,7 @@ struct RouteBuilderView: View {
                 }
             }
 
+            if mode != .fast, let sights, !sights.isEmpty, !sightsLoading { KitCard(count: sights.count, byModel: kitByModel) }
             if mode != .fast { placesSection }
 
             HStack {
@@ -295,11 +298,19 @@ struct RouteBuilderView: View {
                 if currentMode != .fast, !fresh.polyline.isEmpty {
                     sights = nil
                     sightsLoading = true
+                    kitByModel = false
                     let line = fresh.polyline
-                    let found = await Task.detached { Kit.picks(along: line, mode: currentMode, profile: profile).quick }.value
+                    let found = await Task.detached { Kit.picks(along: line, mode: currentMode, profile: profile) }.value
                     guard gen == generation else { return }
-                    sights = found
+                    sights = found.quick
                     sightsLoading = false
+                    // Quick picks are showing; the model's replace them only if this line is still current.
+                    Task {
+                        guard let better = await KitModel.refine(line: line, quick: found.quick, candidates: found.candidates, profile: profile),
+                              let applied = Self.apply(better, forGeneration: gen, current: generation) else { return }
+                        sights = applied
+                        kitByModel = true
+                    }
                 }
             } catch {
                 guard gen == generation else { return }
@@ -307,6 +318,11 @@ struct RouteBuilderView: View {
                 planning = false
             }
         }
+    }
+
+    /// A model answer lands only if no newer pin or mode change has happened since it was asked.
+    nonisolated static func apply(_ result: [Sight], forGeneration g: Int, current: Int) -> [Sight]? {
+        g == current ? result : nil
     }
 
     private func save() {
