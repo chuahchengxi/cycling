@@ -144,6 +144,8 @@ nonisolated struct Sight: Codable, Identifiable, Sendable {
     var url: String = ""
     /// places.json id ("n123", "w123", "r123") or a hand-added overlay key ("x-…"); nil on saves made before it existed.
     var osmID: String? = nil
+    /// Kit's one line on why this place (from our data, or a grounded model note); nil on older saves.
+    var note: String? = nil
 
     var coordinate: CLLocationCoordinate2D { .init(latitude: lat, longitude: lon) }
 }

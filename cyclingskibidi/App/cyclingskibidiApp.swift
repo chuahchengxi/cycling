@@ -39,6 +39,10 @@ struct cyclingskibidiApp: App {
         Discovery.selfCheck()
         CreateRouteFlow.selfCheck()
         Obstacle.selfCheck()
+        RiderProfile.selfCheck()
+        Kit.selfCheck()
+        Task { await KitModel.selfCheck() }
+        KitLearning.selfCheck()
         #endif
     }
 

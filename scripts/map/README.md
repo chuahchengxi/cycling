@@ -14,7 +14,7 @@ curl -A pcn-map-build -o sg.osm.pbf https://download.bbbike.org/osm/bbbike/Singa
 ```
 
 - `roads.bin` (~11 MB): cyclable ways as a directed graph, read by `RoadGraph.swift`.
-- `places.json` (~1.6 MB, ODbL): named places island-wide, plus toilets, water, shelters and bike amenities within 1 km of a park connector, read by `Discovery.swift`. `places_overlay.json` is our own research (`scripts/places/overlay.src.json`), keyed by OSM ID.
+- `places.json` (~1.5 MB, ODbL): named places in Singapore (the extract also covers Johor; build.py clips at the OSM Singapore–Malaysia boundary), plus toilets, water, shelters and bike amenities within 1 km of a park connector, read by `Discovery.swift`. `places_overlay.json` is our own research (`scripts/places/overlay.src.json`), keyed by OSM ID.
 - `tiles.pack` (~45 MB): z11-16 raster tiles, read by `TilePack` in `OfflineMap.swift`; deeper zooms are scaled from z16.
 - The `*.ql` files are the equivalent Overpass queries, if the extract download is unavailable.
 - Credit: © OpenStreetMap contributors (ODbL). It is shown on every map and in Credits.

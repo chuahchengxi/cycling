@@ -1,7 +1,7 @@
 # Kit — Personalised, Offline Places Along Your Route — Design
 
 Date: 2026-11-20
-Status: approved. Built: section 0 (plan 1), section 5 (offline). Amended 26 Nov 2026: iOS 18 target, places from the shared OSM extract.
+Status: approved. Built: section 0 (plan 1), section 1 (plan 2), section 2 (plan 3), section 5 (offline). Amended 26 Nov 2026: iOS 18 target, places from the shared OSM extract, section 6a no-bike ways.
 Builds on: Phase 2 PCN routing (`docs/superpowers/specs/2026-09-04-phase2-pcn-routing-design.md`), existing leisure sights (`Discovery.swift`, `Sight`, `RideRecorder.checkSights`).
 Research: `reports/Singapore PCN stops and reviews.md`, `reports/Singapore cycling rider personas.md` (+ `research_notes/`).
 Visual reference: Figma file `XXNkFRE4TcJ9VesSYFxnBx`, page "Cycling — Kit style", section "REDESIGN v3" (screens `v3 · 01`–`06`, components `Kit/bubble`, `Kit/timer`, `Kit/chart`, `Kit/avatar`).
@@ -45,7 +45,7 @@ Places along a route today are **not personalised and not accurate**: some aren'
 ## Constraints
 
 - **iOS 18 and later** (decided with the user, 26 Nov 2026; replaces the earlier 27.2 target). Anything newer sits behind `#available` with a fallback that works on iOS 18:
-  - Kit's model picks (Foundation Models) run only on iOS 26+ with Apple Intelligence on. Every device first gets the approach A picks; the model's picks replace them when ready. On iOS 18–25 approach A is the whole feature, so it must be good on its own.
+  - Kit's model picks (Foundation Models) run only on iOS 26+ with Apple Intelligence on. Every device first gets the approach A picks; the model's picks replace them only when they are better (see the model stage). On iOS 18–25 approach A is the whole feature, so it must be good on its own.
   - Liquid Glass falls back to the standard material on iOS 18–25.
   - Fall detection, alarms, fonts and Kit's UI use only iOS 18 APIs.
 - Project defaults to MainActor isolation; avoid blocking async bridges (see memory: use fire-and-forget `Task {}`).
@@ -61,7 +61,7 @@ Places along a route today are **not personalised and not accurate**: some aren'
 | **B. Foundation Models picks from a pre-filtered candidate list and writes notes** | Handles subtle preferences; slower, non-deterministic, needs fallback | **Chosen by the user** ("slower is fine at leisure pace") |
 | C. Pre-rank per interest in the build script | Least app code; can't fit the rider's own line or fitness | Rejected |
 
-Guardrails that make B safe: (1) hard filters run in code before the model sees anything; (2) the model returns only candidate IDs via `@Generable` structured output — it cannot introduce places; (3) notes are generated from the candidate's own facts; (4) devices without Apple Intelligence (or on model error/timeout) use approach A.
+Guardrails that make B safe: (1) hard filters run in code before the model sees anything; (2) the model returns only candidate IDs via `@Generable` structured output — it cannot introduce places; (3) notes always come from our template, never from the model (amended 26 Nov 2026: on-device trials showed the model pasting facts, writing "none" and borrowing other places' facts); (4) devices without Apple Intelligence (or on model error/timeout) use approach A.
 
 ## Decisions made with the user
 
@@ -105,7 +105,7 @@ Guardrails that make B safe: (1) hard filters run in code before the model sees 
 
 - **Onboarding sheet** (Figma `v3 · 01`, to be updated for the two-axis split): "What I like" chips, "How I'm riding today" chips, and rider level (Beginner / Regular / Strong). Editable later in settings and per-route in the builder.
 - **Candidate stage (code):** places within the corridor, after hard filters, scored roughly by persona match + notability (`wikipedia`) + overlay reason codes + spacing; top ~40 sent to the model as compact lines (`id | name | category | km along | facts`).
-- **Model stage (Foundation Models, on device):** `LanguageModelSession` with instructions describing Kit and the rider profile; `@Generable` result `{ picks: [{ id, note }] }` with a target count (~5 per 20 km, rider-adjustable later). Notes must use only the supplied facts. Validate every returned ID against the candidates; drop unknown IDs.
+- **Model stage (Foundation Models, on device):** `LanguageModelSession` with instructions describing Kit and the rider profile, the approach A picks given as a draft; `@Generable` result `{ ids: [String] }` with a target count (~5 per 20 km, rider-adjustable later). Validate every returned ID against the candidates; drop unknown IDs; notes come from the template. The model's picks replace the approach A picks only when their summed score is strictly higher, they are no more bunched, and every strong approach A pick (score ≥ 4) is still in (amended 26 Nov 2026, from a measured trial: the model was worse than approach A in ~20 of 36 answers).
 - **Fallback (approach A):** if the model is unavailable, errors, or exceeds a timeout, take the top-scored candidates and fill notes from a template ("Toilets and water · km 11").
 - **Ride context axis** changes the route, not the places: With kids → avoid climbs, gravel, roads; Visiting Singapore → favour iconic views and pass rental points; Keep it quiet → avoid stretches with `crowded_*` reason codes at the planned time.
 - **Learning:** Stop / Skip on Kit's pass-by card and detected stops (stationary ≥ 3 min within 50 m of a pick) adjust per-category weights stored on device; the finished screen shows what Kit learned.
@@ -151,6 +151,17 @@ Foundation Models runs on device, so it is already offline. After this, the app 
 - **Alarm:** full-screen flashing terracotta/ink "HELP!" for passers-by, with location (place, km, coordinates, time), "Hold to stop alarm", and "Call 995" (a tap, works on cell signal without internet).
 - **Loud on silent:** play the alarm through an audio session in playback mode at full app volume, which ignores the silent switch. Requires adding the `audio` background mode next to the existing `location` one so it keeps ringing with the screen locked. Apple's "Critical Alerts" permission (gets past Focus / Do Not Disturb via a notification) needs Apple to approve the app; apply for it but don't depend on it.
 - iPhone's own Crash Detection is for car crashes and has no app API; Apple Watch fall detection is separate. This feature is the app's own.
+
+### 6a. No-bike ways (decided with the user, 26 Nov 2026)
+
+Two kinds of "no cycling", treated differently:
+
+| Kind | Examples | Routing (plans and reroutes) | Warning |
+|---|---|---|---|
+| **No bikes at all** (terracotta) | Expressways and their slip roads, `bicycle=no` ways, steps | **Never**: not by the road network (already true), and never by a straight fallback leg that crosses one. A reroute that would need one is not applied. | Before the ride: Kit card + "No bike path" row (Figma `v3 · 13`). Riding off route toward an expressway or no-bike entrance: full-screen alarm (`v3 · 12`). Reroute banner says why (`v3 · 14`). |
+| **Walk your bike** (gold) | Henderson Waves, Punggol Waterway bridges, boardwalks (`no_cycling` in `closures.json`) | Used when sensible, plans and reroutes alike, with the small penalty from section 0 | A gold row before the ride; on the bridge, the "Walk your bike" banner and map label, moving time paused (`v3 · 16`) |
+
+Labels use `Kit/road label` (13 kinds, three tones: terracotta = no access, gold = caution, paper = info) and the 12×12 pixel traffic icons in Figma. This change ships the four it needs (no bikes, expressway, walk your bike, closed); the rest come with the UI rework.
 
 ### 7. Review follow-ups (decided with the user, 20 Nov 2026)
 

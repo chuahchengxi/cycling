@@ -18,7 +18,8 @@ enum PCNRouting {
     nonisolated static let gapEpsilon: Double = 15
 
     /// `graph` may carry closure penalties (see `PCNGraph.penalised`); `base` is the
-    /// same network without them (nil = `graph`). Per waypoint pair the penalised path
+    /// same network without them (nil = `graph`); `fallback` carries the closure costs only,
+    /// tried when `graph` (closures plus avoid circles) gives nothing usable. Per waypoint pair the penalised path
     /// is used when it avoids every `closed` circle within `maxDetourRatio` of the
     /// open path; otherwise the open path is ridden and each run of closed vertices
     /// becomes an off-connector `gap` leg round it. Runs off the main actor.
@@ -26,7 +27,9 @@ enum PCNRouting {
         waypoints: [Coord],
         graph: PCNGraph,
         base: PCNGraph? = nil,
+        fallback: PCNGraph? = nil,
         closed: [NoGoCircle] = [],
+        avoid: [NoGoCircle] = [],
         gap: @Sendable (Coord, Coord) async -> [Coord]
     ) async -> (poly: [Coord], offSegments: [[Coord]], offMeters: Double) {
         guard waypoints.count >= 2 else { return ([], [], 0) }
@@ -57,10 +60,15 @@ enum PCNRouting {
                 continue
             }
             var onPCN = open
-            if !closed.isEmpty, let avoid = graph.path(from: entry, to: exit),
-               !avoid.contains(where: isClosed),
-               base.pathLength(avoid) <= PCNGraph.maxDetourRatio * base.pathLength(open) {
-                onPCN = avoid
+            // The penalised path first; if it's closed or over the cap, the closures-only one
+            // (`fallback`), so a crowd to avoid never pushes the rider onto road gap legs.
+            if !closed.isEmpty || !avoid.isEmpty {
+                for g in [graph, fallback].compactMap({ $0 }) {
+                    guard let p = g.path(from: entry, to: exit), !p.contains(where: isClosed),
+                          base.pathLength(p) <= PCNGraph.maxDetourRatio * base.pathLength(open) else { continue }
+                    onPCN = p
+                    break
+                }
             }
             // start -> entry node (gap), unless already essentially on it. A closed entry
             // node is never visited: the closed run below gaps straight from `a`.
@@ -258,5 +266,23 @@ extension PCNRouting {
         let r6 = await stitched(waypoints: [nearCorner, west], graph: g1.penalised(closed: [shut], walk: []), base: g1,
                                 closed: [shut], gap: { [$0, $1] })
         assert(!r6.poly.contains { $0 == corner } && r6.poly.first == nearCorner, "entry spur into closure: \(r6.poly)")
+        // 7. Ride context: an avoid circle on one side of the square sends the route the other way (within the cap)…
+        let r7 = await stitched(waypoints: [west, north], graph: sq.penalised(closed: [], walk: [], avoid: [shut]), base: sq,
+                                avoid: [shut], gap: { [$0, $1] })
+        assert(r7.offSegments.isEmpty && !r7.poly.contains(where: inside), "avoid circle should bend the route: \(r7.poly)")
+        // …but past the +30 % cap the short side is ridden, no gap leg (avoid is a preference, not a closure).
+        let r8 = await stitched(waypoints: [west, north], graph: lg.penalised(closed: [], walk: [], avoid: [shut]), base: lg,
+                                avoid: [shut], gap: { [$0, $1] })
+        assert(r8.offSegments.isEmpty && r8.poly.contains { $0 == corner }, "over the cap the short side stays: \(r8.poly)")
+        // 9. Closure on one side, a crowd on the other, a long way round over the cap: the crowded
+        //    side is still a closure-free connector within the cap, so it beats road gap legs.
+        let longWay = [west, Coord(lat: 1.300, lon: 103.797), Coord(lat: 1.302, lon: 103.797), north]
+        let side = Coord(lat: 1.302, lon: 103.7999)   // the crowded side, a little longer than the closed one
+        let three = PCNGraph(polylines: [[west, corner, north], [west, side, north], longWay])
+        let crowd = NoGoCircle(coord: side, radiusMeters: 20)
+        let r9 = await stitched(waypoints: [west, north], graph: three.penalised(closed: [shut], walk: [], avoid: [crowd]), base: three,
+                                fallback: three.penalised(closed: [shut], walk: []), closed: [shut], avoid: [crowd], gap: { [$0, $1] })
+        assert(r9.offSegments.isEmpty && r9.poly.contains { $0 == side }, "closure-only detour must beat road gap legs: \(r9.poly)")
+        print("PCNRouting avoid checks: r7 r8 r9")
     }
 }

@@ -17,6 +17,7 @@ struct SheetView: View {
     var obstacles: [Obstacle] = []
     var closures: (active: [Closure], expired: [Closure]) = ([], [])
     var replanning = false
+    var kitByModel = false
     @Binding var currentDetent: PresentationDetent
     var onStart: () -> Void
     var onReplan: () -> Void = {}
@@ -39,7 +40,10 @@ struct SheetView: View {
                         elevationGraph
                         if !closures.active.isEmpty || !closures.expired.isEmpty { closureList }
                         if !obstacles.isEmpty { obstacleList }
-                        if !route.sights.isEmpty { sightList }
+                        if !route.sights.isEmpty {
+                            KitCard(count: route.sights.count, byModel: kitByModel)
+                            sightList
+                        }
                         turnList
                     }
                     .padding(20)
@@ -193,7 +197,7 @@ struct SheetView: View {
                             .font(.title3).frame(width: 30).foregroundStyle(.green)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(sight.name).font(.subheadline.weight(.semibold))
-                            Text(Discovery.icon(for: sight.category).label)
+                            Text(sight.note ?? Discovery.icon(for: sight.category).label)
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer(minLength: 8)

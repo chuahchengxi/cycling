@@ -13,6 +13,8 @@ import MapKit
 
 struct FinishedView: View {
     let ride: Ride
+    /// What Kit learned on this ride, e.g. "More bridges, fewer cafés next time".
+    var kitNote: String? = nil
     let onDone: () -> Void
 
     private var track: [TrackPoint] { ride.track }
@@ -30,6 +32,18 @@ struct FinishedView: View {
 
             speedGraph
                 .frame(height: 200)
+
+            if let kitNote {
+                Label {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Kit · Noted").font(.caption.weight(.semibold)).textCase(.uppercase).foregroundStyle(.secondary)
+                        Text(kitNote).font(.subheadline)
+                    }
+                } icon: { Image(systemName: "cat.fill") }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.background, in: .rect(cornerRadius: 14))
+            }
 
             Spacer(minLength: 0)
 

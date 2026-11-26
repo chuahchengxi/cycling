@@ -40,6 +40,10 @@ struct RouteBuilderView: View {
     @State private var sights: [Sight]?
     @State private var sightsLoading = false
     @State private var selectedSight: Sight?
+    @State private var editingInterests = false
+    /// The model's picks replaced the quick ones for the current line.
+    @State private var kitByModel = false
+    @AppStorage(RiderProfile.storageKey) private var profileRaw = ""
 
     /// Search the bundled places, so a route can start from a name instead of a lucky tap.
     @State private var query = ""
@@ -64,7 +68,7 @@ struct RouteBuilderView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { naming = true }
-                        .disabled(plan.polyline.isEmpty || planning || (mode == .leisure && sightsLoading))
+                        .disabled(plan.polyline.isEmpty || planning || (mode != .fast && sightsLoading))
                 }
             }
             .searchable(text: $query, prompt: "Search for a place")
@@ -80,7 +84,9 @@ struct RouteBuilderView: View {
                 Button("OK") { error = nil }
             } message: { Text(error ?? "") }
             .sheet(item: $selectedSight) { SightSheet(sight: $0) }
+            .sheet(isPresented: $editingInterests) { InterestsSheet() }
             .onChange(of: mode) { _, _ in replan() }
+            .onChange(of: profileRaw) { _, _ in replan() }   // "For you" edits re-pick
         }
     }
 
@@ -142,10 +148,16 @@ struct RouteBuilderView: View {
     private var controls: some View {
         VStack(spacing: 12) {
             if waypoints.count >= 2 {
-                Picker("Mode", selection: $mode) {
-                    ForEach(RideMode.allCases) { Text($0.rawValue).tag($0) }
+                HStack {
+                    Picker("Mode", selection: $mode) {
+                        ForEach(RideMode.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    if mode != .fast {
+                        Button { editingInterests = true } label: { Label("For you", systemImage: "heart") }
+                            .buttonStyle(.bordered)
+                    }
                 }
-                .pickerStyle(.segmented)
             }
 
             if mode == .leisure, let region = mapRegion {
@@ -178,7 +190,8 @@ struct RouteBuilderView: View {
                 }
             }
 
-            if mode == .leisure { placesSection }
+            if mode != .fast, let sights, !sights.isEmpty, !sightsLoading { KitCard(count: sights.count, byModel: kitByModel) }
+            if mode != .fast { placesSection }
 
             HStack {
                 Button(role: .destructive) {
@@ -242,7 +255,7 @@ struct RouteBuilderView: View {
                                 Button { selectedSight = sight } label: {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(sight.name).font(.footnote.weight(.semibold)).lineLimit(1)
-                                        Text("\(Discovery.icon(for: sight.category).label) · \(Fmt.km(sight.offsetAlong))")
+                                        Text("\(sight.note ?? Discovery.icon(for: sight.category).label) · \(Fmt.km(sight.offsetAlong))")
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
                                     }
@@ -272,23 +285,32 @@ struct RouteBuilderView: View {
         let gen = generation
         guard waypoints.count >= 2 else { plan = RoutePlan(); planning = false; sights = nil; sightsLoading = false; return }
         planning = true
-        if mode != .leisure { sights = nil; sightsLoading = false }
+        if mode == .fast { sights = nil; sightsLoading = false }
         let currentMode = mode
+        let profile = RiderProfile.decode(profileRaw) ?? RiderProfile()
         let currentWaypoints = waypoints
         planTask = Task {
             do {
-                let fresh = try await Routing.plan(through: currentWaypoints, mode: currentMode)
+                let fresh = try await Routing.plan(through: currentWaypoints, mode: currentMode, context: profile.today)
                 guard gen == generation else { return }
                 plan = fresh
                 planning = false
-                if currentMode == .leisure, !fresh.polyline.isEmpty {
+                if currentMode != .fast, !fresh.polyline.isEmpty {
                     sights = nil
                     sightsLoading = true
+                    kitByModel = false
                     let line = fresh.polyline
-                    let found = await Task.detached { Discovery.sights(along: line, mode: currentMode) }.value
+                    let found = await Task.detached { Kit.picks(along: line, mode: currentMode, profile: profile) }.value
                     guard gen == generation else { return }
-                    sights = found
+                    sights = found.quick
                     sightsLoading = false
+                    // Quick picks are showing; the model's replace them only if this line is still current.
+                    Task {
+                        guard let better = await KitModel.refine(line: line, quick: found.quick, candidates: found.candidates, profile: profile),
+                              let applied = Self.apply(better, forGeneration: gen, current: generation) else { return }
+                        sights = applied
+                        kitByModel = true
+                    }
                 }
             } catch {
                 guard gen == generation else { return }
@@ -296,6 +318,11 @@ struct RouteBuilderView: View {
                 planning = false
             }
         }
+    }
+
+    /// A model answer lands only if no newer pin or mode change has happened since it was asked.
+    nonisolated static func apply(_ result: [Sight], forGeneration g: Int, current: Int) -> [Sight]? {
+        g == current ? result : nil
     }
 
     private func save() {

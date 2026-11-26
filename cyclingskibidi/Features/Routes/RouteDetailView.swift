@@ -18,6 +18,8 @@ struct RouteDetailView: View {
     @Environment(Trip.self) private var trip
     @Environment(\.modelContext) private var context
     @Query private var obstacles: [Obstacle]
+    @AppStorage(RiderProfile.storageKey) private var profileRaw = ""
+    private var profile: RiderProfile { RiderProfile.decode(profileRaw) ?? RiderProfile() }
 
     @State private var sheetShown = true
     @State private var startPending = false
@@ -29,6 +31,7 @@ struct RouteDetailView: View {
     @State private var confirmClosedStart = false
     /// The last re-plan still crossed a closure (no way round).
     @State private var replanFailed = false
+    @State private var kitByModel = false
 
     private var blockingClosures: [Closure] { closureHits.active.filter { $0.kind == .closure } }
 
@@ -58,14 +61,11 @@ struct RouteDetailView: View {
             checkClosures()
         }
         .task {
-            // Leisure sights are found afresh on every open: what's open and what's
+            // Kit's picks are found afresh on every open: what's open and what's
             // closed depends on when you ride, not on when the route was planned.
             // The ride uses what this saves.
-            guard route.mode == .leisure, route.polyline.count > 1 else { return }
-            let (line, mode) = (route.polyline, route.mode)
-            let found = await Task.detached { Discovery.sights(along: line, mode: mode) }.value
-            route.sightData = found.isEmpty ? nil : Blob.encode(found)
-            try? context.save()
+            guard route.mode != .fast, route.polyline.count > 1 else { return }
+            await pick()
         }
         .sheet(isPresented: $sheetShown, onDismiss: {
             // Begin navigation only once the brief sheet is fully dismissed.
@@ -73,7 +73,7 @@ struct RouteDetailView: View {
             // "the current sheet is blocking the next one" failure.
             if startPending { startPending = false; trip.begin(route) }
         }) {
-            SheetView(route: route, obstacles: nearby, closures: closureHits, replanning: replanning,
+            SheetView(route: route, obstacles: nearby, closures: closureHits, replanning: replanning, kitByModel: kitByModel,
                       currentDetent: $detent, onStart: {
                 // Saved routes are rechecked at ride start too: a closure may have begun since opening.
                 checkClosures()
@@ -129,13 +129,10 @@ struct RouteDetailView: View {
         replanning = true
         Task {
             defer { replanning = false }
-            if let plan = try? await Routing.plan(through: route.waypoints, mode: route.mode), plan.polyline.count > 1 {
+            if let plan = try? await Routing.plan(through: route.waypoints, mode: route.mode, context: profile.today), plan.polyline.count > 1 {
                 route.apply(plan)   // new line, turns and climb chart together
                 // Sights follow the new line: found afresh for Leisure, offline.
-                let (line, mode) = (route.polyline, route.mode)
-                let sights = mode == .leisure ? await Task.detached { Discovery.sights(along: line, mode: mode) }.value : route.sights
-                route.sightData = sights.isEmpty ? nil : Blob.encode(sights)
-                try? context.save()
+                await pick()
                 checkClosures()
                 frameRoute()
             }
@@ -143,6 +140,26 @@ struct RouteDetailView: View {
             // Only start if the new line is actually clear; otherwise ask again, honestly.
             checkClosures()
             if blockingClosures.isEmpty { start() } else { replanFailed = true; confirmClosedStart = true }
+        }
+    }
+
+    /// Kit's quick picks now, saved; the model's later if it answers for this same line.
+    private func pick() async {
+        guard route.mode != .fast, route.polyline.count > 1 else { return }
+        let (line, mode, profile) = (route.polyline, route.mode, profile)
+        let found = await Task.detached { Kit.picks(along: line, mode: mode, profile: profile) }.value
+        guard route.polyline == line else { return }
+        kitByModel = false
+        route.sightData = found.quick.isEmpty ? nil : Blob.encode(found.quick)
+        try? context.save()
+        Task {
+            // Not once the ride has started: it already copied the quick picks, and the
+            // saved route should show what's being ridden.
+            guard let better = await KitModel.refine(line: line, quick: found.quick, candidates: found.candidates, profile: profile),
+                  route.polyline == line, trip.route == nil else { return }
+            route.sightData = Blob.encode(better)
+            kitByModel = true
+            try? context.save()
         }
     }
 
