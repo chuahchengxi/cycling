@@ -39,6 +39,7 @@ struct SheetView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
                         summary
+                        heatHint
                         climb
                         elevationGraph
                         if !noBike.crossings.isEmpty || !noBike.walk.isEmpty { noBikeList }
@@ -92,6 +93,22 @@ struct SheetView: View {
         .minimumScaleFactor(0.75)   // shrink to fit rather than wrap ("Leisure"/"Moderate")
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, collapsed ? 20 : 0)
+    }
+
+    /// Afternoon heat and storms matter on the slower, scenic rides; a Fast
+    /// route brief stays as compact as before.
+    @ViewBuilder
+    private var heatHint: some View {
+        if route.mode != .fast {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(HeatHint.text)
+                if let suggestion = HeatHint.shelterSuggestion(start: .now, stops: route.restStops) {
+                    Text(suggestion)
+                }
+            }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+        }
     }
 
     /// A vertical rule whose centre sits on the row's text baseline, so the big
@@ -286,10 +303,17 @@ struct SheetView: View {
                         }
                     }
                     Spacer(minLength: 8)
+                    if stop.sheltered {
+                        Image(systemName: "umbrella.fill")
+                            .font(.caption)
+                            .foregroundStyle(.blue)
+                            .accessibilityLabel("Sheltered")
+                    }
                     Text(Fmt.km(stop.offsetAlong)).font(.caption).foregroundStyle(.secondary)
                 }
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("Rest stop, \(stop.name), \(Fmt.km(stop.offsetAlong)). \(stop.amenities.map { Discovery.icon(for: $0).label }.joined(separator: ", ")). \(stop.warning ?? "")")
+                .accessibilityLabel("Rest stop, \(stop.name), \(Fmt.km(stop.offsetAlong)). \(stop.amenities.map { Discovery.icon(for: $0).label }.joined(separator: ", "))."
+                                    + (stop.sheltered ? " Sheltered." : "") + (stop.warning.map { " \($0)" } ?? ""))
             }
         }
     }

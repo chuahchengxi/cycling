@@ -47,6 +47,7 @@ struct cyclingskibidiApp: App {
         Task { await KitModel.selfCheck() }
         KitLearning.selfCheck()
         RestStops.selfCheck()
+        HeatHint.selfCheck()
         PixelArt.selfCheck()
         KitColor.selfCheck()
         NoBike.selfCheck()

@@ -19,6 +19,35 @@ nonisolated struct RestStop: Codable, Identifiable, Sendable, Equatable {
     var offsetAlong: Double
     var amenities: [String]
     var warning: String? = nil
+    /// True when the stop has a `shelter` amenity — the only shelter signal in
+    /// places.json (OSM `covered=yes` is not in that file).
+    var sheltered: Bool
+
+    init(name: String, lat: Double, lon: Double, offsetAlong: Double,
+         amenities: [String], warning: String? = nil, sheltered: Bool? = nil) {
+        self.id = UUID()
+        self.name = name
+        self.lat = lat
+        self.lon = lon
+        self.offsetAlong = offsetAlong
+        self.amenities = amenities
+        self.warning = warning
+        self.sheltered = sheltered ?? amenities.contains("shelter")
+    }
+
+    /// Old saved routes have no `sheltered` key: read it off the amenities so
+    /// they still decode, defaulting to false when there is no shelter there.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try c.decode(String.self, forKey: .name)
+        lat = try c.decode(Double.self, forKey: .lat)
+        lon = try c.decode(Double.self, forKey: .lon)
+        offsetAlong = try c.decode(Double.self, forKey: .offsetAlong)
+        amenities = try c.decode([String].self, forKey: .amenities)
+        warning = try c.decodeIfPresent(String.self, forKey: .warning)
+        sheltered = try c.decodeIfPresent(Bool.self, forKey: .sheltered) ?? amenities.contains("shelter")
+    }
 
     var coordinate: CLLocationCoordinate2D { .init(latitude: lat, longitude: lon) }
 }
@@ -178,6 +207,14 @@ extension RestStops {
         assert(clustered[0].amenities == ["drinkingWater", "toilets", "bikeParking"],
                "cluster order: \(clustered[0].amenities)")
         assert(clustered[0].name == "Drinking water · km 1.0", "fallback name: \(clustered[0].name)")
+
+        // Shelter: a "shelter" amenity makes a stop sheltered; old saved JSON
+        // without the key still decodes (as false when there is no such amenity).
+        let sheltered = cluster([sight("toilets", 1000), sight("shelter", 1020)])
+        assert(sheltered.count == 1 && sheltered[0].sheltered, "shelter amenity must mark the stop sheltered")
+        let oldJSON = #"{"name":"Old","lat":1.3,"lon":103.8,"offsetAlong":5000,"amenities":["drinkingWater"]}"#
+        let oldStop = try? JSONDecoder().decode(RestStop.self, from: Data(oldJSON.utf8))
+        assert(oldStop?.sheltered == false, "saved JSON without sheltered must decode as false")
 
         // Quality.
         func stop(_ km: Double, _ amenities: [String]) -> RestStop {
