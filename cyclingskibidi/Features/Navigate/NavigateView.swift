@@ -90,7 +90,7 @@ struct NavigateView: View {
         // Every marked hazard warns on approach, whatever route is being ridden.
         .onChange(of: obstacles, initial: true) { recorder.hazards = obstacles.filter(\.isActive) }
         .sheet(isPresented: Binding(   // the full-screen alarm hides the nav sheet, whoever asks for it back
-            get: { showSheet && recorder.noBikeAhead == nil }, set: { showSheet = $0 })) {
+            get: { showSheet && recorder.noBikeAhead == nil }, set: { if recorder.noBikeAhead == nil { showSheet = $0 } })) {
             navSheet
                 .presentationDetents([.height(150), .fraction(0.45), .large], selection: $detent)
                 .presentationBackgroundInteraction(.enabled)

@@ -33,7 +33,7 @@ struct RouteDetailView: View {
     /// The last re-plan still crossed a closure (no way round).
     @State private var replanFailed = false
     @State private var kitByModel = false
-    @State private var restLevel: RiderLevel = .regular
+    @State private var restLevel: RiderLevel?
 
     private var blockingClosures: [Closure] { closureHits.active.filter { $0.kind == .closure } }
 
@@ -75,7 +75,7 @@ struct RouteDetailView: View {
             // "the current sheet is blocking the next one" failure.
             if startPending { startPending = false; trip.begin(route) }
         }) {
-            SheetView(route: route, obstacles: nearby, closures: closureHits, replanning: replanning, kitByModel: kitByModel, restLevel: restLevel,
+            SheetView(route: route, obstacles: nearby, closures: closureHits, replanning: replanning, kitByModel: kitByModel, restLevel: restLevel ?? RiderLevel.effective(profile: profile, rides: rides),
                       currentDetent: $detent, onStart: {
                 // Saved routes are rechecked at ride start too: a closure may have begun since opening.
                 checkClosures()

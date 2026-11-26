@@ -136,7 +136,7 @@ nonisolated enum Discovery {
     static func sights(along polyline: [Coord], mode: RideMode = .leisure, start: Date = .now,
                        in places: [Sight] = Discovery.places, facts: [String: PlaceFacts] = Discovery.facts,
                        closed: [NoGoCircle]? = nil, walk: [NoGoCircle]? = nil, limit: Int? = 20,
-                       categories: Set<String> = leisureCategories) -> [Sight] {
+                       categories: Set<String> = leisureCategories, mergeByName: Bool = true) -> [Sight] {
         // A thinned line is plenty for a 100-300 m corridor and keeps the snap cheap.
         let coords = Geo.sample(polyline.map(\.cl), count: 400)
         guard coords.count >= 2, let inBox = box(coords, pad: largeCorridor) else { return [] }
@@ -162,7 +162,7 @@ nonisolated enum Discovery {
         }
         // One per place merges a park's zones by name; amenities are all called "Toilets" or
         // "Drinking water", so for them it would keep one tap for the whole route.
-        let one = categories == leisureCategories ? onePerPlace(kept, polyline: coords, cumulative: cumulative, facts: facts) : kept
+        let one = mergeByName ? onePerPlace(kept, polyline: coords, cumulative: cumulative, facts: facts) : kept
         guard let limit else { return one }
         return spread(one, polyline: coords, cumulative: cumulative, limit: limit) { Double(notability($0, facts)) }
     }

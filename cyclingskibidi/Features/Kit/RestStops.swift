@@ -146,7 +146,7 @@ nonisolated enum RestStops {
         guard mode != .fast else { return [] }
         let amenities = Discovery.sights(along: polyline, mode: mode, start: start, in: places, facts: facts,
                                          closed: closed, walk: walk, limit: nil,
-                                         categories: amenityCategories)
+                                         categories: amenityCategories, mergeByName: false)
         guard let length = Geo.cumulative(polyline.map(\.cl)).last else { return [] }
         return choose(cluster(amenities), length: length, level: level)
     }

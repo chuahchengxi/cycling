@@ -60,7 +60,7 @@ struct SheetView: View {
             }
         }
         .sheet(item: $selectedSight) { SightSheet(sight: $0) }
-        .task(id: [route.polylineData?.hashValue ?? 0] + closures.active.map(\.id.hashValue)) {
+        .task(id: [AnyHashable(route.polylineData)] + closures.active.map { AnyHashable($0.id) }) {
             let (polyline, found) = (route.polyline, route.noBikeCrossings)
             let walk = closures.active.filter { $0.kind == .noCycling }
             let circles = walk.flatMap(\.noGoCircles), names = walk.flatMap { c in c.noGoCircles.map { _ in c.name } }
@@ -267,7 +267,7 @@ struct SheetView: View {
     private var restStopList: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Rest stops").font(.headline)
-            Text(route.distanceMeters < 20_000 ? "Water and toilets on the way"
+            Text((Geo.cumulative(route.polyline.map(\.cl)).last ?? 0) < 20_000 ? "Water and toilets on the way"
                  : { let w = RestStops.spacing(restLevel); return "A rest stop every \(Int(w.lowerBound / 1000))–\(Int(w.upperBound / 1000)) km for a \(restLevel.label.lowercased()) rider" }())
                 .font(.subheadline).foregroundStyle(.secondary)
             ForEach(route.restStops) { stop in

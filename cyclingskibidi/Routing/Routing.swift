@@ -170,6 +170,7 @@ extension Route {
         expectedSeconds = Routing.duration(distance: distanceMeters, ascent: ascentMeters, mode: mode)
         difficulty = .rated(distanceMeters: distanceMeters, ascentMeters: ascentMeters)
         noBikeData = plan.noBikeCrossings.isEmpty ? nil : Blob.encode(plan.noBikeCrossings)
+        restStopData = nil   // found afresh for the new line by the route brief
     }
 
     /// The mode's current-speed estimate for this route, recomputed from its
