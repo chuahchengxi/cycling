@@ -243,3 +243,18 @@ extension RestStops {
                "open toilet missing: \(closedStops.map(\.name))")
     }
 }
+
+extension RestStops {
+    /// Real data: a ~30 km Leisure ride along the east coast gets spaced stops with facilities.
+    static func selfCheckReal() async {
+        guard let plan = try? await Routing.plan(through: [Coord(lat: 1.2806, lon: 103.8711), Coord(lat: 1.3907, lon: 103.9915)], mode: .leisure),
+              plan.distance > 20_000 else { return assertionFailure("the east-coast test ride didn't plan") }
+        let stops = await Task.detached { along(plan.polyline, mode: .leisure, level: .regular) }.value
+        let gaps = zip([0] + stops.map(\.offsetAlong), stops.map(\.offsetAlong)).map { $1 - $0 }
+        let beginner = await Task.detached { along(plan.polyline, mode: .leisure, level: .beginner) }.value
+        assert(beginner.count >= 3, "a beginner on 22 km needs a stop every 5–7 km: \(beginner.map(\.offsetAlong))")
+        assert(stops.contains { $0.amenities.contains("drinkingWater") } && gaps.allSatisfy { $0 <= 25_000 } && stops.allSatisfy { !$0.amenities.isEmpty },
+               "east coast rest stops: \(stops.map { "\(Int($0.offsetAlong)) \($0.amenities)" }) over \(Int(plan.distance)) m")
+        print("RestStops real:", Int(plan.distance), stops.map { "\(Int($0.offsetAlong / 100) / 10)km \($0.name) \($0.amenities) \($0.warning ?? "")" })
+    }
+}

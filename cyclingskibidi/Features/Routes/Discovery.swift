@@ -160,7 +160,9 @@ nonisolated enum Discovery {
             if inside(s.coordinate, walk), f?.note?.reasons?.contains("park_and_walk") != true { return false }
             return true
         }
-        let one = onePerPlace(kept, polyline: coords, cumulative: cumulative, facts: facts)
+        // One per place merges a park's zones by name; amenities are all called "Toilets" or
+        // "Drinking water", so for them it would keep one tap for the whole route.
+        let one = categories == leisureCategories ? onePerPlace(kept, polyline: coords, cumulative: cumulative, facts: facts) : kept
         guard let limit else { return one }
         return spread(one, polyline: coords, cumulative: cumulative, limit: limit) { Double(notability($0, facts)) }
     }

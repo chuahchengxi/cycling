@@ -188,6 +188,8 @@ final class Route {
     var sightData: Data?
     /// Where a straight leg crosses a no-bike way, as [Coord]; nil = none (and on older saves).
     var noBikeData: Data?
+    /// Rest stops along the line, as [RestStop]; nil until the route brief finds them (and on older saves).
+    var restStopData: Data?
 
     init(name: String = "Untitled route") {
         self.name = name
@@ -207,6 +209,7 @@ final class Route {
     var elevations: [Double] { Blob.decode([Double].self, elevationData) ?? [] }
     var sights: [Sight] { Blob.decode([Sight].self, sightData) ?? [] }
     var noBikeCrossings: [Coord] { Blob.decode([Coord].self, noBikeData) ?? [] }
+    var restStops: [RestStop] { Blob.decode([RestStop].self, restStopData) ?? [] }
 
     var distanceKM: Double { distanceMeters / 1000 }
 }

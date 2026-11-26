@@ -18,6 +18,7 @@ struct SheetView: View {
     var closures: (active: [Closure], expired: [Closure]) = ([], [])
     var replanning = false
     var kitByModel = false
+    var restLevel: RiderLevel = .regular
     @Binding var currentDetent: PresentationDetent
     var onStart: () -> Void
     var onReplan: () -> Void = {}
@@ -47,6 +48,7 @@ struct SheetView: View {
                             KitCard(count: route.sights.count, byModel: kitByModel)
                             sightList
                         }
+                        if !route.restStops.isEmpty { restStopList }
                         turnList
                     }
                     .padding(20)
@@ -257,6 +259,37 @@ struct SheetView: View {
                     }
                 }
                 .buttonStyle(.plain)
+            }
+        }
+    }
+
+    /// Rest stops (spec section 3): water and toilets under 20 km, else spaced by the rider's level.
+    private var restStopList: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Rest stops").font(.headline)
+            Text(route.distanceMeters < 20_000 ? "Water and toilets on the way"
+                 : { let w = RestStops.spacing(restLevel); return "A rest stop every \(Int(w.lowerBound / 1000))–\(Int(w.upperBound / 1000)) km for a \(restLevel.label.lowercased()) rider" }())
+                .font(.subheadline).foregroundStyle(.secondary)
+            ForEach(route.restStops) { stop in
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: stop.amenities.contains("drinkingWater") ? "drop.fill" : Discovery.icon(for: stop.amenities.first ?? "").symbol)
+                        .font(.title3).frame(width: 30).foregroundStyle(.teal)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(stop.name).font(.subheadline.weight(.semibold))
+                        Text(stop.amenities.map { Discovery.icon(for: $0).label }.joined(separator: " · "))
+                            .font(.caption).foregroundStyle(.secondary)
+                        if let warning = stop.warning {
+                            Text(warning).font(.caption.weight(.semibold))
+                                .padding(.horizontal, 6).padding(.vertical, 2)
+                                .background(KitColor.gold).foregroundStyle(KitColor.ink).kitSurface()
+                        }
+                    }
+                    Spacer(minLength: 8)
+                    Text(Fmt.km(stop.offsetAlong)).font(.caption).foregroundStyle(.secondary)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Rest stop, \(stop.name), \(Fmt.km(stop.offsetAlong)). \(stop.amenities.map { Discovery.icon(for: $0).label }.joined(separator: ", ")). \(stop.warning ?? "")")
             }
         }
     }

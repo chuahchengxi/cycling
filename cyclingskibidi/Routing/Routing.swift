@@ -238,6 +238,13 @@ extension Routing {
         assert(Route(name: "Old").noBikeCrossings.isEmpty, "a route saved before no-bike data must show no warning")
         var p = RoutePlan(); p.noBikeCrossings = [Coord(lat: 1.3, lon: 103.8)]
         assert(Route.make(name: "X", mode: .moderate, waypoints: [], plan: p).noBikeCrossings.count == 1)
+
+        // Rest stops: none saved = none; two round-trip.
+        assert(Route(name: "Old").restStops.isEmpty, "a route saved before rest stops must have none")
+        let withStops = Route(name: "Stops")
+        withStops.restStopData = Blob.encode([RestStop(name: "A", lat: 1.3, lon: 103.8, offsetAlong: 5000, amenities: ["drinkingWater"]),
+                                              RestStop(name: "B", lat: 1.31, lon: 103.8, offsetAlong: 9000, amenities: ["toilets"], warning: "No water for 8 km — fill up here")])
+        assert(withStops.restStops.map(\.name) == ["A", "B"] && withStops.restStops[1].warning != nil, "rest stops must round-trip")
     }
 }
 

@@ -18,6 +18,7 @@ struct RouteDetailView: View {
     @Environment(Trip.self) private var trip
     @Environment(\.modelContext) private var context
     @Query private var obstacles: [Obstacle]
+    @Query(sort: \Ride.startedAt, order: .reverse) private var rides: [Ride]
     @AppStorage(RiderProfile.storageKey) private var profileRaw = ""
     private var profile: RiderProfile { RiderProfile.decode(profileRaw) ?? RiderProfile() }
 
@@ -32,6 +33,7 @@ struct RouteDetailView: View {
     /// The last re-plan still crossed a closure (no way round).
     @State private var replanFailed = false
     @State private var kitByModel = false
+    @State private var restLevel: RiderLevel = .regular
 
     private var blockingClosures: [Closure] { closureHits.active.filter { $0.kind == .closure } }
 
@@ -73,7 +75,7 @@ struct RouteDetailView: View {
             // "the current sheet is blocking the next one" failure.
             if startPending { startPending = false; trip.begin(route) }
         }) {
-            SheetView(route: route, obstacles: nearby, closures: closureHits, replanning: replanning, kitByModel: kitByModel,
+            SheetView(route: route, obstacles: nearby, closures: closureHits, replanning: replanning, kitByModel: kitByModel, restLevel: restLevel,
                       currentDetent: $detent, onStart: {
                 // Saved routes are rechecked at ride start too: a closure may have begun since opening.
                 checkClosures()
@@ -102,6 +104,10 @@ struct RouteDetailView: View {
         }
         pins += nearby.map { o in
             MapPin(id: o.pinID, coordinate: o.coordinate, title: o.kind.rawValue, look: .view(AnyView(ObstacleBadge(kind: o.kind))))
+        }
+        pins += route.restStops.map { r in
+            MapPin(id: "rest-\(r.id.uuidString)", coordinate: r.coordinate, title: "Rest stop, \(r.name)",
+                   look: .marker(symbol: r.amenities.contains("drinkingWater") ? "drop.fill" : Discovery.icon(for: r.amenities.first ?? "").symbol, tint: .systemTeal))
         }
         pins += route.sights.map { s in
             MapPin(id: s.id.uuidString, coordinate: s.coordinate, title: s.name, look: .view(AnyView(SightBadge(sight: s))))
@@ -147,10 +153,15 @@ struct RouteDetailView: View {
     private func pick() async {
         guard route.mode != .fast, route.polyline.count > 1 else { return }
         let (line, mode, profile) = (route.polyline, route.mode, profile)
-        let found = await Task.detached { Kit.picks(along: line, mode: mode, profile: profile) }.value
+        let level = RiderLevel.effective(profile: profile, rides: rides)
+        let (found, stops) = await Task.detached {
+            (Kit.picks(along: line, mode: mode, profile: profile), RestStops.along(line, mode: mode, level: level))
+        }.value
         guard route.polyline == line else { return }
         kitByModel = false
+        restLevel = level
         route.sightData = found.quick.isEmpty ? nil : Blob.encode(found.quick)
+        route.restStopData = stops.isEmpty ? nil : Blob.encode(stops)
         try? context.save()
         Task {
             // Not once the ride has started: it already copied the quick picks, and the

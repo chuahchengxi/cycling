@@ -51,6 +51,7 @@ struct cyclingskibidiApp: App {
         KitColor.selfCheck()
         NoBike.selfCheck()
         Task { await Routing.selfCheckNoBike() }
+        Task { await RestStops.selfCheckReal() }
         #endif
     }
 
