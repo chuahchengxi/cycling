@@ -1,7 +1,7 @@
 # Kit — Personalised, Offline Places Along Your Route — Design
 
 Date: 2026-11-20
-Status: design, awaiting approval. Not built.
+Status: approved. Built: section 0 (plan 1), section 5 (offline). Amended 26 Nov 2026: iOS 18 target, places from the shared OSM extract.
 Builds on: Phase 2 PCN routing (`docs/superpowers/specs/2026-09-04-phase2-pcn-routing-design.md`), existing leisure sights (`Discovery.swift`, `Sight`, `RideRecorder.checkSights`).
 Research: `reports/Singapore PCN stops and reviews.md`, `reports/Singapore cycling rider personas.md` (+ `research_notes/`).
 Visual reference: Figma file `XXNkFRE4TcJ9VesSYFxnBx`, page "Cycling — Kit style", section "REDESIGN v3" (screens `v3 · 01`–`06`, components `Kit/bubble`, `Kit/timer`, `Kit/chart`, `Kit/avatar`).
@@ -44,7 +44,10 @@ Places along a route today are **not personalised and not accurate**: some aren'
 
 ## Constraints
 
-- iOS deployment target moves 26.5 → **27.2** (Foundation Models available without availability shims; device must still support and enable Apple Intelligence at runtime).
+- **iOS 18 and later** (decided with the user, 26 Nov 2026; replaces the earlier 27.2 target). Anything newer sits behind `#available` with a fallback that works on iOS 18:
+  - Kit's model picks (Foundation Models) run only on iOS 26+ with Apple Intelligence on. Every device first gets the approach A picks; the model's picks replace them when ready. On iOS 18–25 approach A is the whole feature, so it must be good on its own.
+  - Liquid Glass falls back to the standard material on iOS 18–25.
+  - Fall detection, alarms, fonts and Kit's UI use only iOS 18 APIs.
 - Project defaults to MainActor isolation; avoid blocking async bridges (see memory: use fire-and-forget `Task {}`).
 - Fully offline: data ships in the bundle; refreshed by the developer re-running scripts before a release.
 - OpenStreetMap data is **ODbL**: visible "© OpenStreetMap contributors" credit (About / map attribution), OSM-derived file stays ODbL and can be provided on request. Our own labels, research notes and Michelin list live in a **separate file keyed by OSM ID**.
@@ -91,7 +94,7 @@ Guardrails that make B safe: (1) hard filters run in code before the model sees 
 
 ### 1. Offline places file
 
-- **Build script** (run on the developer's Mac, not in the app): clip Geofabrik Malaysia-Singapore-Brunei PBF to Singapore, extract categories with `osmium`, keep places within ~1 km of the PCN graph, emit `places.json` (ODbL). Do **not** depend on the public Overpass server (overloaded in research).
+- **Build script** (run on the developer's Mac, not in the app): read the same Singapore OSM extract the map and road scripts use (`scripts/map/extract.py`, `sg.osm.pbf`) with `osmium`, keep places within ~1 km of the PCN graph, emit `places.json` (ODbL). One OSM snapshot feeds places, roads and tiles. Do **not** depend on the public Overpass server (overloaded in research); `scripts/places/places.ql` is replaced.
 - **Record:** `osm_id`, `name`, `lat`, `lon` (entrance/edge point where available, else centroid), `category`, `tags` subset (`opening_hours`, `wikipedia`/`wikidata`, `religion`, amenity details), `area_m2` for large features.
 - **Categories and OSM sources** (see personas report table): named bridges (`man_made=bridge`), waterways (`waterway=canal/river`), reservoirs/wetlands/beaches, `tourism=viewpoint`, parks, hawker centres (`amenity=food_court|marketplace|restaurant` with hawker-style names, cross-checked against NEA list), cafés, places of worship, `historic=*`, museums, `tourism=artwork`, playgrounds, rest-stop amenities (`toilets`, `drinking_water`, `water_tap`, `shelter` excluding bus shelters, `bicycle_repair_station`, `bicycle_parking`, `bicycle_rental`).
 - **Overlay** `places_overlay.json` (ours, not ODbL-derived): keyed by OSM ID or by name+coord for hand-added places. Fields: `persona_tags`, `reason_codes` (`crowded_weekend`, `dismount`, `no_water`, `limited_food`, …), `status` + `valid_until`, `signature_dishes`, `stalls` (only Bib 2026 or sourced long-established), `best_time` (e.g. golden hour), `note` (one sourced line), `source_url`. Architecture spots are **hand-curated** here (OSM has no usable architecture tags in Singapore).
