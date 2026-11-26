@@ -78,10 +78,13 @@ enum Routing {
             let base = await PCNDataset.graph()
             // Penalising touches every node; keep it off the main actor like A*.
             // "How I'm riding today" steers round crowded / dismount stretches; Fast ignores it.
-            let avoid = Kit.avoidCircles(for: context, at: start)
-            let graph = await Task.detached { [closed, walk] in base.penalised(closed: closed, walk: walk, avoid: avoid) }.value
+            let (graph, fallback, avoid) = await Task.detached { [closed, walk] in
+                let avoid = Kit.avoidCircles(for: context, at: start)
+                return (base.penalised(closed: closed, walk: walk, avoid: avoid),
+                        avoid.isEmpty ? nil : base.penalised(closed: closed, walk: walk), avoid)
+            }.value
             let result = await PCNRouting.stitched(
-                waypoints: waypoints, graph: graph, base: base, closed: closed, avoid: avoid,
+                waypoints: waypoints, graph: graph, base: base, fallback: fallback, closed: closed, avoid: avoid,
                 gap: { [closed, walk] a, b in roads?.route(a, b, profile: .quiet, closed: closed, walk: walk) ?? [a, b] })
             poly = result.poly
             plan.offConnectorSegments = result.offSegments

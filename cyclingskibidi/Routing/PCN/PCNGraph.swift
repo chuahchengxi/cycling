@@ -108,13 +108,16 @@ nonisolated struct PCNGraph: Sendable {
     /// Extra cost on edges touching a closure / a no-cycling (walk) zone.
     static let closedExtraMeters: Double = 1500
     static let walkExtraMeters: Double = 100
-    /// Extra cost near crowded or dismount places when the rider's context asks to avoid them.
-    static let avoidExtraMeters: Double = 600
+    /// Near crowded or dismount places the rider's context asks to avoid, an edge costs this
+    /// many times its length: per metre, so the cost doesn't grow with vertex density.
+    /// Crossing a 150 m circle (~300 m of path) costs about +600 m.
+    static let avoidCostFactor: Double = 3
     /// A detour round a closure is taken only up to this ratio of the open route.
     static let maxDetourRatio: Double = 1.3
 
     /// A copy with closure and walk-zone costs added to every edge with an endpoint inside a circle,
-    /// plus `avoidExtraMeters` on top for an endpoint inside an `avoid` circle (never a removal).
+    /// and an edge with an endpoint inside an `avoid` circle costing `avoidCostFactor` times its
+    /// length (never a removal).
     /// ponytail: endpoint-only test; edges longer than ~50 m (max in seed 857 m) can miss a small
     /// circle. Split long edges at graph build if that shows up.
     func penalised(closed: [NoGoCircle], walk: [NoGoCircle], avoid: [NoGoCircle] = []) -> PCNGraph {
@@ -134,7 +137,7 @@ nonisolated struct PCNGraph: Sendable {
         var g = self
         for (a, list) in adj {
             g.adj[a] = list.map { (b, w) in
-                (b, w + max(extras[a] ?? 0, extras[b] ?? 0) + (avoids.contains(a) || avoids.contains(b) ? Self.avoidExtraMeters : 0))
+                (b, w * (avoids.contains(a) || avoids.contains(b) ? Self.avoidCostFactor : 1) + max(extras[a] ?? 0, extras[b] ?? 0))
             }
         }
         return g
@@ -173,9 +176,21 @@ extension PCNGraph {
         let w2 = shut.adj[junction]!.first!.1
         assert(abs(w2 - w - closedExtraMeters) < 1, "closed penalty off: \(w2 - w)")
         assert(g.penalised(closed: [], walk: []).nodeCount == g.nodeCount, "empty penalty must keep the graph")
-        // An avoid circle (ride context) adds exactly avoidExtraMeters: a cost, never a removal.
+        // An avoid circle (ride context) multiplies the edge by avoidCostFactor: a cost, never a removal.
         let quiet = g.penalised(closed: [], walk: [], avoid: [NoGoCircle(coord: Coord(lat: 1.300, lon: 103.802), radiusMeters: 10)])
         let w3 = quiet.adj[junction]!.first!.1
-        assert(abs(w3 - w - avoidExtraMeters) < 1, "avoid penalty off: \(w3 - w)")
+        assert(abs(w3 - w * avoidCostFactor) < 1, "avoid penalty off: \(w3) vs \(w)")
+        // …so crossing a crowd costs the same however many vertices the path has inside it.
+        let a = Coord(lat: 1.300, lon: 103.800), b = Coord(lat: 1.300, lon: 103.802)
+        let dense = PCNGraph(polylines: [(0...8).map { Coord(lat: 1.300, lon: 103.800 + Double($0) * 0.00025) }])
+        let crowd = [NoGoCircle(coord: Coord(lat: 1.300, lon: 103.801), radiusMeters: 300)]
+        let costOne = PCNGraph(polylines: [[a, b]]).penalised(closed: [], walk: [], avoid: crowd)
+        let costDense = dense.penalised(closed: [], walk: [], avoid: crowd)
+        func cost(_ g: PCNGraph) -> Double {
+            var total = 0.0, at = key(a, cell: g.cell), prev: GridKey? = nil
+            while at != key(b, cell: g.cell), let next = g.adj[at]?.first(where: { $0.0 != prev }) { total += next.1; prev = at; at = next.0 }
+            return total
+        }
+        assert(abs(cost(costOne) - cost(costDense)) < 2, "crowd cost depends on vertex count: \(cost(costOne)) vs \(cost(costDense))")
     }
 }

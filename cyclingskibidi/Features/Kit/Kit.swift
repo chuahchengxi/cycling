@@ -85,9 +85,18 @@ nonisolated enum Kit {
         let cumulative = Geo.cumulative(coords)
         guard let length = cumulative.last, length > 0 else { return ([], []) }
         let all = Discovery.sights(along: polyline, mode: mode, start: start, facts: facts, limit: nil)
-        let ranked = candidates(all, profile: profile, facts: facts)
-        let quick = quickPicks(ranked, polyline: coords, cumulative: cumulative, count: targetCount(lengthMeters: length), facts: facts)
-        return (quick, ranked)
+        return choose(all, profile: profile, facts: facts, polyline: coords, cumulative: cumulative)
+    }
+
+    /// Quick picks and the model's candidates from every place a rider passes.
+    static func choose(_ all: [Sight], profile: RiderProfile, facts: [String: PlaceFacts],
+                       polyline: [CLLocationCoordinate2D], cumulative: [Double]) -> (quick: [Sight], candidates: [KitCandidate]) {
+        // The spread sees every place, so a long route's later stretches have something to
+        // choose from; only the model's list is cut to the best 40 (its context is small).
+        let ranked = candidates(all, profile: profile, facts: facts, max: .max)
+        let quick = quickPicks(ranked, polyline: polyline, cumulative: cumulative,
+                               count: targetCount(lengthMeters: cumulative.last ?? 0), facts: facts)
+        return (quick, Array(ranked.prefix(40)))
     }
 
     /// Circles to steer round for "How I'm riding today": Keep it quiet avoids crowds
@@ -196,6 +205,13 @@ extension Kit {
         assert(templateNote(at(3.4, "park"), facts: facts(note: otter), lengthMeters: length) == "Resident otter family", "note sentence")
         assert(templateNote(at(5, "museum"), facts: nil, lengthMeters: length) == "Museum", "category label")
         assert(templateNote(at(8.5, "hawker"), facts: facts(note: dishes), lengthMeters: length) == "Try satay or BBQ chicken wings · good after the ride", "late hawker")
+
+        // Long routes: the spread sees every place, not just the top 40 by score — 60 unscored
+        // places in the first 6 km must not crowd out the only one in the last stretch.
+        let early = (0..<60).map { p("e\($0)", 103.80 + Double($0) * 0.0009) }, late = p("late", 103.8855)
+        let picked = choose(early + [late], profile: none, facts: [:], polyline: line, cumulative: cum)
+        assert(picked.quick.contains { $0.name == "late" }, "spread over every place: \(picked.quick.map(\.name))")
+        assert(picked.candidates.count == 40, "the model still sees at most 40")
 
         // Counts.
         assert(targetCount(lengthMeters: 5_000) == 3 && targetCount(lengthMeters: 20_000) == 5 && targetCount(lengthMeters: 40_000) == 10, "target counts")
