@@ -3,9 +3,10 @@
 //  cyclingskibidi
 //
 //  Kit's picks from the on-device model (iOS 26+, Apple Intelligence). The model
-//  sees only our candidate lines and returns IDs and one-line notes; every ID is
-//  validated and every note checked against that place's facts. Without the
-//  model, or when it fails or is slow, the quick picks simply stay.
+//  sees only our candidate lines plus the quick picks as a draft, and returns IDs
+//  only: every note is our own template note, so nothing it says reaches a rider.
+//  Its picks replace the quick picks only when they're clearly better (`accept`).
+//  Without the model, or when it fails or is slow, the quick picks simply stay.
 //
 
 import Foundation
@@ -14,37 +15,36 @@ import CoreLocation
 import FoundationModels
 #endif
 
-nonisolated struct ModelPick: Sendable, Equatable {
-    let id: String
-    let note: String
-}
-
 nonisolated enum KitModel {
     static let instructions = """
-        You are Kit, a friendly cycling cat in Singapore. Choose places for this rider from the list only, \
-        and return their IDs exactly as given. Each note is one short line using only that place's facts; \
-        never name a stall, dish or number that isn't in the facts. Spell out "park connector" and "hawker centre".
+        You are Kit, a cycling cat in Singapore, choosing stops along one bike route.
+        Choose only from the Places list and copy each ID exactly.
+        Spread the picks along the whole route: use the km to avoid bunching.
+        Favour places that match what the rider likes. Places with facts are better than places with no facts.
         """
 
-    static func prompt(candidates: [KitCandidate], profile: RiderProfile, count: Int) -> String {
+    static func prompt(candidates: [KitCandidate], profile: RiderProfile, count: Int, quick: [Sight]) -> String {
         let likes = profile.likes.isEmpty ? "nothing in particular yet" : Interest.allCases.filter(profile.likes.contains).map(\.label).joined(separator: ", ")
         let today = profile.today.isEmpty ? "" : "\nRiding today: " + RideContext.allCases.filter(profile.today.contains).map(\.label).joined(separator: ", ") + "."
+        let draft = quick.map { "- \($0.osmID ?? $0.id.uuidString) \($0.name)" }.joined(separator: "\n")
+        // "none" in a line made the model write "none" back; say what it means.
+        let lines = candidates.prefix(40).map { $0.line.replacingOccurrences(of: "| none", with: "| no facts") }
         return """
             The rider likes: \(likes).\(today)
-            Pick \(count) places spread along the route. The list is ordered best match first for this rider: \
-            prefer places near the top that fit what they like.
-            For each, write a fresh note under 12 words from that place's facts. If its facts are "none", \
-            say only what kind of place it is.
+            Pick exactly \(count) places. Kit's draft is below: keep a draft place unless another place fits the rider \
+            better and the picks stay spread along the route.
+            Draft:
+            \(draft)
             Places (ID | name | kind | km along the route | facts):
-            \(candidates.prefix(40).map(\.line).joined(separator: "\n"))
+            \(lines.joined(separator: "\n"))
             """
     }
 
-    /// The model's answer, or nil when there is no model, it fails, or it's slower than `timeout`.
-    static func pick(candidates: [KitCandidate], profile: RiderProfile, count: Int, timeout: Duration = .seconds(8),
-                     ask: @escaping @Sendable (String) async throws -> [ModelPick] = KitModel.askSystemModel) async -> [ModelPick]? {
-        let text = prompt(candidates: candidates, profile: profile, count: count)
-        return await withTaskGroup(of: [ModelPick]?.self) { group in
+    /// The model's IDs, or nil when there is no model, it fails, or it's slower than `timeout`.
+    static func pick(candidates: [KitCandidate], profile: RiderProfile, count: Int, quick: [Sight], timeout: Duration = .seconds(8),
+                     ask: @escaping @Sendable (String) async throws -> [String] = KitModel.askSystemModel) async -> [String]? {
+        let text = prompt(candidates: candidates, profile: profile, count: count, quick: quick)
+        return await withTaskGroup(of: [String]?.self) { group in
             group.addTask { try? await ask(text) }
             group.addTask { try? await Task.sleep(for: timeout); return nil }
             let first = await group.next() ?? nil
@@ -53,25 +53,27 @@ nonisolated enum KitModel {
         }
     }
 
-    /// The model's picks for this line, validated, or nil to keep the quick picks.
+    /// The model's picks for this line when they beat the quick picks (`accept`), else nil.
     static func refine(line: [Coord], quick: [Sight], candidates: [KitCandidate], profile: RiderProfile) async -> [Sight]? {
-        guard !quick.isEmpty, let raw = await pick(candidates: candidates, profile: profile, count: quick.count) else { return nil }
+        guard !quick.isEmpty, let ids = await pick(candidates: candidates, profile: profile, count: quick.count, quick: quick) else { return nil }
         let length = Geo.cumulative(Geo.sample(line.map(\.cl), count: 400)).last ?? 0
-        return validate(raw, candidates: candidates, count: quick.count, quick: quick, facts: Discovery.facts, lengthMeters: length)
+        let facts = Discovery.facts
+        let model = validate(ids, candidates: candidates, count: quick.count, quick: quick, facts: facts, lengthMeters: length)
+        return accept(model, over: quick, lengthMeters: length) { Kit.score($0, profile: profile, facts: facts) } ? model : nil
     }
 
     /// Exactly `count` real candidates in route order: unknown IDs dropped, duplicates
-    /// once, extras cut, gaps filled from the quick picks; every note grounded or
-    /// replaced by the template note.
-    static func validate(_ raw: [ModelPick], candidates: [KitCandidate], count: Int, quick: [Sight],
+    /// once, extras cut, gaps filled from the quick picks; every note our template note.
+    static func validate(_ ids: [String], candidates: [KitCandidate], count: Int, quick: [Sight],
                          facts: [String: PlaceFacts], lengthMeters: Double) -> [Sight] {
         let byID = Dictionary(candidates.map { ($0.sight.osmID ?? $0.sight.id.uuidString, $0) }, uniquingKeysWith: { a, _ in a })
         var chosen: [Sight] = [], seen: Set<String> = []
-        for p in raw where chosen.count < count {
-            guard let c = byID[p.id], seen.insert(p.id).inserted else { continue }
+        // IDs have no spaces; the model sometimes copies the name after one, so keep the first word.
+        for raw in ids where chosen.count < count {
+            let id = String(raw.split(separator: " ").first ?? "")
+            guard let c = byID[id], seen.insert(id).inserted else { continue }
             var s = c.sight
-            s.note = noteIsGrounded(p.note, in: c) ? p.note.trimmingCharacters(in: .whitespacesAndNewlines)
-                : Kit.templateNote(s, facts: s.osmID.flatMap { facts[$0] }, lengthMeters: lengthMeters)
+            s.note = Kit.templateNote(s, facts: s.osmID.flatMap { facts[$0] }, lengthMeters: lengthMeters)
             chosen.append(s)
         }
         for s in quick where chosen.count < count {
@@ -82,46 +84,28 @@ nonisolated enum KitModel {
         return chosen.sorted { $0.offsetAlong < $1.offsetAlong }
     }
 
-    /// A note may only name what the candidate's line names: every capitalised word
-    /// (bar a sentence's first, "Kit" and "km"), every number, and every dish we know of.
-    static func noteIsGrounded(_ note: String, in candidate: KitCandidate) -> Bool {
-        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        // "none" is the facts placeholder, not a note; a note is one short line.
-        guard !trimmed.isEmpty, trimmed.count <= 100, tokens(trimmed).map({ $0.lowercased() }) != ["none"] else { return false }
-        let lineTokens = Set(tokens(candidate.line).map { $0.lowercased() })
-        var sentenceStart = true
-        for raw in trimmed.split(whereSeparator: \.isWhitespace).map(String.init) {
-            defer { sentenceStart = raw.last.map { ".!?".contains($0) } ?? false }
-            for t in tokens(raw) {
-                let named = t.first?.isNumber == true || (t.first?.isUppercase == true && !sentenceStart)
-                if named, !["kit", "km"].contains(t.lowercased()), !lineTokens.contains(t.lowercased()) { return false }
-            }
+    /// Use the model's picks only when all hold: the same count; a strictly higher summed
+    /// score (a tie keeps the quick picks, so nothing flickers); no tighter bunching than
+    /// the quick picks or half an even spacing, whichever is less; and every strong quick
+    /// pick (score ≥ 4: a liked place with our notes, say) still in.
+    static func accept(_ model: [Sight], over quick: [Sight], lengthMeters: Double, score: (Sight) -> Double) -> Bool {
+        guard model.count == quick.count, !quick.isEmpty else { return false }
+        func sum(_ xs: [Sight]) -> Double { xs.map(score).reduce(0, +) }
+        func minGap(_ xs: [Sight]) -> Double {
+            let a = xs.map(\.offsetAlong).sorted()
+            return zip(a, a.dropFirst()).map { $1 - $0 }.min() ?? .infinity
         }
-        let noteText = " " + tokens(trimmed).joined(separator: " ").lowercased() + " "
-        let lineText = " " + tokens(candidate.line).joined(separator: " ").lowercased() + " "
-        return !dishWords.contains { noteText.contains(" \($0) ") && !lineText.contains(" \($0) ") }
+        let ids = Set(model.map { $0.osmID ?? $0.id.uuidString })
+        return sum(model) > sum(quick)
+            && minGap(model) >= min(minGap(quick), lengthMeters / Double(2 * quick.count))
+            && quick.filter { score($0) >= 4 }.allSatisfy { ids.contains($0.osmID ?? $0.id.uuidString) }
     }
 
-    private static func tokens(_ s: String) -> [String] {
-        s.matches(of: /[\p{L}\p{N}]+(?:[.'][\p{L}\p{N}]+)*/).map { String($0.output) }
-    }
-
-    /// Dishes a note could invent: every dish in our overlay plus common hawker fare.
-    static let dishWords: [String] = {
-        let common = ["laksa", "rojak", "popiah", "prata", "roti prata", "murtabak", "bak kut teh", "char kway teow", "mee goreng",
-                      "nasi goreng", "nasi briyani", "briyani", "yong tau foo", "chilli crab", "kaya toast", "otah", "putu piring",
-                      "hor fun", "bak chor mee", "duck rice", "fish ball", "fishball", "economic rice", "dim sum", "durian", "kopi",
-                      "teh tarik", "chee cheong fun", "lontong", "mee pok", "goreng pisang", "kueh", "tutu kueh", "satay", "noodles"]
-        let ours = Discovery.facts.values.flatMap { $0.note?.dishes ?? [] }
-        return Array(Set((common + ours).map { tokens($0).joined(separator: " ").lowercased() }))
-    }()
-
-    static func askSystemModel(_ prompt: String) async throws -> [ModelPick] {
+    static func askSystemModel(_ prompt: String) async throws -> [String] {
         #if canImport(FoundationModels)
         if #available(iOS 26.0, *), case .available = SystemLanguageModel.default.availability {
             let session = LanguageModelSession(instructions: instructions)
-            let answer = try await session.respond(to: prompt, generating: KitAnswer.self).content
-            return answer.picks.map { ModelPick(id: $0.id, note: $0.note) }
+            return try await session.respond(to: prompt, generating: KitAnswer.self).content.ids
         }
         #endif
         throw CancellationError()   // no model on this iPhone: the caller keeps the quick picks
@@ -132,16 +116,8 @@ nonisolated enum KitModel {
 @available(iOS 26.0, *)
 @Generable
 struct KitAnswer {
-    @Guide(.maximumCount(12))
-    var picks: [KitAnswerPick]
-}
-
-@available(iOS 26.0, *)
-@Generable
-struct KitAnswerPick {
-    var id: String
-    @Guide(description: "One short line, only from this place's facts")
-    var note: String
+    @Guide(description: "IDs of the chosen places, copied exactly", .maximumCount(12))
+    var ids: [String]
 }
 #endif
 
@@ -156,54 +132,54 @@ extension KitModel {
         let cs = [c("a", km: 1, cat: "hawker", facts: "dishes: satay, carrot cake"), c("b", km: 3), c("c", km: 5), c("d", km: 7), c("e", km: 9)]
         let quick = Kit.quickPicks(cs, polyline: line, cumulative: cum, count: 3, facts: [:])
 
-        // Validate.
-        let junk = [ModelPick(id: "zzz", note: "Nice"), ModelPick(id: "e", note: "Quiet stretch by the water"),
-                    ModelPick(id: "e", note: "Again"), ModelPick(id: "a", note: "Try the satay")]
-        let v = validate(junk, candidates: cs, count: 3, quick: quick, facts: [:], lengthMeters: length)
+        // Validate: IDs only; every note is our own template note.
+        let v = validate(["zzz", "e", "e", "a"], candidates: cs, count: 3, quick: quick, facts: [:], lengthMeters: length)
         assert(v.count == 3, "topped up to count: \(v.map(\.osmID))")
         assert(Set(v.compactMap(\.osmID)).count == 3 && !v.contains { $0.osmID == "zzz" }, "unknown dropped, duplicates once: \(v.map(\.osmID))")
         assert(v.allSatisfy { s in cs.contains { $0.sight.id == s.id } }, "every pick is a candidate")
         assert(v.map(\.offsetAlong) == v.map(\.offsetAlong).sorted(), "route order")
-        assert(v.first { $0.osmID == "a" }?.note == "Try the satay", "grounded note kept")
-        let many = cs.map { ModelPick(id: $0.sight.osmID!, note: "Worth a stop") }
-        assert(validate(many, candidates: cs, count: 3, quick: quick, facts: [:], lengthMeters: length).count == 3, "cut to count")
+        assert(v.allSatisfy { $0.note == Kit.templateNote($0, facts: nil, lengthMeters: length) }, "notes are always ours")
+        assert(validate(cs.map { $0.sight.osmID! }, candidates: cs, count: 3, quick: quick, facts: [:], lengthMeters: length).count == 3, "cut to count")
+        // The real model sometimes copies the name after the ID ("r19580129 East Coast Park").
+        assert(validate(["e Place e"], candidates: cs, count: 1, quick: [], facts: [:], lengthMeters: length).first?.osmID == "e", "ID with its name kept")
 
-        // Grounding.
-        let a = cs[0]
-        assert(noteIsGrounded("Try the satay", in: a), "satay is in the facts")
-        assert(!noteIsGrounded("Try the laksa", in: a), "laksa is not")
-        assert(!noteIsGrounded("Tian Tian Chicken Rice is a Bib pick", in: a), "invented stall")
-        assert(!noteIsGrounded("Open until 11 pm", in: a), "invented number")
-        assert(noteIsGrounded("Kit says satay at km 1.0", in: a), "Kit and km are always fine")
-        assert(!noteIsGrounded("", in: a) && !noteIsGrounded("   ", in: a), "empty note")
-        assert(!noteIsGrounded("none", in: a) && !noteIsGrounded("None.", in: a), "the facts placeholder is not a note")
-        assert(!noteIsGrounded(String(repeating: "satay ", count: 20), in: a), "a note is one short line")
-        let bad = validate([ModelPick(id: "a", note: "Try the laksa")], candidates: cs, count: 1, quick: [], facts: [:], lengthMeters: length)
-        assert(bad.first?.note == Kit.templateNote(a.sight, facts: nil, lengthMeters: length), "ungrounded note replaced by the template")
+        // Keep the model's picks only when they're strictly better, as spread out, and keep every strong quick pick.
+        func s(_ id: String, _ km: Double) -> Sight { var x = Sight(name: id, category: "park", lat: 1.30, lon: 103.80); x.osmID = id; x.offsetAlong = km * 1000; return x }
+        let scores: [String: Double] = ["q1": 1, "q2": 4.5, "q3": 1, "x": 3, "y": 5]
+        let score: (Sight) -> Double = { scores[$0.osmID ?? ""] ?? 0 }
+        let q = [s("q1", 1), s("q2", 5), s("q3", 9)]
+        func ok(_ m: [Sight]) -> Bool { accept(m, over: q, lengthMeters: length, score: score) }
+        assert(!ok(q), "a tie keeps the quick picks")
+        assert(ok([s("x", 2), s("q2", 5), s("q3", 9)]), "better, spread, keeps the strong pick")
+        assert(!ok([s("x", 5.2), s("q2", 5), s("q3", 9)]), "bunched picks rejected")
+        assert(!ok([s("x", 2), s("y", 5.5), s("q3", 9)]), "dropping a strong quick pick rejected")
+        assert(!ok([s("q1", 1), s("q3", 9)]), "fewer picks rejected")
 
         // Fallbacks.
         struct Boom: Error {}
-        let threw = await pick(candidates: cs, profile: RiderProfile(), count: 3) { _ in throw Boom() }
+        let threw = await pick(candidates: cs, profile: RiderProfile(), count: 3, quick: quick) { _ in throw Boom() }
         assert(threw == nil, "a throwing model gives nil")
         let clock = ContinuousClock(), t0 = clock.now
-        let slow = await pick(candidates: cs, profile: RiderProfile(), count: 3, timeout: .milliseconds(200)) { _ in
-            try await Task.sleep(for: .seconds(10)); return [ModelPick(id: "a", note: "late")]
+        let slow = await pick(candidates: cs, profile: RiderProfile(), count: 3, quick: quick, timeout: .milliseconds(200)) { _ in
+            try await Task.sleep(for: .seconds(10)); return ["a"]
         }
         assert(slow == nil && clock.now - t0 < .seconds(1), "timeout gives nil fast: \(clock.now - t0)")
-        let good = await pick(candidates: cs, profile: RiderProfile(), count: 3) { _ in [ModelPick(id: "b", note: "Quiet")] }
-        assert(good == [ModelPick(id: "b", note: "Quiet")], "a good model's picks come back")
+        let good = await pick(candidates: cs, profile: RiderProfile(), count: 3, quick: quick) { _ in ["b"] }
+        assert(good == ["b"], "a good model's IDs come back")
 
-        // Prompt.
-        let pr = prompt(candidates: cs, profile: RiderProfile(likes: [.food, .heritage]), count: 3)
-        assert(cs.allSatisfy { pr.contains($0.line) }, "prompt has every line")
-        assert(pr.contains("Food") && pr.contains("Heritage") && pr.contains("3"), "prompt has likes and count")
+        // Prompt: likes, count, the quick picks as a draft, every line, "no facts" not "none", at most 40 places.
+        let pr = prompt(candidates: cs, profile: RiderProfile(likes: [.food, .heritage]), count: 3, quick: quick)
+        assert(cs.allSatisfy { pr.contains($0.line.replacingOccurrences(of: "| none", with: "| no facts")) }, "prompt has every line")
+        assert(pr.contains("Food") && pr.contains("Heritage") && pr.contains("exactly 3"), "prompt has likes and count")
+        assert(quick.allSatisfy { pr.contains("- \($0.osmID!) \($0.name)") }, "prompt has the draft")
+        assert(!pr.contains("| none"), "no literal none")
         let fifty = (0..<50).map { c("x\($0)", km: Double($0) / 10) }
-        assert(prompt(candidates: fifty, profile: RiderProfile(), count: 3).components(separatedBy: "\n").filter { $0.hasPrefix("x") }.count == 40,
+        assert(prompt(candidates: fifty, profile: RiderProfile(), count: 3, quick: []).components(separatedBy: "\n").filter { $0.hasPrefix("x") }.count == 40,
                "at most 40 candidate lines")
 
         // Generation guard: an answer for an older line never lands.
         assert(RouteBuilderView.apply(v, forGeneration: 4, current: 5) == nil, "stale answer dropped")
         assert(RouteBuilderView.apply(v, forGeneration: 5, current: 5)?.count == 3, "current answer applied")
-        print("KitModel check: validate, grounding, fallbacks (timeout in \(clock.now - t0)), prompt, guard")
+        print("KitModel check: validate, keep rule, fallbacks (timeout in \(clock.now - t0)), prompt, guard")
     }
 }
