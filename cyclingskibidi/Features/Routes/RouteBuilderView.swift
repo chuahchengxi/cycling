@@ -29,6 +29,9 @@ struct RouteBuilderView: View {
     @State private var scenic = Route.defaultScenic
     /// Direct distance for the current pins, planned once per pin change.
     @State private var direct: (waypoints: [Coord], distance: Double)?
+    @State private var draggingScenic = false
+    /// The scenic value the current plan was asked for, so a settled slider doesn't re-plan twice.
+    @State private var plannedScenic = Route.defaultScenic
     @State private var error: String?
     @State private var name = ""
     @State private var naming = false
@@ -90,6 +93,7 @@ struct RouteBuilderView: View {
             .sheet(item: $selectedSight) { SightSheet(sight: $0) }
             .sheet(isPresented: $editingInterests) { InterestsSheet() }
             .onChange(of: mode) { _, _ in replan() }
+            .onChange(of: profileRaw) { _, _ in direct = nil }   // today's context changes the direct line too
             .onChange(of: profileRaw) { _, _ in replan() }   // "For you" edits re-pick
         }
     }
@@ -165,15 +169,27 @@ struct RouteBuilderView: View {
             }
 
             if mode == .leisure, waypoints.count >= 2 {
-                HStack(spacing: 10) {
-                    Text("Direct").font(.footnote).foregroundStyle(.secondary)
-                    Slider(value: $scenic, in: 0...1) { Text("Scenery") } onEditingChanged: { editing in
+                VStack(alignment: .leading, spacing: 2) {
+                    Slider(value: $scenic, in: 0...1) {
+                        Text("Scenery")
+                    } minimumValueLabel: {
+                        Text("Direct").font(.footnote).foregroundStyle(.secondary).lineLimit(1).fixedSize()
+                    } maximumValueLabel: {
+                        Text("Scenic").font(.footnote).foregroundStyle(.secondary).lineLimit(1).fixedSize()
+                    } onEditingChanged: { editing in
+                        draggingScenic = editing
                         if !editing { replan() }
                     }
                     .accessibilityValue(scenic < 0.05 ? "Direct" : scenic > 0.95 ? "Most scenic" : "\(Int((scenic * 100).rounded())) percent scenic")
-                    Text("Scenic").font(.footnote).foregroundStyle(.secondary)
+                    .accessibilityHint("Direct is shortest; scenic bends toward water and parks, up to 30 percent longer.")
+                    // VoiceOver and Switch Control adjust without a drag: re-plan once they settle.
+                    .task(id: scenic) {
+                        guard !draggingScenic, scenic != plannedScenic else { return }
+                        try? await Task.sleep(for: .milliseconds(500))
+                        if !Task.isCancelled, !draggingScenic { replan() }
+                    }
                     if !planning, let d = direct, d.waypoints == waypoints, let extra = Self.extraLabel(scenic: plan.distance, direct: d.distance) {
-                        Text(extra).font(.footnote.monospacedDigit().weight(.semibold))
+                        Text("\(extra) for the scenery").font(.footnote.monospacedDigit().weight(.semibold))
                             .accessibilityLabel("\(extra) longer than direct")
                     }
                 }
@@ -311,13 +327,15 @@ struct RouteBuilderView: View {
         planTask = Task {
             do {
                 let s = scenic
+                plannedScenic = s
                 let fresh = try await Routing.plan(through: currentWaypoints, mode: currentMode, context: profile.today, scenic: s)
                 guard gen == generation else { return }
                 // The extra-distance label needs the direct length once per pin set.
                 if currentMode == .leisure, direct?.waypoints != currentWaypoints {
-                    let d = s == 0 ? fresh : try await Routing.plan(through: currentWaypoints, mode: .leisure, context: profile.today)
+                    // A failed comparison plan only loses the label, never the route.
+                    let d = s == 0 ? fresh : try? await Routing.plan(through: currentWaypoints, mode: .leisure, context: profile.today)
                     guard gen == generation else { return }
-                    direct = (currentWaypoints, d.distance)
+                    if let d { direct = (currentWaypoints, d.distance) }
                 }
                 plan = fresh
                 planning = false
