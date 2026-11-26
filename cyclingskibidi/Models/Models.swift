@@ -190,6 +190,13 @@ final class Route {
     var noBikeData: Data?
     /// Rest stops along the line, as [RestStop]; nil until the route brief finds them (and on older saves).
     var restStopData: Data?
+    /// Direct (0) ↔ Scenic (1) for Leisure; nil on older saves, read as the midway default.
+    var scenicRaw: Double?
+    static let defaultScenic = 0.5
+    var scenic: Double {
+        get { scenicRaw ?? Self.defaultScenic }
+        set { scenicRaw = newValue }
+    }
 
     init(name: String = "Untitled route") {
         self.name = name

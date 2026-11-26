@@ -110,6 +110,7 @@ final class RideRecorder {
     private var routeName = ""
     private var destination: Coord?
     private var mode: RideMode = .moderate
+    private var scenic = 0.0
 
     // Internals
     private var task: Task<Void, Never>?
@@ -141,6 +142,7 @@ final class RideRecorder {
         routeName = route.name
         destination = route.waypoints.last ?? route.polyline.last
         mode = route.mode
+        scenic = route.mode == .leisure ? route.scenic : 0
         stepIndex = 0
         searchIndex = 0
         distanceAlong = 0
@@ -495,7 +497,7 @@ final class RideRecorder {
             defer { self?.rerouting = false }
             // Routing.plan always avoids every "Path closed" the rider has marked.
             guard let plan = try? await Routing.plan(through: [Coord(fix), destination], mode: self?.mode ?? .moderate,
-                                                      context: self?.loadProfile().today ?? []),
+                                                      context: self?.loadProfile().today ?? [], scenic: self?.scenic ?? 0),
                   !plan.polyline.isEmpty, let self else { return }
             if !self.applyReroute(plan) { self.announce(self.rerouteBlockedReason ?? "") }
         }
@@ -515,7 +517,7 @@ final class RideRecorder {
         Task { [weak self] in
             defer { self?.rerouting = false }
             guard let plan = try? await Routing.plan(through: [Coord(start), destination], mode: self?.mode ?? .moderate,
-                                                      closures: [nogo], context: self?.loadProfile().today ?? []),
+                                                      closures: [nogo], context: self?.loadProfile().today ?? [], scenic: self?.scenic ?? 0),
                   !plan.polyline.isEmpty, let self else {
                 self?.rerouteFailure = "Couldn't find a way around that closure."
                 return

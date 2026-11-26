@@ -135,7 +135,7 @@ struct RouteDetailView: View {
         replanning = true
         Task {
             defer { replanning = false }
-            if let plan = try? await Routing.plan(through: route.waypoints, mode: route.mode, context: profile.today), plan.polyline.count > 1 {
+            if let plan = try? await Routing.plan(through: route.waypoints, mode: route.mode, context: profile.today, scenic: route.scenic), plan.polyline.count > 1 {
                 route.apply(plan)   // new line, turns and climb chart together
                 // Sights follow the new line: found afresh for Leisure, offline.
                 await pick()

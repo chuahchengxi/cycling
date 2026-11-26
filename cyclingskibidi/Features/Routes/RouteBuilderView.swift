@@ -25,6 +25,10 @@ struct RouteBuilderView: View {
     @State private var waypoints: [Coord] = []
     @State private var plan = RoutePlan()
     @State private var planning = false
+    /// Direct ↔ Scenic (Leisure only); the plan follows on release.
+    @State private var scenic = Route.defaultScenic
+    /// Direct distance for the current pins, planned once per pin change.
+    @State private var direct: (waypoints: [Coord], distance: Double)?
     @State private var error: String?
     @State private var name = ""
     @State private var naming = false
@@ -160,6 +164,21 @@ struct RouteBuilderView: View {
                 }
             }
 
+            if mode == .leisure, waypoints.count >= 2 {
+                HStack(spacing: 10) {
+                    Text("Direct").font(.footnote).foregroundStyle(.secondary)
+                    Slider(value: $scenic, in: 0...1) { Text("Scenery") } onEditingChanged: { editing in
+                        if !editing { replan() }
+                    }
+                    .accessibilityValue(scenic < 0.05 ? "Direct" : scenic > 0.95 ? "Most scenic" : "\(Int((scenic * 100).rounded())) percent scenic")
+                    Text("Scenic").font(.footnote).foregroundStyle(.secondary)
+                    if !planning, let d = direct, d.waypoints == waypoints, let extra = Self.extraLabel(scenic: plan.distance, direct: d.distance) {
+                        Text(extra).font(.footnote.monospacedDigit().weight(.semibold))
+                            .accessibilityLabel("\(extra) longer than direct")
+                    }
+                }
+            }
+
             if mode == .leisure, let region = mapRegion {
                 DiscoveryPanel(region: region) { coord in
                     waypoints.append(Coord(coord))
@@ -291,8 +310,15 @@ struct RouteBuilderView: View {
         let currentWaypoints = waypoints
         planTask = Task {
             do {
-                let fresh = try await Routing.plan(through: currentWaypoints, mode: currentMode, context: profile.today)
+                let s = scenic
+                let fresh = try await Routing.plan(through: currentWaypoints, mode: currentMode, context: profile.today, scenic: s)
                 guard gen == generation else { return }
+                // The extra-distance label needs the direct length once per pin set.
+                if currentMode == .leisure, direct?.waypoints != currentWaypoints {
+                    let d = s == 0 ? fresh : try await Routing.plan(through: currentWaypoints, mode: .leisure, context: profile.today)
+                    guard gen == generation else { return }
+                    direct = (currentWaypoints, d.distance)
+                }
                 plan = fresh
                 planning = false
                 if currentMode != .fast, !fresh.polyline.isEmpty {
@@ -320,6 +346,12 @@ struct RouteBuilderView: View {
         }
     }
 
+    /// "+1.2 km" beside the slider; nil when Scenic adds under 50 m (nothing worth showing).
+    nonisolated static func extraLabel(scenic: Double, direct: Double) -> String? {
+        let extra = scenic - direct
+        return extra < 50 ? nil : "+" + (extra / 1000).formatted(.number.precision(.fractionLength(1))) + " km"
+    }
+
     /// A model answer lands only if no newer pin or mode change has happened since it was asked.
     nonisolated static func apply(_ result: [Sight], forGeneration g: Int, current: Int) -> [Sight]? {
         g == current ? result : nil
@@ -329,6 +361,7 @@ struct RouteBuilderView: View {
         let route = Route.make(
             name: name.isEmpty ? "Route \(Date.now.formatted(date: .abbreviated, time: .shortened))" : name,
             mode: mode, waypoints: waypoints, plan: plan, sights: sights ?? [])
+        route.scenicRaw = mode == .leisure ? scenic : nil
         context.insert(route)
         try? context.save()
         (onSaved ?? { dismiss() })()

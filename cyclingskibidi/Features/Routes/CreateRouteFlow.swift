@@ -251,6 +251,7 @@ private struct RoutePreview: View {
     private func save() {
         let route = Route.make(name: editedName.isEmpty ? name : editedName,
                                mode: mode, waypoints: waypoints, plan: plan)
+        route.scenicRaw = 0   // an imported ride is kept as ridden; re-plans don't bend it
         context.insert(route)
         try? context.save()
         dismiss()
