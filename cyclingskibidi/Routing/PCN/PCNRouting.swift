@@ -307,6 +307,12 @@ extension PCNRouting {
         let r12 = await stitched(waypoints: [a, b], graph: box.penalised(closed: [shutNorth], walk: []).scenic(pretty, strength: 1), base: box,
                                  fallbacks: [box.penalised(closed: [shutNorth], walk: [])], closed: [shutNorth], gap: { [$0, $1] })
         assert(r12.poly.contains(southMid) && r12.offSegments.isEmpty, "a closed scenic side must not be ridden: \(r12.poly)")
+        // Scenic discounts the ride, never a penalty: a walk zone on a scenic edge still costs its full extra.
+        if let ka = box.nearest(to: a), let kn = box.nearest(to: northMid),
+           let w0 = box.adj[ka]?.first(where: { $0.0 == kn })?.1,
+           let w1 = box.scenic(pretty, strength: 1).penalised(closed: [], walk: [NoGoCircle(coord: northMid, radiusMeters: 30)]).adj[ka]?.first(where: { $0.0 == kn })?.1 {
+            assert(abs(w1 - (w0 * 0.5 + PCNGraph.walkExtraMeters)) < 0.01, "walk penalty must apply in full on a scenic edge: \(w1) vs \(w0)")
+        } else { assertionFailure("toy square edge missing") }
         print("PCNRouting scenic checks: r10 r11 r12")
     }
 }
