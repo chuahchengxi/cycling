@@ -20,7 +20,9 @@ nonisolated enum HeatHint {
     /// The first sheltered rest stop on a hot ride, if the ride has one.
     static func shelterSuggestion(start: Date, stops: [RestStop]) -> String? {
         guard isHot(start), let stop = stops.first(where: \.sheltered) else { return nil }
-        return "It's the hottest part of the day. \(stop.name) at km \(String(format: "%.1f", stop.offsetAlong / 1000)) has shelter."
+        // Unnamed stops are already called "Shelter · km 5.0"; don't say the km twice.
+        let name = stop.name.contains(" · km ") ? "A shelter" : stop.name
+        return "It's the hottest part of the day. \(name) at km \(String(format: "%.1f", stop.offsetAlong / 1000)) has shelter."
     }
 
     static func selfCheck() {
