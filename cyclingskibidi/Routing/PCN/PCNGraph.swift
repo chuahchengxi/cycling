@@ -160,26 +160,26 @@ nonisolated struct PCNGraph: Sendable {
     /// Nodes within `scenicRadius` of a scenic place's pin or any point of its
     /// outline. Points are bucketed in a ~50 m grid so this is one pass over nodes.
     func scenicNodes(near places: [Sight], facts: [String: PlaceFacts]) -> Set<GridKey> {
-        let bucket = Self.scenicRadius / Self.metresPerDegree
+        Self.nearScenery(coord.lazy.map { ($0.key, $0.value) }, places: places, facts: facts)
+    }
+
+    /// The keys of `nodes` near a scenic place; shared by the connector and road graphs.
+    static func nearScenery<K: Hashable>(_ nodes: some Sequence<(K, Coord)>, places: [Sight], facts: [String: PlaceFacts]) -> Set<K> {
+        let bucket = scenicRadius / metresPerDegree
+        func key(_ la: Double, _ lo: Double) -> GridKey { GridKey(la: Int((la / bucket).rounded(.down)), lo: Int((lo / bucket).rounded(.down))) }
         var points: [GridKey: [CLLocationCoordinate2D]] = [:]
-        func add(_ c: CLLocationCoordinate2D) {
-            let k = GridKey(la: Int((c.latitude / bucket).rounded(.down)),
-                            lo: Int((c.longitude / bucket).rounded(.down)))
-            points[k, default: []].append(c)
-        }
-        for p in places where Self.scenicCategories.contains(p.category) {
-            add(p.coordinate)
-            for q in p.osmID.flatMap({ facts[$0]?.shape }) ?? [] { add(q.cl) }
+        for p in places where scenicCategories.contains(p.category) {
+            for q in [p.coordinate] + (p.osmID.flatMap { facts[$0]?.shape } ?? []).map(\.cl) {
+                points[key(q.latitude, q.longitude), default: []].append(q)
+            }
         }
         guard !points.isEmpty else { return [] }
-        var out: Set<GridKey> = []
-        for (k, c) in coord {
-            let centre = GridKey(la: Int((c.lat / bucket).rounded(.down)),
-                                 lo: Int((c.lon / bucket).rounded(.down)))
+        var out: Set<K> = []
+        for (k, c) in nodes {
+            let centre = key(c.lat, c.lon)
             scan: for dla in -1...1 {
                 for dlo in -1...1 {
-                    for q in points[GridKey(la: centre.la + dla, lo: centre.lo + dlo)] ?? []
-                    where Geo.distance(c.cl, q) <= Self.scenicRadius {
+                    for q in points[GridKey(la: centre.la + dla, lo: centre.lo + dlo)] ?? [] where Geo.distance(c.cl, q) <= scenicRadius {
                         out.insert(k)
                         break scan
                     }
@@ -202,7 +202,7 @@ nonisolated struct PCNGraph: Sendable {
                 (b, nodes.contains(a) && nodes.contains(b) ? w * factor : w)
             }
         }
-        g.heuristicScale = factor
+        g.heuristicScale = heuristicScale * factor   // discounts compound; keep A* admissible
         return g
     }
 

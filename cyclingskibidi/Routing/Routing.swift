@@ -54,6 +54,7 @@ enum Routing {
                      closures: [NoGoCircle] = [],
                      context: Set<RideContext> = [],
                      start: Date = .now,
+                     scenic: Double = 0,
                      noBikeLines: [NoBikeLine] = NoBike.lines) async throws -> RoutePlan {
         guard waypoints.count >= 2 else { return RoutePlan() }
 
@@ -84,14 +85,31 @@ enum Routing {
             let base = await PCNDataset.graph()
             // Penalising touches every node; keep it off the main actor like A*.
             // "How I'm riding today" steers round crowded / dismount stretches; Fast ignores it.
-            let (graph, fallback, avoid) = await Task.detached { [closed, walk] in
+            // Scenic (Leisure only): bend toward scenery, falling back to half strength, then
+            // to the plain graph, so the +30 % cap is kept by lowering the discount.
+            let s = mode == .leisure ? min(max(scenic, 0), 1) : 0
+            let pretty = s > 0 ? await PCNDataset.scenicNodes() : []
+            let roadPretty = s > 0 ? await RoadNetwork.scenicNodes() : []
+            let (graphs, avoid) = await Task.detached { [closed, walk] in
                 let avoid = Kit.avoidCircles(for: context, at: start)
-                return (base.penalised(closed: closed, walk: walk, avoid: avoid),
-                        avoid.isEmpty ? nil : base.penalised(closed: closed, walk: walk), avoid)
+                let plain = base.penalised(closed: closed, walk: walk, avoid: avoid)
+                var graphs = s > 0 && !pretty.isEmpty ? [plain.scenic(pretty, strength: s), plain.scenic(pretty, strength: s / 2), plain] : [plain]
+                if !avoid.isEmpty { graphs.append(base.penalised(closed: closed, walk: walk)) }
+                return (graphs, avoid)
             }.value
             let result = await PCNRouting.stitched(
-                waypoints: waypoints, graph: graph, base: base, fallback: fallback, closed: closed, avoid: avoid,
-                gap: { [closed, walk] a, b in roads?.route(a, b, profile: .quiet, closed: closed, walk: walk) ?? [a, b] })
+                waypoints: waypoints, graph: graphs[0], base: base, fallbacks: Array(graphs.dropFirst()), closed: closed, avoid: avoid,
+                gap: { [closed, walk] a, b in
+                    guard let roads, let plain = roads.route(a, b, profile: .quiet, closed: closed, walk: walk) else { return [a, b] }
+                    guard !roadPretty.isEmpty else { return plain }
+                    // Scenic road legs keep the same +30 % cap, falling back to half strength, then plain.
+                    let cap = PCNGraph.maxDetourRatio * (Geo.cumulative(plain.coordinates).last ?? 0)
+                    for k in [s, s / 2] {
+                        if let r = roads.route(a, b, profile: .quiet, closed: closed, walk: walk, scenic: roadPretty, scenicStrength: k),
+                           (Geo.cumulative(r.coordinates).last ?? 0) <= cap { return r }
+                    }
+                    return plain
+                })
             poly = result.poly
             plan.offConnectorSegments = result.offSegments
             plan.offConnectorMeters = result.offMeters
@@ -115,6 +133,42 @@ enum Routing {
             .map { Coord($0.0, alt: $0.1) }
         if plan.polyline.isEmpty { plan.polyline = poly }
         return plan
+    }
+
+    /// Real graph: inside one connected piece of the park connector network, Scenic never
+    /// passes +30 % of Direct and bends toward scenery; the slider is ignored outside Leisure.
+    /// ponytail: the network is 91 pieces; trips between pieces are road legs, which scenic doesn't touch.
+    static func selfCheckScenic() async {
+        let g = await PCNDataset.graph()
+        // The largest connected piece, then a node about 5 km from its southernmost node.
+        var comp: [GridKey: Int] = [:], sizes: [Int] = []
+        for k in g.coord.keys where comp[k] == nil {
+            var stack = [k]; comp[k] = sizes.count; var n = 0
+            while let c = stack.popLast() { n += 1; for (nb, _) in g.adj[c] ?? [] where comp[nb] == nil { comp[nb] = sizes.count; stack.append(nb) } }
+            sizes.append(n)
+        }
+        guard let big = sizes.indices.max(by: { sizes[$0] < sizes[$1] }) else { return assertionFailure("no PCN graph") }
+        let piece = g.coord.filter { comp[$0.key] == big }.map(\.value)
+        guard let a = piece.min(by: { $0.lat < $1.lat }),
+              let b = piece.min(by: { abs(Geo.distance(a.cl, $0.cl) - 5000) < abs(Geo.distance(a.cl, $1.cl) - 5000) }),
+              let direct = try? await plan(through: [a, b], mode: .leisure, scenic: 0),
+              let pretty = try? await plan(through: [a, b], mode: .leisure, scenic: 1),
+              let moderate = try? await plan(through: [a, b], mode: .moderate, scenic: 1),
+              let moderate0 = try? await plan(through: [a, b], mode: .moderate) else { return assertionFailure("scenic plans failed") }
+        assert(direct.offConnectorMeters < direct.distance / 2, "the test pair must be on the network: off \(direct.offConnectorMeters) of \(direct.distance)")
+        assert(pretty.distance <= PCNGraph.maxDetourRatio * direct.distance + 50, "scenic broke the +30 % cap: \(pretty.distance) vs \(direct.distance)")
+        assert(abs(moderate.distance - moderate0.distance) < 1, "scenic must be ignored outside Leisure")
+        // Scenic must bend at least one of a handful of real Leisure trips (road legs give the choice).
+        var bent = 0, sums: [String] = []
+        for (p, q) in [((1.3008, 103.8710), (1.3405, 103.8580)), ((1.3521, 103.9447), (1.3200, 103.9000)), ((1.3700, 103.8480), (1.3350, 103.8200)), ((1.4050, 103.9050), (1.3800, 103.8700))] {
+            let pins = [Coord(lat: p.0, lon: p.1), Coord(lat: q.0, lon: q.1)]
+            guard let d = try? await plan(through: pins, mode: .leisure, scenic: 0), let sc = try? await plan(through: pins, mode: .leisure, scenic: 1) else { continue }
+            assert(sc.distance <= PCNGraph.maxDetourRatio * d.distance + 50, "scenic broke the cap: \(sc.distance) vs \(d.distance)")
+            if abs(sc.distance - d.distance) > 1 || sc.polyline.count != d.polyline.count { bent += 1 }
+            sums.append("\(Int(d.distance))→\(Int(sc.distance))")
+        }
+        assert(bent > 0, "scenic bent none of the test trips: \(sums)")
+        print("Scenic real: bent \(bent)/4 \(sums); \(sizes.count) pieces; direct \(Int(direct.distance)) m, scenic \(Int(pretty.distance)) m")
     }
 
     /// Stretch a short profile back over every vertex, linearly.

@@ -44,9 +44,9 @@ enum PCNDataset {
     static func scenicNodes() async -> Set<GridKey> {
         if let s = cachedScenicNodes { return s }
         if let buildingScenicNodes { return await buildingScenicNodes.value }
-        let g = await graph()
+        // Single flight: the task is registered before any suspension, so a second caller waits on it.
         let task = Task.detached(priority: .userInitiated) { () -> Set<GridKey> in
-            g.scenicNodes(near: Discovery.places, facts: Discovery.facts)
+            await graph().scenicNodes(near: Discovery.places, facts: Discovery.facts)
         }
         buildingScenicNodes = task
         let s = await task.value

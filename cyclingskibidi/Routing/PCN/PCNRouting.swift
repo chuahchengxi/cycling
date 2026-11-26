@@ -18,8 +18,8 @@ enum PCNRouting {
     nonisolated static let gapEpsilon: Double = 15
 
     /// `graph` may carry closure penalties (see `PCNGraph.penalised`); `base` is the
-    /// same network without them (nil = `graph`); `fallback` carries the closure costs only,
-    /// tried when `graph` (closures plus avoid circles) gives nothing usable. Per waypoint pair the penalised path
+    /// same network without them (nil = `graph`); `fallbacks` are tried in order when `graph`
+    /// gives nothing usable (a half-strength scenic graph, then closures only, ...). Per waypoint pair the penalised path
     /// is used when it avoids every `closed` circle within `maxDetourRatio` of the
     /// open path; otherwise the open path is ridden and each run of closed vertices
     /// becomes an off-connector `gap` leg round it. Runs off the main actor.
@@ -27,7 +27,7 @@ enum PCNRouting {
         waypoints: [Coord],
         graph: PCNGraph,
         base: PCNGraph? = nil,
-        fallback: PCNGraph? = nil,
+        fallbacks: [PCNGraph] = [],
         closed: [NoGoCircle] = [],
         avoid: [NoGoCircle] = [],
         gap: @Sendable (Coord, Coord) async -> [Coord]
@@ -60,10 +60,10 @@ enum PCNRouting {
                 continue
             }
             var onPCN = open
-            // The penalised path first; if it's closed or over the cap, the closures-only one
-            // (`fallback`), so a crowd to avoid never pushes the rider onto road gap legs.
-            if !closed.isEmpty || !avoid.isEmpty {
-                for g in [graph, fallback].compactMap({ $0 }) {
+            // The preferred graph first; if its path is closed or over the cap, each fallback in
+            // turn (so a scenic bend or a crowd to avoid never breaks the cap or forces road gap legs).
+            if !closed.isEmpty || !avoid.isEmpty || !fallbacks.isEmpty {
+                for g in [graph] + fallbacks {
                     guard let p = g.path(from: entry, to: exit), !p.contains(where: isClosed),
                           base.pathLength(p) <= PCNGraph.maxDetourRatio * base.pathLength(open) else { continue }
                     onPCN = p
@@ -281,8 +281,32 @@ extension PCNRouting {
         let three = PCNGraph(polylines: [[west, corner, north], [west, side, north], longWay])
         let crowd = NoGoCircle(coord: side, radiusMeters: 20)
         let r9 = await stitched(waypoints: [west, north], graph: three.penalised(closed: [shut], walk: [], avoid: [crowd]), base: three,
-                                fallback: three.penalised(closed: [shut], walk: []), closed: [shut], avoid: [crowd], gap: { [$0, $1] })
+                                fallbacks: [three.penalised(closed: [shut], walk: [])], closed: [shut], avoid: [crowd], gap: { [$0, $1] })
         assert(r9.offSegments.isEmpty && r9.poly.contains { $0 == side }, "closure-only detour must beat road gap legs: \(r9.poly)")
         print("PCNRouting avoid checks: r7 r8 r9")
+
+        // 10. Scenic: a square A→B, the north side a little longer and all scenic.
+        let a = Coord(lat: 1.300, lon: 103.800), b = Coord(lat: 1.300, lon: 103.810)
+        let southMid = Coord(lat: 1.299, lon: 103.805), northMid = Coord(lat: 1.3012, lon: 103.805)
+        let box = PCNGraph(polylines: [[a, southMid, b], [a, northMid, b]])
+        let pretty = Set([a, northMid, b].compactMap { box.nearest(to: $0) })
+        let r10 = await stitched(waypoints: [a, b], graph: box.scenic(pretty, strength: 1), base: box,
+                                 fallbacks: [box.scenic(pretty, strength: 0.5), box], gap: { [$0, $1] })
+        assert(r10.poly.contains(northMid), "scenic strength 1 should take the scenic side: \(r10.poly)")
+        let r10d = await stitched(waypoints: [a, b], graph: box, base: box, gap: { [$0, $1] })
+        assert(r10d.poly.contains(southMid), "Direct takes the short side: \(r10d.poly)")
+        // 11. Scenic loop 1.6 × the direct length: both scenic graphs break the cap, so the direct path.
+        let farMid = Coord(lat: 1.3 + 694 / 111_195, lon: 103.805)
+        let loop = PCNGraph(polylines: [[a, southMid, b], [a, farMid, b]])
+        let loopPretty = Set([a, farMid, b].compactMap { loop.nearest(to: $0) })
+        let r11 = await stitched(waypoints: [a, b], graph: loop.scenic(loopPretty, strength: 1), base: loop,
+                                 fallbacks: [loop.scenic(loopPretty, strength: 0.5), loop], gap: { [$0, $1] })
+        assert(r11.poly.contains(southMid) && !r11.poly.contains(farMid), "a scenic loop over +30 % must fall back to direct: \(r11.poly)")
+        // 12. The scenic side inside an active closure: closure cost wins, the route goes round.
+        let shutNorth = NoGoCircle(coord: northMid, radiusMeters: 30)
+        let r12 = await stitched(waypoints: [a, b], graph: box.penalised(closed: [shutNorth], walk: []).scenic(pretty, strength: 1), base: box,
+                                 fallbacks: [box.penalised(closed: [shutNorth], walk: [])], closed: [shutNorth], gap: { [$0, $1] })
+        assert(r12.poly.contains(southMid) && r12.offSegments.isEmpty, "a closed scenic side must not be ridden: \(r12.poly)")
+        print("PCNRouting scenic checks: r10 r11 r12")
     }
 }
