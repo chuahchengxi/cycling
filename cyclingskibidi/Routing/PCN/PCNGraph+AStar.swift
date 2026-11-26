@@ -9,7 +9,7 @@
 
 import Foundation
 
-extension PCNGraph {
+nonisolated extension PCNGraph {
 
     /// On-PCN path between two graph nodes, as their vertex coords. nil if the
     /// nodes are in disconnected components.
@@ -18,23 +18,21 @@ extension PCNGraph {
         if start == goal { return [coord[start]!] }
 
         var g: [GridKey: Double] = [start: 0]
-        var f: [GridKey: Double] = [start: Geo.distance(coord[start]!.cl, goalC.cl)]
         var came: [GridKey: GridKey] = [:]
-        var open: Set<GridKey> = [start]
+        var open = MinHeap()
+        open.push(Geo.distance(coord[start]!.cl, goalC.cl), start)
 
-        while !open.isEmpty {
-            // Lowest f in the open set. ponytail: linear min, O(V^2) overall —
-            // fine for SG's few-thousand-node PCN; swap in a heap if it grows.
-            let current = open.min { (f[$0] ?? .infinity) < (f[$1] ?? .infinity) }!
+        while let (f, current) = open.pop() {
             if current == goal { return rebuild(came, from: current) }
-            open.remove(current)
+            let gc = g[current] ?? .infinity
+            // Lazy deletion: skip entries pushed before a cheaper route to this node was found.
+            if f > gc + Geo.distance(coord[current]!.cl, goalC.cl) + 1e-9 { continue }
             for (nb, w) in adj[current] ?? [] {
-                let tentative = (g[current] ?? .infinity) + w
+                let tentative = gc + w
                 if tentative < (g[nb] ?? .infinity) {
                     came[nb] = current
                     g[nb] = tentative
-                    f[nb] = tentative + Geo.distance(coord[nb]!.cl, goalC.cl)
-                    open.insert(nb)
+                    open.push(tentative + Geo.distance(coord[nb]!.cl, goalC.cl), nb)
                 }
             }
         }
@@ -52,6 +50,30 @@ extension PCNGraph {
         var cur = goal
         while let prev = came[cur] { chain.append(prev); cur = prev }
         return chain.reversed().compactMap { coord[$0] }
+    }
+}
+
+/// Binary min-heap of (f, node) for A*'s open set.
+nonisolated private struct MinHeap {
+    private var a: [(Double, GridKey)] = []
+    mutating func push(_ f: Double, _ k: GridKey) {
+        a.append((f, k))
+        var i = a.count - 1
+        while i > 0, a[(i - 1) / 2].0 > a[i].0 { a.swapAt(i, (i - 1) / 2); i = (i - 1) / 2 }
+    }
+    mutating func pop() -> (Double, GridKey)? {
+        guard !a.isEmpty else { return nil }
+        a.swapAt(0, a.count - 1)
+        let top = a.removeLast()
+        var i = 0
+        while true {
+            let l = 2 * i + 1, r = l + 1
+            var m = i
+            if l < a.count, a[l].0 < a[m].0 { m = l }
+            if r < a.count, a[r].0 < a[m].0 { m = r }
+            if m == i { return top }
+            a.swapAt(i, m); i = m
+        }
     }
 }
 
@@ -81,5 +103,13 @@ extension PCNGraph {
         let westKey   = key(Coord(lat: 1.300, lon: 103.800), cell: g2.cell)
         let islandKey = key(Coord(lat: 2.000, lon: 104.000), cell: g2.cell)
         assert(g2.path(from: westKey, to: islandKey) == nil, "disconnected components must return nil")
+
+        // 30x30 grid: corner to corner is 29 east + 29 north edges, whatever order.
+        let d = 0.0005, o = Coord(lat: 1.3, lon: 103.8)
+        func at(_ i: Int, _ j: Int) -> Coord { Coord(lat: o.lat + Double(i) * d, lon: o.lon + Double(j) * d) }
+        let grid = PCNGraph(polylines: (0..<30).map { i in (0..<30).map { at(i, $0) } } + (0..<30).map { j in (0..<30).map { at($0, j) } })
+        let ns = Geo.distance(at(0, 0).cl, at(1, 0).cl), ew = Geo.distance(at(0, 0).cl, at(0, 1).cl)
+        let gp = grid.path(from: at(0, 0), to: at(29, 29)) ?? []
+        assert(abs(grid.pathLength(gp) - 29 * (ns + ew)) < 1, "grid path length off: \(grid.pathLength(gp))")
     }
 }

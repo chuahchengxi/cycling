@@ -60,16 +60,8 @@ struct FinishedView: View {
     private var mapOverview: some View {
         Group {
             if track.count > 1 {
-                Map(initialPosition: .region(region), interactionModes: []) {
-                    MapPolyline(coordinates: track.map(\.cl))
-                        .stroke(.blue, style: .init(lineWidth: 5, lineCap: .round, lineJoin: .round))
-                    if let start = track.first {
-                        Marker("", systemImage: "flag.fill", coordinate: start.cl).tint(.green)
-                    }
-                    if let end = track.last {
-                        Marker("", systemImage: "flag.checkered", coordinate: end.cl).tint(.red)
-                    }
-                }
+                OfflineMap(lines: [MapLine(coords: track.map(\.cl), color: .systemBlue, width: 5)],
+                           pins: endPins(track.map(\.cl)), initialRegion: region, interactive: false)
             } else {
                 ContentUnavailableView("No track", systemImage: "map")
             }

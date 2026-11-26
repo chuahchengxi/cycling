@@ -20,7 +20,7 @@ struct RouteBuilderView: View {
     /// The mode CreateRouteFlow sent us in, kept as the map builder's starting
     /// point; the segmented control below can then move it to any of the three.
     @State private var mode: RideMode
-    @State private var camera: MapCameraPosition = .userLocation(fallback: .automatic)
+    @State private var focus: MapFocus? = .user()
     @State private var mapRegion: MKCoordinateRegion?
     @State private var waypoints: [Coord] = []
     @State private var plan = RoutePlan()
@@ -41,9 +41,9 @@ struct RouteBuilderView: View {
     @State private var sightsLoading = false
     @State private var selectedSight: Sight?
 
-    /// Search, so a route can start from an address instead of a lucky tap.
+    /// Search the bundled places, so a route can start from a name instead of a lucky tap.
     @State private var query = ""
-    @State private var results: [MKMapItem] = []
+    @State private var results: [Sight] = []
 
     init(mode: RideMode = .moderate, onSaved: (() -> Void)? = nil) {
         _mode = State(initialValue: mode)
@@ -68,7 +68,8 @@ struct RouteBuilderView: View {
                 }
             }
             .searchable(text: $query, prompt: "Search for a place")
-            .onSubmit(of: .search) { Task { await runSearch() } }
+            .onSubmit(of: .search, runSearch)
+            .onChange(of: query) { if query.isEmpty { results = [] } }
             .overlay(alignment: .top) { searchResults }
             .alert("Name this route", isPresented: $naming) {
                 TextField("Route name", text: $name)
@@ -86,60 +87,46 @@ struct RouteBuilderView: View {
     // MARK: Map
 
     private var map: some View {
-        MapReader { proxy in
-            Map(position: $camera) {
-                UserAnnotation()
+        OfflineMap(lines: mapLines, pins: mapPins, focus: focus, showsUser: true, showsUserButton: true,
+                   onTap: { coord in waypoints.append(Coord(coord)); replan() },
+                   onRegionChange: { mapRegion = $0 })
+            .ignoresSafeArea(edges: .bottom)
+    }
 
-                if !plan.polyline.isEmpty {
-                    MapPolyline(coordinates: plan.polyline.coordinates)
-                        .stroke(.blue, style: .init(lineWidth: 6, lineCap: .round, lineJoin: .round))
-                }
-                // Off-connector stretches (roads/paths) drawn distinctly so the rider sees
-                // exactly what leaves the PCN and can reject or redirect it.
-                ForEach(Array(plan.offConnectorSegments.enumerated()), id: \.offset) { _, seg in
-                    MapPolyline(coordinates: seg.coordinates)
-                        .stroke(.orange, style: .init(lineWidth: 6, lineCap: .round, lineJoin: .round, dash: [2, 6]))
-                }
+    private var mapLines: [MapLine] {
+        // Off-connector stretches (roads/paths) drawn distinctly so the rider sees
+        // exactly what leaves the PCN and can reject or redirect it.
+        [MapLine(coords: plan.polyline.coordinates, color: .systemBlue, width: 6)]
+            + plan.offConnectorSegments.map { MapLine(coords: $0.coordinates, color: .systemOrange, width: 6, dashed: true) }
+    }
 
-                ForEach(Array(waypoints.enumerated()), id: \.offset) { index, point in
-                    Annotation("", coordinate: point.cl) {
-                        WaypointPin(index: index, last: index == waypoints.count - 1)
-                    }
-                }
-
-                ForEach(sights ?? []) { sight in
-                    Annotation(sight.name, coordinate: sight.coordinate) {
-                        Button { selectedSight = sight } label: { SightBadge(sight: sight) }
-                    }
-                }
-            }
-            .mapStyle(.standard(elevation: .realistic))
-            .mapControls { MapUserLocationButton(); MapCompass() }
-            .onTapGesture { screenPoint in
-                guard let coord = proxy.convert(screenPoint, from: .local) else { return }
-                waypoints.append(Coord(coord))
-                replan()
-            }
-            .onMapCameraChange(frequency: .onEnd) { context in mapRegion = context.region }
+    private var mapPins: [MapPin] {
+        let pins = waypoints.enumerated().map { index, point in
+            MapPin(id: "wp\(index)", coordinate: point.cl, title: "Pin \(index + 1)",
+                   look: .view(AnyView(WaypointPin(index: index, last: index == waypoints.count - 1))))
         }
-        .ignoresSafeArea(edges: .bottom)
+        return pins + (sights ?? []).map { sight in
+            MapPin(id: sight.id.uuidString, coordinate: sight.coordinate, title: sight.name,
+                   look: .view(AnyView(SightBadge(sight: sight))), onTap: { selectedSight = sight })
+        }
     }
 
     private var searchResults: some View {
         Group {
             if !results.isEmpty {
-                List(results, id: \.self) { item in
+                List(results) { item in
                     Button {
-                        let c = item.location.coordinate
+                        let c = item.coordinate
                         waypoints.append(Coord(c))
-                        camera = .region(.init(center: c, latitudinalMeters: 1500, longitudinalMeters: 1500))
+                        focus = .region(.init(center: c, latitudinalMeters: 1500, longitudinalMeters: 1500))
                         replan()
                         results = []
                         query = ""
                     } label: {
                         VStack(alignment: .leading) {
-                            Text(item.name ?? "Place").font(.body)
-                            Text(item.address?.fullAddress ?? "").font(.caption).foregroundStyle(.secondary)
+                            Text(item.name).font(.body)
+                            Text([Discovery.icon(for: item.category).label, item.address].filter { !$0.isEmpty }.joined(separator: " · "))
+                                .font(.caption).foregroundStyle(.secondary)
                         }
                     }
                 }
@@ -161,10 +148,10 @@ struct RouteBuilderView: View {
                 .pickerStyle(.segmented)
             }
 
-            if mode == .leisure, let region = mapRegion ?? camera.region {
+            if mode == .leisure, let region = mapRegion {
                 DiscoveryPanel(region: region) { coord in
                     waypoints.append(Coord(coord))
-                    camera = .region(.init(center: coord, latitudinalMeters: 1500, longitudinalMeters: 1500))
+                    focus = .region(.init(center: coord, latitudinalMeters: 1500, longitudinalMeters: 1500))
                     replan()
                 }
             }
@@ -278,7 +265,7 @@ struct RouteBuilderView: View {
     /// Re-routes on every pin/mode change. `generation` guards two async
     /// stages — the plan itself and, for leisure, the sights search that
     /// follows it — so a superseded request can never overwrite a newer one,
-    /// even if its network call is still in flight when the next starts.
+    /// even if it is still in flight when the next starts.
     private func replan() {
         planTask?.cancel()
         generation += 1
@@ -297,7 +284,8 @@ struct RouteBuilderView: View {
                 if currentMode == .leisure, !fresh.polyline.isEmpty {
                     sights = nil
                     sightsLoading = true
-                    let found = await Discovery.sights(along: fresh.polyline)
+                    let line = fresh.polyline
+                    let found = await Task.detached { Discovery.sights(along: line, mode: currentMode) }.value
                     guard gen == generation else { return }
                     sights = found
                     sightsLoading = false
@@ -319,12 +307,9 @@ struct RouteBuilderView: View {
         (onSaved ?? { dismiss() })()
     }
 
-    private func runSearch() async {
-        guard !query.isEmpty else { results = []; return }
-        let request = MKLocalSearch.Request()
-        request.naturalLanguageQuery = query
-        if let region = camera.region { request.region = region }
-        results = (try? await MKLocalSearch(request: request).start())?.mapItems ?? []
+    private func runSearch() {
+        let centre = mapRegion?.center ?? .init(latitude: 1.3521, longitude: 103.8198)
+        results = Discovery.search(query, near: centre)
     }
 }
 

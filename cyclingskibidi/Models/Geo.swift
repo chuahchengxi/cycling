@@ -131,10 +131,10 @@ extension Array where Element == StoredStep {
 /// A leisure point of interest sitting near the route line, flattened for
 /// storage. `offsetAlong` is metres from the route start at the sight's closest
 /// approach — it orders the list and fires the pass-by card.
-struct Sight: Codable, Identifiable, Sendable {
+nonisolated struct Sight: Codable, Identifiable, Sendable {
     var id: UUID = UUID()
     var name: String = ""
-    /// MKPointOfInterestCategory rawValue, or "" when the search gave none.
+    /// A places.json category ("park", "hawker"…); older saves hold an MKPointOfInterestCategory rawValue.
     var category: String = ""
     var lat: Double = 0
     var lon: Double = 0
@@ -142,6 +142,8 @@ struct Sight: Codable, Identifiable, Sendable {
     var address: String = ""
     var phone: String = ""
     var url: String = ""
+    /// places.json id ("n123", "w123", "r123") or a hand-added overlay key ("x-…"); nil on saves made before it existed.
+    var osmID: String? = nil
 
     var coordinate: CLLocationCoordinate2D { .init(latitude: lat, longitude: lon) }
 }
@@ -162,7 +164,7 @@ enum Geo {
     /// Flat local frame in metres, east/north of `origin`. Good to a centimetre
     /// over the few hundred metres a snap ever spans, and it turns the snap into
     /// plain 2D vector maths.
-    static func project(_ c: CLLocationCoordinate2D, origin: CLLocationCoordinate2D) -> (x: Double, y: Double) {
+    nonisolated static func project(_ c: CLLocationCoordinate2D, origin: CLLocationCoordinate2D) -> (x: Double, y: Double) {
         let lat0 = origin.latitude * .pi / 180
         let x = (c.longitude - origin.longitude) * .pi / 180 * earthRadius * cos(lat0)
         let y = (c.latitude - origin.latitude) * .pi / 180 * earthRadius
@@ -170,7 +172,7 @@ enum Geo {
     }
 
     /// Compass bearing in degrees, 0 = north, clockwise.
-    static func bearing(from a: CLLocationCoordinate2D, to b: CLLocationCoordinate2D) -> Double {
+    nonisolated static func bearing(from a: CLLocationCoordinate2D, to b: CLLocationCoordinate2D) -> Double {
         let la1 = a.latitude * .pi / 180, la2 = b.latitude * .pi / 180
         let dLon = (b.longitude - a.longitude) * .pi / 180
         let y = sin(dLon) * cos(la2)
@@ -215,7 +217,7 @@ enum Geo {
 
     /// Running distance to each vertex. `cumulative[i]` is the distance from the
     /// start of the line to `poly[i]`, so `cumulative.last` is the route length.
-    static func cumulative(_ poly: [CLLocationCoordinate2D]) -> [Double] {
+    nonisolated static func cumulative(_ poly: [CLLocationCoordinate2D]) -> [Double] {
         guard !poly.isEmpty else { return [] }
         var out = [0.0]
         out.reserveCapacity(poly.count)
@@ -223,7 +225,7 @@ enum Geo {
         return out
     }
 
-    struct Snap: Sendable {
+    nonisolated struct Snap: Sendable {
         /// Index of the segment the fix landed on.
         var index: Int
         /// Where along that segment, 0...1.
@@ -244,7 +246,7 @@ enum Geo {
     /// that loops back on itself would otherwise snap a rider on lap two onto
     /// lap one. Callers pass the last matched segment as `from`; a full rescan
     /// is the caller's job when the result comes back far off the line.
-    static func snap(_ p: CLLocationCoordinate2D,
+    nonisolated static func snap(_ p: CLLocationCoordinate2D,
                      to poly: [CLLocationCoordinate2D],
                      cumulative cum: [Double],
                      from: Int = 0,
@@ -311,7 +313,7 @@ enum Geo {
     }
 
     /// Evenly spaced sample of a line, for elevation lookups and graphs.
-    static func sample(_ poly: [CLLocationCoordinate2D], count: Int) -> [CLLocationCoordinate2D] {
+    nonisolated static func sample(_ poly: [CLLocationCoordinate2D], count: Int) -> [CLLocationCoordinate2D] {
         guard poly.count > count, count > 1 else { return poly }
         let cum = cumulative(poly)
         guard let total = cum.last, total > 0 else { return poly }

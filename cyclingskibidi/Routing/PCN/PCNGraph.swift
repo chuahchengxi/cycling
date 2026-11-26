@@ -30,14 +30,22 @@ nonisolated struct PCNGraph: Sendable {
     let cell: Double                                   // grid size in degrees
     private(set) var coord: [GridKey: Coord] = [:]     // node -> representative vertex
     private(set) var adj: [GridKey: [(GridKey, Double)]] = [:]
+    /// Spoken connector name per node, first feature to reach it wins.
+    /// ponytail: per node, not per edge; at a junction the name comes from the node after it.
+    private(set) var name: [GridKey: String] = [:]
 
     init(polylines: [[Coord]], snapTolerance: Double = PCNGraph.defaultSnapTolerance) {
+        self.init(named: polylines.map { (nil, $0) }, snapTolerance: snapTolerance)
+    }
+
+    init(named lines: [(name: String?, line: [Coord])], snapTolerance: Double = PCNGraph.defaultSnapTolerance) {
         self.cell = snapTolerance / PCNGraph.metresPerDegree
-        for line in polylines {
+        for (label, line) in lines {
             var prev: GridKey?
             for v in line {
                 let k = Self.key(v, cell: cell)
                 if coord[k] == nil { coord[k] = v }
+                if let label, name[k] == nil { name[k] = label }
                 if let p = prev, p != k {
                     addEdge(p, k, weight: Geo.distance(coord[p]!.cl, v.cl))
                 }
@@ -50,6 +58,15 @@ nonisolated struct PCNGraph: Sendable {
     var isEmpty: Bool { coord.isEmpty }
 
     func coord(of k: GridKey) -> Coord? { coord[k] }
+
+    /// The node this exact vertex is, if it is one (path vertices are node coords).
+    func node(at c: Coord) -> GridKey? {
+        let k = Self.key(c, cell: cell)
+        return coord[k] == c ? k : nil
+    }
+
+    /// Distinct neighbours: 3+ means a real junction, a choice for the rider.
+    func degree(_ k: GridKey) -> Int { Set((adj[k] ?? []).map(\.0)).count }
 
     static func key(_ c: Coord, cell: Double) -> GridKey {
         GridKey(la: Int((c.lat / cell).rounded()), lo: Int((c.lon / cell).rounded()))
@@ -87,6 +104,37 @@ nonisolated struct PCNGraph: Sendable {
         }
         return best
     }
+
+    /// Extra cost on edges touching a closure / a no-cycling (walk) zone.
+    static let closedExtraMeters: Double = 1500
+    static let walkExtraMeters: Double = 100
+    /// A detour round a closure is taken only up to this ratio of the open route.
+    static let maxDetourRatio: Double = 1.3
+
+    /// A copy with closure and walk-zone costs added to every edge with an endpoint inside a circle.
+    /// ponytail: endpoint-only test; edges longer than ~50 m (max in seed 857 m) can miss a small
+    /// circle. Split long edges at graph build if that shows up.
+    func penalised(closed: [NoGoCircle], walk: [NoGoCircle]) -> PCNGraph {
+        guard !closed.isEmpty || !walk.isEmpty else { return self }
+        func inside(_ c: Coord, _ n: NoGoCircle) -> Bool {   // cheap latitude reject before the haversine
+            abs(c.lat - n.coord.lat) * Self.metresPerDegree <= n.radiusMeters && Geo.distance(c.cl, n.coord.cl) <= n.radiusMeters
+        }
+        func extra(_ k: GridKey) -> Double {
+            let c = coord[k]!
+            if closed.contains(where: { inside(c, $0) }) { return Self.closedExtraMeters }
+            if walk.contains(where: { inside(c, $0) }) { return Self.walkExtraMeters }
+            return 0
+        }
+        let extras = coord.keys.reduce(into: [GridKey: Double]()) { if case let e = extra($1), e > 0 { $0[$1] = e } }
+        var g = self
+        for (a, list) in adj {
+            g.adj[a] = list.map { (b, w) in (b, w + max(extras[a] ?? 0, extras[b] ?? 0)) }
+        }
+        return g
+    }
+
+    /// Ground length of a path (vertex coords), ignoring any penalties.
+    func pathLength(_ path: [Coord]) -> Double { Geo.cumulative(path.coordinates).last ?? 0 }
 }
 
 // MARK: - Self check
@@ -113,5 +161,10 @@ extension PCNGraph {
         // Nearest to a point 10 m off the west end returns the west-end node.
         let near = g.nearest(to: Coord(lat: 1.30005, lon: 103.800))
         assert(near == key(Coord(lat: 1.300, lon: 103.800), cell: g.cell), "nearest wrong")
+        // A closed circle at the junction adds exactly closedExtraMeters to its edges.
+        let shut = g.penalised(closed: [NoGoCircle(coord: Coord(lat: 1.300, lon: 103.802), radiusMeters: 10)], walk: [])
+        let w2 = shut.adj[junction]!.first!.1
+        assert(abs(w2 - w - closedExtraMeters) < 1, "closed penalty off: \(w2 - w)")
+        assert(g.penalised(closed: [], walk: []).nodeCount == g.nodeCount, "empty penalty must keep the graph")
     }
 }

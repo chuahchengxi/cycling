@@ -2,8 +2,7 @@
 //  GeoJSON.swift
 //  cyclingskibidi
 //
-//  Turning a GeoJSON FeatureCollection into connector polylines. Shared by the
-//  bundled PCN dataset and the BRouter response — both hand back the same shape.
+//  Turning the bundled PCN GeoJSON FeatureCollection into connector polylines.
 //  GeoJSON positions are [longitude, latitude, (elevation)] — never lat first.
 //
 
@@ -14,18 +13,36 @@ nonisolated enum GeoJSON {
     /// Every LineString/MultiLineString in a FeatureCollection, as [lat,lon]
     /// Coord polylines. Returns [] on any parse failure — a bad dataset must
     /// flatten to "no connectors," never a crash.
-    static func polylines(_ data: Data) -> [[Coord]] {
+    static func polylines(_ data: Data) -> [[Coord]] { named(data).map(\.line) }
+
+    /// Each polyline with the connector's spoken name (see `spokenName`).
+    static func named(_ data: Data) -> [(name: String?, line: [Coord])] {
         guard let fc = try? JSONDecoder().decode(FeatureCollection.self, from: data) else { return [] }
-        var out: [[Coord]] = []
+        var out: [(name: String?, line: [Coord])] = []
         for feature in fc.features {
             guard let geom = feature.geometry else { continue }
+            let name = spokenName(park: feature.properties?.PARK, loop: feature.properties?.PCN_LOOP)
             switch geom.kind {
-            case .line(let line):    out.append(coords(line))
-            case .multiLine(let ml): out.append(contentsOf: ml.map(coords))
+            case .line(let line):    out.append((name, coords(line)))
+            case .multiLine(let ml): out += ml.map { (name, coords($0)) }
             case .other:             break
             }
         }
-        return out.filter { $0.count >= 2 }
+        return out.filter { $0.line.count >= 2 }
+    }
+
+    /// NParks' PARK field tidied for speech: first line only, no "(btwn ...)" notes,
+    /// "PC" spelled out, no trailing section number. Falls back to the PCN loop name
+    /// when PARK is a works label ("Interim RIR - ...") or a from-to stretch.
+    static func spokenName(park: String?, loop: String?) -> String? {
+        var s = park?.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
+        s = s.replacingOccurrences(of: #"\s*\(.*?(\)|$)"#, with: "", options: .regularExpression)
+        for (from, to) in [(#"\bPC\b"#, "Park Connector"), (#"\bSg\b"#, "Sungei"), (#"\bRes\b"#, "Reservoir"), (#"\s+\d+$"#, "")] {
+            s = s.replacingOccurrences(of: from, with: to, options: .regularExpression)
+        }
+        s = s.trimmingCharacters(in: .whitespaces)
+        if s.isEmpty || s.contains("RIR") || s.contains(" to ") { s = loop?.trimmingCharacters(in: .whitespaces) ?? "" }
+        return s.isEmpty ? nil : s
     }
 
     /// One position ring [[lon,lat,(ele)]] -> [Coord].
@@ -39,7 +56,8 @@ nonisolated enum GeoJSON {
     // MARK: Decodable shapes
 
     private struct FeatureCollection: Decodable { let features: [Feature] }
-    private struct Feature: Decodable { let geometry: Geometry? }
+    private struct Feature: Decodable { let geometry: Geometry?; let properties: Properties? }
+    private struct Properties: Decodable { let PARK: String?; let PCN_LOOP: String? }
 
     /// GeoJSON geometry is variant: `coordinates` is [[Double]] for a LineString
     /// and [[[Double]]] for a MultiLineString. Decode `type` first, then the
@@ -84,5 +102,11 @@ extension GeoJSON {
                "lon/lat swapped")
         // The point and degenerate-LineString features were ignored, short rings dropped.
         assert(lines.allSatisfy { $0.count == 2 })
+        // Names tidied for speech.
+        assert(spokenName(park: "Bukit Timah PC (btwn King Albert Park - Adam Rd)", loop: nil) == "Bukit Timah Park Connector")
+        assert(spokenName(park: "Choa Chu Kang PC (KJE to Brickland Rd)\r\nChoa Chu K", loop: nil) == "Choa Chu Kang Park Connector")
+        assert(spokenName(park: "Lower Seletar Res Park 3", loop: nil) == "Lower Seletar Reservoir Park")
+        assert(spokenName(park: "Interim RIR - Jalan Kayu/Sengkang West Wat to Seng", loop: "Northern Explorer Loop") == "Northern Explorer Loop")
+        assert(spokenName(park: nil, loop: nil) == nil)
     }
 }

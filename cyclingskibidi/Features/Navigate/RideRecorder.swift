@@ -47,6 +47,12 @@ final class RideRecorder {
     private(set) var sights: [Sight] = []
     var passingSight: Sight?
 
+    /// Every hazard the rider has marked (kept in step with the store by the
+    /// view). Each one warns as the rider nears it, on every route.
+    var hazards: [Obstacle] = []
+    /// The nearest marked hazard within `hazardWarn`, for the banner; nil when clear.
+    private(set) var nearHazard: HazardAlert?
+
     var voiceEnabled = true
 
     var currentStep: StoredStep? { steps[safe: stepIndex] }
@@ -84,6 +90,8 @@ final class RideRecorder {
     private var rollingSpeed: Double = 0
     private var announced: Set<String> = []
     private var passedSights: Set<UUID> = []
+    /// Hazards already announced on this approach; re-armed once the rider is clear.
+    private var warnedHazards: Set<String> = []
     private let speaker = AVSpeechSynthesizer()
 
     /// Called when the rider has left the route and a new line is needed.
@@ -108,6 +116,8 @@ final class RideRecorder {
         passedSights.removeAll()
         passingSight = nil
         rerouteFailure = nil
+        nearHazard = nil
+        warnedHazards.removeAll()
     }
 
     func start() {
@@ -161,6 +171,7 @@ final class RideRecorder {
         stepIndex = 0; distanceAlong = 0; offRoute = false; joinedRoute = false; announced.removeAll()
         sights = []; passedSights.removeAll(); passingSight = nil
         rerouteFailure = nil
+        nearHazard = nil; warnedHazards.removeAll()
         // A ride cannot inherit the previous ride's pace or distance.
         rollingSpeed = 0; lastRecorded = nil; offRouteStreak = 0
     }
@@ -254,6 +265,7 @@ final class RideRecorder {
 
         advanceSteps(to: s.along)
         checkSights(at: s.along)
+        checkHazards(at: fix)
 
         // One bad fix should never trigger a reroute; a run of them should —
         // but only once the rider has actually joined the line. At the start
@@ -322,6 +334,26 @@ final class RideRecorder {
         }
     }
 
+    /// Warn this far from a marked hazard; re-arm it once the rider is beyond `hazardRearm`.
+    /// ponytail: straight-line distance, so a hazard on a parallel path also warns. Measure
+    /// along the line if that's noisy on real rides.
+    static let hazardWarn: Double = 150
+    static let hazardRearm: Double = 250
+
+    /// Distance to every marked hazard, from the raw fix, so it works on or off the route
+    /// and after any reroute. Announces each one once per approach.
+    func checkHazards(at fix: CLLocationCoordinate2D) {
+        let near = hazards.map { (h: $0, d: Geo.distance(fix, $0.coordinate)) }
+        for x in near where x.d > Self.hazardRearm { warnedHazards.remove(Self.key(x.h)) }
+        guard let x = near.filter({ $0.d <= Self.hazardWarn }).min(by: { $0.d < $1.d }) else { nearHazard = nil; return }
+        nearHazard = HazardAlert(kind: x.h.kind, distance: x.d, note: x.h.note)
+        if warnedHazards.insert(Self.key(x.h)).inserted {
+            announce("Caution, \(x.h.kind.rawValue.lowercased()) in \(max(10, Int((x.d / 10).rounded()) * 10)) metres.")
+        }
+    }
+
+    private static func key(_ h: Obstacle) -> String { "\(h.latitude),\(h.longitude),\(h.reportedAt.timeIntervalSince1970)" }
+
     private func markOffRoute(from fix: CLLocationCoordinate2D) {
         offRoute = true
         announce("Off route. Recalculating.")
@@ -329,7 +361,8 @@ final class RideRecorder {
         rerouting = true
         Task { [weak self] in
             defer { self?.rerouting = false }
-            guard let plan = try? await Routing.plan(through: [Coord(fix), destination], mode: self?.mode ?? .moderate, fetchElevation: false),
+            // Routing.plan always avoids every "Path closed" the rider has marked.
+            guard let plan = try? await Routing.plan(through: [Coord(fix), destination], mode: self?.mode ?? .moderate),
                   !plan.polyline.isEmpty, let self else { return }
             self.applyReroute(plan)
         }
@@ -339,15 +372,17 @@ final class RideRecorder {
     /// whichever start is best trusted right now — the snapped position, then
     /// the raw fix, then the route's own start if neither has arrived yet —
     /// to the existing destination. Keeps the current route on failure.
+    /// The new mark is passed explicitly: the store's copy may not have reached
+    /// `Closures.marked` yet. Every earlier mark is avoided by `Routing.plan` itself.
     func rerouteAround(closed coordinate: CLLocationCoordinate2D) {
         guard let destination, let start = snapped ?? location ?? polyline.first, !rerouting else { return }
         rerouteFailure = nil
         rerouting = true
-        let nogo = NoGoCircle(coord: Coord(coordinate), radiusMeters: 40)
+        let nogo = NoGoCircle(coord: Coord(coordinate), radiusMeters: Closures.markedRadius)
         Task { [weak self] in
             defer { self?.rerouting = false }
             guard let plan = try? await Routing.plan(through: [Coord(start), destination], mode: self?.mode ?? .moderate,
-                                                      fetchElevation: false, closures: [nogo]),
+                                                      closures: [nogo]),
                   !plan.polyline.isEmpty, let self else {
                 self?.rerouteFailure = "Couldn't find a way around that closure."
                 return
@@ -373,9 +408,8 @@ final class RideRecorder {
         offRouteStreak = 0
         joinedRoute = false
         announced.removeAll()
-        // The stored sights' offsets are along the old line; drop them
-        // rather than fire them at the wrong spot on the new one.
-        sights = []
+        // Re-measure the sights along the new line; ones it no longer passes drop out.
+        sights = Discovery.sightsAlong(sights, polyline: polyline, cumulative: cumulative)
         passedSights.removeAll()
         passingSight = nil
         onReroute?(plan)
@@ -418,8 +452,36 @@ final class RideRecorder {
         var plan = RoutePlan()
         plan.polyline = [Coord(lat: 1.3, lon: 103.8), Coord(lat: 1.31, lon: 103.8)]
         plan.expected = 42
+        r.sights = [Sight(name: "On the new line", lat: 1.305, lon: 103.8), Sight(name: "Far away", lat: 1.305, lon: 103.9)]
         r.applyReroute(plan)
         assert(r.plannedDuration == 42, "applyReroute() did not refresh plannedDuration from the new plan")
+        assert(r.sights.map(\.name) == ["On the new line"] && r.sights[0].offsetAlong > 500,
+               "a reroute must keep the sights on the new line, re-measured: \(r.sights.map(\.name))")
+
+        // A marked hazard warns on approach, clears once passed, and warns again next time.
+        let pothole = Obstacle(kind: .pothole, at: .init(latitude: 1.3, longitude: 103.8))
+        r.hazards = [pothole]
+        let metre = 1 / 111_195.0
+        r.checkHazards(at: .init(latitude: 1.3 - 400 * metre, longitude: 103.8))
+        assert(r.nearHazard == nil, "400 m away is not near")
+        r.checkHazards(at: .init(latitude: 1.3 - 100 * metre, longitude: 103.8))
+        assert(r.nearHazard?.kind == .pothole && abs((r.nearHazard?.distance ?? 0) - 100) < 2, "100 m away must warn: \(String(describing: r.nearHazard))")
+        assert(r.warnedHazards.count == 1, "announced once")
+        r.checkHazards(at: .init(latitude: 1.3 + 300 * metre, longitude: 103.8))
+        assert(r.nearHazard == nil && r.warnedHazards.isEmpty, "passed and clear must re-arm")
+        r.checkHazards(at: .init(latitude: 1.3 + 50 * metre, longitude: 103.8))
+        assert(r.nearHazard != nil && r.warnedHazards.count == 1, "coming back must warn again")
+        // Hazards outlive a reroute and the next ride.
+        r.applyReroute(plan)
+        r.reset()
+        assert(r.hazards.count == 1, "a reroute or a new ride forgot the marked hazards")
     }
     #endif
+}
+
+/// The marked hazard the rider is closing on, for the navigation banner.
+struct HazardAlert: Equatable {
+    let kind: ObstacleKind
+    let distance: Double
+    let note: String
 }

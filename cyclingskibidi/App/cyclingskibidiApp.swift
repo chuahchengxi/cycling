@@ -25,9 +25,12 @@ struct cyclingskibidiApp: App {
         GeoJSON.selfCheck()
         PCNGraph.selfCheck()
         PCNGraph.selfCheckAStar()
-        BRouter.selfCheck()
+        Elevation.selfCheck()
+        Closures.selfCheck()
         Task { await PCNDataset.selfCheck() }
         Task { await PCNRouting.selfCheck() }
+        Task { await RoadNetwork.selfCheck() }
+        TilePack.selfCheck()
         RideMode.selfCheck()
         Routing.selfCheck()
         RideRecorder.selfCheck()

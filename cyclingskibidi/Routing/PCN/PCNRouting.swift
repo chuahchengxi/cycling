@@ -4,7 +4,7 @@
 //
 //  Assembling a ride: snap the rider's points to the connector network, run A*
 //  for the on-PCN stretches, and route the unavoidable gaps (start/end/holes)
-//  with the injected gap router — walkable paths first, roads only when forced.
+//  with the injected gap leg (a straight off-connector line in the app).
 //  Off-connector stretches are tracked so the builder can flag them.
 //
 
@@ -15,14 +15,23 @@ enum PCNRouting {
 
     /// Distance under which a gap is treated as already-on-network noise (skip
     /// the gap router). ponytail: 15 m; tune with the real snap tolerance on-device.
-    static let gapEpsilon: Double = 15
+    nonisolated static let gapEpsilon: Double = 15
 
-    static func stitched(
+    /// `graph` may carry closure penalties (see `PCNGraph.penalised`); `base` is the
+    /// same network without them (nil = `graph`). Per waypoint pair the penalised path
+    /// is used when it avoids every `closed` circle within `maxDetourRatio` of the
+    /// open path; otherwise the open path is ridden and each run of closed vertices
+    /// becomes an off-connector `gap` leg round it. Runs off the main actor.
+    @concurrent nonisolated static func stitched(
         waypoints: [Coord],
         graph: PCNGraph,
-        gap: (Coord, Coord) async -> [Coord]
+        base: PCNGraph? = nil,
+        closed: [NoGoCircle] = [],
+        gap: @Sendable (Coord, Coord) async -> [Coord]
     ) async -> (poly: [Coord], offSegments: [[Coord]], offMeters: Double) {
         guard waypoints.count >= 2 else { return ([], [], 0) }
+        let base = base ?? graph
+        func isClosed(_ c: Coord) -> Bool { closed.contains { Geo.distance(c.cl, $0.coord.cl) <= $0.radiusMeters } }
 
         var poly: [Coord] = []
         var offSegments: [[Coord]] = []
@@ -40,19 +49,38 @@ enum PCNRouting {
 
         for i in 0..<(waypoints.count - 1) {
             let a = waypoints[i], b = waypoints[i + 1]
-            guard let entry = graph.nearest(to: a), let exit = graph.nearest(to: b),
-                  let onPCN = graph.path(from: entry, to: exit), onPCN.count >= 1,
-                  let entryC = graph.coord(of: entry), let exitC = graph.coord(of: exit) else {
+            guard let entry = base.nearest(to: a), let exit = base.nearest(to: b),
+                  let open = base.path(from: entry, to: exit), open.count >= 1,
+                  let entryC = base.coord(of: entry), let exitC = base.coord(of: exit) else {
                 // No usable PCN between these points — bridge the whole pair.
                 append(await gap(a, b), off: true)
                 continue
             }
-            // start -> entry node (gap), unless already essentially on it.
-            if Geo.distance(a.cl, entryC.cl) > gapEpsilon { append(await gap(a, entryC), off: true) }
+            var onPCN = open
+            if !closed.isEmpty, let avoid = graph.path(from: entry, to: exit),
+               !avoid.contains(where: isClosed),
+               base.pathLength(avoid) <= PCNGraph.maxDetourRatio * base.pathLength(open) {
+                onPCN = avoid
+            }
+            // start -> entry node (gap), unless already essentially on it. A closed entry
+            // node is never visited: the closed run below gaps straight from `a`.
+            if Geo.distance(a.cl, entryC.cl) > gapEpsilon, !isClosed(entryC) { append(await gap(a, entryC), off: true) }
             else { append([a], off: false) }
-            // entry -> exit along the PCN (on-connector).
-            append(onPCN, off: false)
-            // exit node -> destination (gap).
+            // entry -> exit along the PCN, each closed run swapped for a gap leg round it.
+            var k = 0
+            while k < onPCN.count {
+                guard isClosed(onPCN[k]) else {
+                    var j = k
+                    while j < onPCN.count, !isClosed(onPCN[j]) { j += 1 }
+                    append(Array(onPCN[k..<j]), off: false); k = j; continue
+                }
+                var j = k
+                while j < onPCN.count, isClosed(onPCN[j]) { j += 1 }
+                let from = poly.last ?? a, to = j < onPCN.count ? onPCN[j] : b
+                append(await gap(from, to), off: true); k = j
+            }
+            // exit node -> destination (gap). A closed exit node already gapped to `b` above.
+            if isClosed(exitC) { continue }
             if Geo.distance(exitC.cl, b.cl) > gapEpsilon { append(await gap(exitC, b), off: true) }
             else { append([b], off: false) }
         }
@@ -61,27 +89,79 @@ enum PCNRouting {
         return (poly, offSegments, offMeters)
     }
 
-    /// A turn list from bare geometry — the PCN path has no street names, so
-    /// steps are synthesised from the polyline's own bends. Reuses Geo's bearing
-    /// maths, the same classification the MapKit path uses.
+    /// A turn list from the line's own bends. Reuses Geo's bearing maths, the
+    /// same classification the MapKit path uses. With the graphs the line was
+    /// routed on, a bend is only announced near a real junction (a choice for the
+    /// rider) or where the line changes network, and says what it turns onto:
+    /// the connector's name, else the kind of path.
     /// ponytail: emits a step only on a >minTurn bend spaced >minSpacing apart, so
     /// dense connector vertices don't spam the turn list. Both tuned on-device.
     static let minTurn: Double = 25       // degrees
     static let minSpacing: Double = 30    // metres
+    /// A bend this close to a junction (along the line) is that junction's turn:
+    /// windowed bearings put the bend a few metres off the junction vertex.
+    static let junctionWindow: Double = 15
 
-    static func steps(from poly: [Coord]) -> [StoredStep] {
+    private enum Spot: Equatable {
+        case pcn(GridKey), road(Int), none
+        func sameNetwork(_ o: Spot) -> Bool {
+            switch (self, o) { case (.pcn, .pcn), (.road, .road): return true; default: return false }
+        }
+    }
+
+    static func steps(from poly: [Coord], pcn: PCNGraph? = nil, roads: RoadGraph? = nil) -> [StoredStep] {
         let coords = poly.coordinates
         guard coords.count >= 2 else { return [] }
         let cum = Geo.cumulative(coords)
+        let spots: [Spot] = poly.map { c in
+            if let k = pcn?.node(at: c) { return .pcn(k) }
+            if let i = roads?.node(at: c) { return .road(i) }
+            return .none
+        }
+        // Junction, network seam or unknown ground: somewhere a turn can be a choice.
+        let choice: [Bool] = spots.indices.map { i in
+            if i > 0, spots[i - 1].sameNetwork(spots[i]) == false { return true }
+            if i + 1 < spots.count, spots[i + 1].sameNetwork(spots[i]) == false { return true }
+            switch spots[i] {
+            case .none:          return true
+            case .pcn(let k):    return (pcn?.degree(k) ?? 3) >= 3
+            case .road(let r):   return Int(roads?.degree[r] ?? 3) >= 3
+            }
+        }
+        func nearChoice(_ i: Int) -> Bool {
+            var j = i; while j >= 0, cum[i] - cum[j] <= junctionWindow { if choice[j] { return true }; j -= 1 }
+            j = i + 1; while j < cum.count, cum[j] - cum[i] <= junctionWindow { if choice[j] { return true }; j += 1 }
+            return false
+        }
+        /// What the rider turns onto at vertex i: (spoken target, street name).
+        func onto(_ i: Int) -> (String, String)? {
+            switch (spots[i], spots[i + 1]) {
+            case (_, .pcn(let k)):
+                if let n = pcn?.name[k] { return (n, n) }
+                return ("the park connector", "")
+            case (.road(let u), .road(let v)):
+                guard let c = roads?.edgeClass(u, v) else { return nil }
+                return (c == 0 ? "the cycleway" : c == 1 ? "the path" : "the road", "")
+            default:
+                return nil
+            }
+        }
+
         var out: [StoredStep] = [step(.depart, "Start", at: coords[0], offset: 0)]
         var lastAt = 0.0
         for i in 1..<(coords.count - 1) {
             guard let inB = Geo.exitBearing(Array(coords[...i])),
                   let outB = Geo.entryBearing(Array(coords[i...])) else { continue }
             let angle = Geo.turn(from: inB, to: outB)
-            guard abs(angle) >= minTurn, cum[i] - lastAt >= minSpacing else { continue }
+            guard abs(angle) >= minTurn, cum[i] - lastAt >= minSpacing, nearChoice(i) else { continue }
             let m = Maneuver.classify(turn: angle)
-            out.append(step(m, phrase(m), at: coords[i], offset: cum[i]))
+            var text = phrase(m), road = ""
+            if m != .uTurn, let (target, name) = onto(i) {
+                let into = !target.contains("Connector") && (target.contains("Park") || target.contains("Garden"))
+                text += (into ? " into " : " onto ") + target
+                road = name
+            }
+            out.append(step(m, text, road: road, at: coords[i], offset: cum[i]))
             lastAt = cum[i]
         }
         out.append(step(.arrive, "Arrive", at: coords.last!, offset: cum.last ?? 0))
@@ -101,8 +181,8 @@ enum PCNRouting {
         }
     }
 
-    private static func step(_ m: Maneuver, _ text: String, at c: CLLocationCoordinate2D, offset: Double) -> StoredStep {
-        StoredStep(instruction: text, road: "", distance: 0, maneuverOffset: offset,
+    private static func step(_ m: Maneuver, _ text: String, road: String = "", at c: CLLocationCoordinate2D, offset: Double) -> StoredStep {
+        StoredStep(instruction: text, road: road, distance: 0, maneuverOffset: offset,
                    maneuverRaw: m.rawValue, lat: c.latitude, lon: c.longitude)
     }
 }
@@ -111,7 +191,7 @@ enum PCNRouting {
 
 extension PCNRouting {
     static func selfCheck() async {
-        // Stitch with a straight-line gap stub (no network). Start 30 m south of
+        // Stitch with a straight-line gap stub. Start 30 m south of
         // the fixture's west end, end exactly on the north node.
         let g = PCNGraph.fixture()
         let start = Coord(lat: 1.30 - 30 / PCNGraph.metresPerDegree, lon: 103.800)
@@ -129,5 +209,54 @@ extension PCNRouting {
                                  Coord(lat: 1.302, lon: 103.802)])
         assert(steps.first?.maneuver == .depart && steps.last?.maneuver == .arrive)
         assert(steps.contains { $0.maneuver == .left }, "left turn not detected")
+
+        // With the graph: a bend with no other way to go is not announced; at a
+        // real junction the turn names the connector it turns onto.
+        let w = Coord(lat: 1.30, lon: 103.80), j = Coord(lat: 1.30, lon: 103.802)
+        let n = Coord(lat: 1.302, lon: 103.802), s = Coord(lat: 1.298, lon: 103.802)
+        let bend = PCNGraph(named: [("Ulu Pandan Park Connector", [w, j]), ("Ulu Pandan Park Connector", [j, n])])
+        assert(PCNRouting.steps(from: [w, j, n], pcn: bend).count == 2, "a plain bend must not be a turn")
+        let tee = PCNGraph(named: [("Ulu Pandan Park Connector", [w, j]), ("Whampoa Park Connector", [j, n]), (nil, [j, s])])
+        let t = PCNRouting.steps(from: [w, j, n], pcn: tee)
+        assert(t.count == 3 && t[1].instruction == "Turn left onto Whampoa Park Connector" && t[1].road == "Whampoa Park Connector",
+               "junction turn unnamed: \(t.map(\.instruction))")
+        let u = PCNRouting.steps(from: [w, j, s], pcn: tee)
+        assert(u[1].instruction == "Turn right onto the park connector", "unnamed connector: \(u.map(\.instruction))")
+
+        // Closures.
+        let west = Coord(lat: 1.300, lon: 103.800), corner = Coord(lat: 1.300, lon: 103.802), north = Coord(lat: 1.302, lon: 103.802)
+        let shut = NoGoCircle(coord: corner, radiusMeters: 20)
+        func inside(_ c: Coord) -> Bool { Geo.distance(c.cl, shut.coord.cl) <= 20 }
+        // 1. Only path is closed: still arrives, closed vertex not ridden, one off-connector gap leg.
+        let g1 = PCNGraph.fixture()
+        let r1 = await stitched(waypoints: [west, north], graph: g1.penalised(closed: [shut], walk: []), base: g1,
+                                closed: [shut], gap: { [$0, $1] })
+        assert(abs(r1.poly.last!.lat - 1.302) < 1e-6, "closure must not stop the route")
+        assert(!r1.poly.contains { $0 == corner }, "closed vertex must not be ridden")
+        assert(r1.offSegments.count == 1, "expected one gap leg round the closure")
+        // 2. Short open detour (square, other side ~444 m vs 444 m): detour wins, no gap leg.
+        let other = Coord(lat: 1.302, lon: 103.800)
+        let sq = PCNGraph(polylines: [[west, corner, north], [west, other, north]])
+        let r2 = await stitched(waypoints: [west, north], graph: sq.penalised(closed: [shut], walk: []), base: sq,
+                                closed: [shut], gap: { [$0, $1] })
+        assert(r2.offSegments.isEmpty && !r2.poly.contains(where: inside), "should take the open side")
+        // 3. Detour far longer than +30%: direct route with a gap leg, not the detour.
+        let far = [west, Coord(lat: 1.296, lon: 103.800), Coord(lat: 1.296, lon: 103.806), Coord(lat: 1.302, lon: 103.806), north]
+        let lg = PCNGraph(polylines: [[west, corner, north], far])
+        let r3 = await stitched(waypoints: [west, north], graph: lg.penalised(closed: [shut], walk: []), base: lg,
+                                closed: [shut], gap: { [$0, $1] })
+        assert(r3.offSegments.count == 1 && r3.poly.count <= 4, "long detour must lose to a dashed gap leg")
+        // 4. No-cycling zone on the only path: ridden (walked), no gap leg.
+        let r4 = await stitched(waypoints: [west, north], graph: g1.penalised(closed: [], walk: [shut]), base: g1,
+                                closed: [], gap: { [$0, $1] })
+        assert(r4.poly.contains { $0 == corner } && r4.offSegments.isEmpty, "walk zones are passed through")
+        // 5. Destination / start just off a closed node: no spur into the closure and back.
+        let nearCorner = Coord(lat: 1.300 - 30 / PCNGraph.metresPerDegree, lon: 103.802)
+        let r5 = await stitched(waypoints: [west, nearCorner], graph: g1.penalised(closed: [shut], walk: []), base: g1,
+                                closed: [shut], gap: { [$0, $1] })
+        assert(!r5.poly.contains { $0 == corner } && r5.poly.last == nearCorner, "exit spur into closure: \(r5.poly)")
+        let r6 = await stitched(waypoints: [nearCorner, west], graph: g1.penalised(closed: [shut], walk: []), base: g1,
+                                closed: [shut], gap: { [$0, $1] })
+        assert(!r6.poly.contains { $0 == corner } && r6.poly.first == nearCorner, "entry spur into closure: \(r6.poly)")
     }
 }

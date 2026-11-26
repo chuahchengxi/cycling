@@ -33,6 +33,7 @@ struct ContentView: View {
     @Environment(\.modelContext) private var context
     @State private var trip = Trip()
     @State private var path = NavigationPath()
+    @Query private var obstacles: [Obstacle]
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -44,6 +45,9 @@ struct ContentView: View {
                 .environment(trip)
         }
         .task { _ = await PCNDataset.graph() }
+        .task { _ = await RoadNetwork.graph() }
+        // Every plan, re-plan and reroute avoids the rider's "Path closed" marks.
+        .onChange(of: obstacles, initial: true) { Closures.marked = obstacles.compactMap(\.asClosure) }
         #if DEBUG
         .task { await openDemoScreen() }
         #endif

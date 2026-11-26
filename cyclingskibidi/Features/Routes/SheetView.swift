@@ -15,8 +15,11 @@ import Charts
 struct SheetView: View {
     let route: Route
     var obstacles: [Obstacle] = []
+    var closures: (active: [Closure], expired: [Closure]) = ([], [])
+    var replanning = false
     @Binding var currentDetent: PresentationDetent
     var onStart: () -> Void
+    var onReplan: () -> Void = {}
 
     @State private var selectedSight: Sight?
 
@@ -34,6 +37,7 @@ struct SheetView: View {
                         summary
                         climb
                         elevationGraph
+                        if !closures.active.isEmpty || !closures.expired.isEmpty { closureList }
                         if !obstacles.isEmpty { obstacleList }
                         if !route.sights.isEmpty { sightList }
                         turnList
@@ -122,6 +126,39 @@ struct SheetView: View {
         }
     }
 
+    private var closureList: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Closures on this route").font(.headline)
+            ForEach(closures.active) { c in
+                HStack(spacing: 12) {
+                    Image(systemName: c.kind == .closure ? "nosign" : "figure.walk")
+                        .foregroundStyle(c.kind == .closure ? .red : .orange)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading) {
+                        Text(c.kind == .closure ? "\(c.name) is closed" : "No cycling: \(c.name)")
+                            .font(.subheadline.weight(.semibold))
+                        Text(c.note).font(.caption).foregroundStyle(.secondary)
+                    }
+                }
+            }
+            if closures.active.contains(where: { $0.kind == .closure }) {
+                Button(action: onReplan) {
+                    if replanning { ProgressView("Re-planning") } else {
+                        Label(closures.active.filter { $0.kind == .closure }.count == 1 ? "Re-plan around it" : "Re-plan around them",
+                              systemImage: "arrow.triangle.branch")
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(replanning)
+            }
+            ForEach(closures.expired) { c in
+                Label("\(c.name): was closed until \(c.untilText ?? "recently")", systemImage: "clock.arrow.circlepath")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
     private var obstacleList: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Marked on this route").font(.headline)
@@ -186,7 +223,7 @@ struct SheetView: View {
         }
         .buttonStyle(.borderedProminent)
         .buttonBorderShape(.roundedRectangle(radius: 18))
-        .disabled(route.polyline.count < 2)
+        .disabled(route.polyline.count < 2 || replanning)
     }
 }
 

@@ -42,7 +42,7 @@ struct TrackPoint: Codable, Sendable {
 }
 
 extension Array where Element == Coord {
-    var coordinates: [CLLocationCoordinate2D] { map(\.cl) }
+    nonisolated var coordinates: [CLLocationCoordinate2D] { map(\.cl) }
 }
 
 /// Codable <-> Data, so blobs are one line at the call site.
@@ -87,7 +87,7 @@ enum RideMode: String, Codable, CaseIterable, Identifiable, Sendable {
 
     /// Planning speed used to estimate route duration — not a target, just
     /// the assumption `Routing.plan` bakes into the ETA for this mode.
-    var planningSpeedKmh: Double {
+    nonisolated var planningSpeedKmh: Double {
         switch self {
         case .fast:     return 20
         case .moderate: return 18
@@ -217,6 +217,8 @@ final class Obstacle {
     var note: String = ""
     var reportedAt: Date = Date.now
     var confirmations: Int = 0
+    /// Last day the mark applies, Singapore time; nil = until the rider removes it.
+    var expiresAt: Date? = nil
 
     init(kind: ObstacleKind, at c: CLLocationCoordinate2D, note: String = "") {
         kindRaw = kind.rawValue
@@ -227,6 +229,28 @@ final class Obstacle {
 
     var kind: ObstacleKind { ObstacleKind(rawValue: kindRaw) ?? .pothole }
     var coordinate: CLLocationCoordinate2D { .init(latitude: latitude, longitude: longitude) }
+
+    /// Still in force today: routes avoid it and rides warn about it.
+    var isActive: Bool {
+        guard let expiresAt else { return true }
+        return Closures.marked(id: "", lat: 0, lon: 0, note: "", until: Closures.dayString(expiresAt)).isActive(on: Closures.now)
+    }
+
+    /// "Until 28 Nov", "Ended 20 Nov" or "Until you remove it".
+    var expiryText: String {
+        guard let expiresAt else { return "Until you remove it" }
+        let day = expiresAt.formatted(.dateTime.day().month(.abbreviated))
+        return isActive ? "Until \(day)" : "Ended \(day)"
+    }
+
+    /// Stable identity for map pins and warnings.
+    var pinID: String { "\(latitude),\(longitude),\(reportedAt.timeIntervalSince1970)" }
+
+    /// A "Path closed" mark as a closure every route avoids; nil for other kinds.
+    var asClosure: Closure? {
+        kind == .closed ? Closures.marked(id: "\(reportedAt.timeIntervalSince1970)", lat: latitude, lon: longitude, note: note,
+                                          until: expiresAt.map(Closures.dayString)) : nil
+    }
 }
 
 #if DEBUG
@@ -243,6 +267,17 @@ extension Obstacle {
         let saved = try! ModelContext(container).fetch(FetchDescriptor<Obstacle>())
         assert(saved.count == 1, "a reported obstacle should survive a context reload")
         assert(saved[0].kind == .flooding && saved[0].note == "ankle-deep")
+
+        // Expiry: the last day is inclusive; yesterday's mark is over; no date never ends.
+        let today = Obstacle(kind: .closed, at: .init(latitude: 1.3, longitude: 103.8))
+        today.expiresAt = Closures.now
+        let past = Obstacle(kind: .closed, at: .init(latitude: 1.3, longitude: 103.8))
+        past.expiresAt = Closures.sg.date(byAdding: .day, value: -1, to: Closures.now)
+        let forever = Obstacle(kind: .closed, at: .init(latitude: 1.3, longitude: 103.8))
+        assert(today.isActive && today.asClosure?.isActive(on: Closures.now) == true, "a mark ending today is still on")
+        assert(!past.isActive && past.asClosure?.isActive(on: Closures.now) == false, "yesterday's mark must be over")
+        assert(forever.isActive && forever.expiryText == "Until you remove it", "no date must never end")
+        assert(past.expiryText.hasPrefix("Ended"), "ended text wrong: \(past.expiryText)")
     }
 }
 #endif

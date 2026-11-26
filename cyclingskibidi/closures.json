@@ -1,0 +1,4711 @@
+[
+ {
+  "id": "rail-corridor-south",
+  "name": "Rail Corridor South, Henderson Rd to Spooner Rd",
+  "circles": [
+   {
+    "lat": 1.280468,
+    "lon": 103.818323,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.280324,
+    "lon": 103.818552,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.28018,
+    "lon": 103.81878,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.280036,
+    "lon": 103.819008,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279893,
+    "lon": 103.819237,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279766,
+    "lon": 103.819475,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279642,
+    "lon": 103.819715,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279545,
+    "lon": 103.819967,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279467,
+    "lon": 103.820224,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279407,
+    "lon": 103.820487,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279393,
+    "lon": 103.820757,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279394,
+    "lon": 103.821026,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279417,
+    "lon": 103.821295,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279454,
+    "lon": 103.821562,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.2795,
+    "lon": 103.821828,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279546,
+    "lon": 103.822094,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279585,
+    "lon": 103.82236,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279594,
+    "lon": 103.82263,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279591,
+    "lon": 103.822899,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279553,
+    "lon": 103.823166,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279519,
+    "lon": 103.823434,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279454,
+    "lon": 103.823695,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279377,
+    "lon": 103.823954,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279273,
+    "lon": 103.824202,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279154,
+    "lon": 103.824444,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.279022,
+    "lon": 103.824679,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.278878,
+    "lon": 103.824907,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.278728,
+    "lon": 103.825131,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.278563,
+    "lon": 103.825345,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.278399,
+    "lon": 103.825559,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.278233,
+    "lon": 103.825772,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.278068,
+    "lon": 103.825985,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.2779,
+    "lon": 103.826197,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.277733,
+    "lon": 103.826408,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.277565,
+    "lon": 103.82662,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.277398,
+    "lon": 103.826831,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.27723,
+    "lon": 103.827043,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.277063,
+    "lon": 103.827255,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.276895,
+    "lon": 103.827466,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.276721,
+    "lon": 103.827672,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.276539,
+    "lon": 103.827871,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.276358,
+    "lon": 103.828071,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.276176,
+    "lon": 103.828271,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.275995,
+    "lon": 103.82847,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.275817,
+    "lon": 103.828673,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.275648,
+    "lon": 103.828883,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.275481,
+    "lon": 103.829096,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.275315,
+    "lon": 103.829309,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.275151,
+    "lon": 103.829523,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.274994,
+    "lon": 103.829742,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.274834,
+    "lon": 103.829959,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.274673,
+    "lon": 103.830176,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   },
+   {
+    "lat": 1.274547,
+    "lon": 103.830347,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Rail Corridor, between OSM Henderson Road and Spooner Road"
+   }
+  ],
+  "starts": "2026-03-02",
+  "valid_until": "2027-07-31",
+  "note": "Trail works. Signed detour along Jalan Bukit Merah. Start given as 2 or 9 Mar 2026; earlier date used.",
+  "source_url": "https://railcorridor.nparks.gov.sg/latest-news/important-notices/closure-notice-feb",
+  "kind": "closure"
+ },
+ {
+  "id": "loyang-pc",
+  "name": "Loyang Park Connector beside Loyang Ave",
+  "circles": [
+   {
+    "lat": 1.39086,
+    "lon": 103.988367,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.390668,
+    "lon": 103.988243,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.390789,
+    "lon": 103.988002,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.390743,
+    "lon": 103.98776,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.390486,
+    "lon": 103.987843,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.390321,
+    "lon": 103.987741,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.390464,
+    "lon": 103.987601,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.390689,
+    "lon": 103.987487,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.390694,
+    "lon": 103.987248,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.390576,
+    "lon": 103.987005,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.390441,
+    "lon": 103.986772,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.390597,
+    "lon": 103.986573,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.390772,
+    "lon": 103.986369,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.390934,
+    "lon": 103.986153,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391076,
+    "lon": 103.985924,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391165,
+    "lon": 103.98567,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391235,
+    "lon": 103.985409,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391345,
+    "lon": 103.985164,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391487,
+    "lon": 103.984935,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391621,
+    "lon": 103.984701,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391673,
+    "lon": 103.984437,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391728,
+    "lon": 103.984174,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391725,
+    "lon": 103.983912,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391652,
+    "lon": 103.983655,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391589,
+    "lon": 103.983393,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391534,
+    "lon": 103.983129,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391475,
+    "lon": 103.982866,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391421,
+    "lon": 103.982601,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391357,
+    "lon": 103.982341,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391328,
+    "lon": 103.982073,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391322,
+    "lon": 103.981803,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391385,
+    "lon": 103.981545,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391477,
+    "lon": 103.981301,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391516,
+    "lon": 103.981043,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.39158,
+    "lon": 103.980782,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.39157,
+    "lon": 103.980514,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391493,
+    "lon": 103.980259,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391345,
+    "lon": 103.980036,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.391149,
+    "lon": 103.979854,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.390918,
+    "lon": 103.979718,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.390669,
+    "lon": 103.979615,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.390425,
+    "lon": 103.9795,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.390186,
+    "lon": 103.979377,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.389957,
+    "lon": 103.979234,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.389745,
+    "lon": 103.979068,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.389563,
+    "lon": 103.978869,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.389401,
+    "lon": 103.978655,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.389234,
+    "lon": 103.978444,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.389068,
+    "lon": 103.978251,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.388938,
+    "lon": 103.978015,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.38883,
+    "lon": 103.977768,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.388629,
+    "lon": 103.977594,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.388379,
+    "lon": 103.977566,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.388197,
+    "lon": 103.977763,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.388033,
+    "lon": 103.977977,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.387895,
+    "lon": 103.978208,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.387763,
+    "lon": 103.978443,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.387674,
+    "lon": 103.978697,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.387614,
+    "lon": 103.97896,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.387553,
+    "lon": 103.979221,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.38752,
+    "lon": 103.979489,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.387474,
+    "lon": 103.979755,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.387435,
+    "lon": 103.980022,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.387413,
+    "lon": 103.98029,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.38716,
+    "lon": 103.980377,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.386999,
+    "lon": 103.980258,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.386893,
+    "lon": 103.980011,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.386758,
+    "lon": 103.979778,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.386588,
+    "lon": 103.979569,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.386446,
+    "lon": 103.97934,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.386263,
+    "lon": 103.979143,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.38606,
+    "lon": 103.978965,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.385845,
+    "lon": 103.97881,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.385611,
+    "lon": 103.978675,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.385369,
+    "lon": 103.978559,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.385114,
+    "lon": 103.978472,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.384852,
+    "lon": 103.97841,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.384583,
+    "lon": 103.97839,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.384315,
+    "lon": 103.978381,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.384045,
+    "lon": 103.978394,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.383778,
+    "lon": 103.97843,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.383511,
+    "lon": 103.978434,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.383241,
+    "lon": 103.97844,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.382973,
+    "lon": 103.978461,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.382703,
+    "lon": 103.978475,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.382434,
+    "lon": 103.978483,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.382164,
+    "lon": 103.978498,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.381896,
+    "lon": 103.97852,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.381627,
+    "lon": 103.978535,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.381358,
+    "lon": 103.978555,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.381089,
+    "lon": 103.978578,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.38082,
+    "lon": 103.978595,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.380551,
+    "lon": 103.97861,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.380282,
+    "lon": 103.97863,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.380012,
+    "lon": 103.978643,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.379743,
+    "lon": 103.978657,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.379474,
+    "lon": 103.978676,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.379269,
+    "lon": 103.978615,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.379236,
+    "lon": 103.978366,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.378967,
+    "lon": 103.978382,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.378699,
+    "lon": 103.978368,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.378431,
+    "lon": 103.978336,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.378167,
+    "lon": 103.97828,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.37791,
+    "lon": 103.978197,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.377664,
+    "lon": 103.978087,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.377431,
+    "lon": 103.977951,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.377212,
+    "lon": 103.977794,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.377004,
+    "lon": 103.977623,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.376804,
+    "lon": 103.977445,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.376621,
+    "lon": 103.977248,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.376429,
+    "lon": 103.977058,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.376238,
+    "lon": 103.976867,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.376047,
+    "lon": 103.976676,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.375856,
+    "lon": 103.976486,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.375665,
+    "lon": 103.976295,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.375474,
+    "lon": 103.976105,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.375283,
+    "lon": 103.975915,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.375092,
+    "lon": 103.975724,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.374901,
+    "lon": 103.975534,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.374703,
+    "lon": 103.97535,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.374502,
+    "lon": 103.975171,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.37432,
+    "lon": 103.974971,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.374131,
+    "lon": 103.974914,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.373941,
+    "lon": 103.974729,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.37399,
+    "lon": 103.974508,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.373801,
+    "lon": 103.974316,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.373612,
+    "lon": 103.974123,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.373423,
+    "lon": 103.97393,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.373232,
+    "lon": 103.97374,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.373039,
+    "lon": 103.973551,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.372848,
+    "lon": 103.97336,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.372658,
+    "lon": 103.973169,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.372469,
+    "lon": 103.972976,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.372255,
+    "lon": 103.972822,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.372046,
+    "lon": 103.972658,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.371854,
+    "lon": 103.972469,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.371662,
+    "lon": 103.972279,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.371471,
+    "lon": 103.972089,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.371282,
+    "lon": 103.971896,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.37111,
+    "lon": 103.97169,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.370901,
+    "lon": 103.971521,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.37071,
+    "lon": 103.97133,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.370518,
+    "lon": 103.97114,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.370375,
+    "lon": 103.970925,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.370184,
+    "lon": 103.970736,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.369989,
+    "lon": 103.970552,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.369805,
+    "lon": 103.970355,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.369589,
+    "lon": 103.970197,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.369398,
+    "lon": 103.970007,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.369222,
+    "lon": 103.969807,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.369035,
+    "lon": 103.969618,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.368832,
+    "lon": 103.969442,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.368646,
+    "lon": 103.969246,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.368455,
+    "lon": 103.969056,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.368256,
+    "lon": 103.968874,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.368067,
+    "lon": 103.968681,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.367884,
+    "lon": 103.968484,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.367689,
+    "lon": 103.968298,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.367489,
+    "lon": 103.968117,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.367298,
+    "lon": 103.967927,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.36711,
+    "lon": 103.967733,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.366908,
+    "lon": 103.967555,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.366716,
+    "lon": 103.967366,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.366522,
+    "lon": 103.967178,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.366335,
+    "lon": 103.966983,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Loyang Park Connector, whole connector (notice names no end roads)"
+   }
+  ],
+  "starts": "2025-06-08",
+  "valid_until": "2029-09-30",
+  "note": "Upgrading, on-site detour. Notice says Q3 2029; last day of Q3 used.",
+  "source_url": "https://pcn.nparks.gov.sg/notices",
+  "kind": "closure"
+ },
+ {
+  "id": "amk-ave6-pc",
+  "name": "Ang Mo Kio Park Connector along Ave 6 (C2C)",
+  "circles": [
+   {
+    "lat": 1.364476,
+    "lon": 103.842863,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.364469,
+    "lon": 103.842971,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.364462,
+    "lon": 103.843078,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.364456,
+    "lon": 103.843186,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.364365,
+    "lon": 103.843173,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.36405,
+    "lon": 103.843125,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.363942,
+    "lon": 103.84312,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.366848,
+    "lon": 103.844215,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.366762,
+    "lon": 103.844149,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.369246,
+    "lon": 103.845231,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.369161,
+    "lon": 103.845298,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.36906,
+    "lon": 103.8453,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.368954,
+    "lon": 103.845281,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.36893,
+    "lon": 103.84524,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.37168,
+    "lon": 103.845229,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.371641,
+    "lon": 103.845218,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.366734,
+    "lon": 103.844127,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.366647,
+    "lon": 103.844063,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.366559,
+    "lon": 103.844,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.366472,
+    "lon": 103.843937,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.366384,
+    "lon": 103.843874,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.366289,
+    "lon": 103.843822,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.366204,
+    "lon": 103.843756,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.366123,
+    "lon": 103.843686,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.366034,
+    "lon": 103.843625,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.365945,
+    "lon": 103.843563,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.365858,
+    "lon": 103.843501,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.36577,
+    "lon": 103.843438,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.365686,
+    "lon": 103.843371,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.365585,
+    "lon": 103.843336,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.365488,
+    "lon": 103.84329,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.36539,
+    "lon": 103.843243,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.365292,
+    "lon": 103.843198,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.365192,
+    "lon": 103.843159,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.365093,
+    "lon": 103.843115,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.36499,
+    "lon": 103.843091,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.364906,
+    "lon": 103.843024,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.364808,
+    "lon": 103.842978,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.364768,
+    "lon": 103.842959,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.364476,
+    "lon": 103.842862,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.36893,
+    "lon": 103.84524,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.368849,
+    "lon": 103.845194,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.368744,
+    "lon": 103.84517,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.368639,
+    "lon": 103.845144,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.368534,
+    "lon": 103.845118,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.368431,
+    "lon": 103.845088,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.368327,
+    "lon": 103.845057,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.368225,
+    "lon": 103.845022,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.368121,
+    "lon": 103.844996,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.368022,
+    "lon": 103.844955,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.367919,
+    "lon": 103.844931,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.367823,
+    "lon": 103.844882,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.367727,
+    "lon": 103.844832,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.367633,
+    "lon": 103.84478,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.367545,
+    "lon": 103.84472,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.367462,
+    "lon": 103.844653,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.367372,
+    "lon": 103.844594,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.367286,
+    "lon": 103.844529,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.367197,
+    "lon": 103.844467,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.36711,
+    "lon": 103.844404,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.367022,
+    "lon": 103.844341,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.366935,
+    "lon": 103.844278,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.366848,
+    "lon": 103.844215,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.371641,
+    "lon": 103.845218,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.371539,
+    "lon": 103.845216,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.371432,
+    "lon": 103.84523,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.371325,
+    "lon": 103.845243,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.371218,
+    "lon": 103.845256,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.371111,
+    "lon": 103.84527,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.371004,
+    "lon": 103.845283,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.370898,
+    "lon": 103.845303,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.370793,
+    "lon": 103.845304,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.370686,
+    "lon": 103.845314,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.37058,
+    "lon": 103.845299,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.370474,
+    "lon": 103.845312,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.370371,
+    "lon": 103.845283,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.370265,
+    "lon": 103.845293,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.370158,
+    "lon": 103.845282,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.370055,
+    "lon": 103.845297,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.369962,
+    "lon": 103.845287,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.369865,
+    "lon": 103.845245,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.369759,
+    "lon": 103.845256,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.369658,
+    "lon": 103.845283,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.36955,
+    "lon": 103.845272,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.369443,
+    "lon": 103.845259,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.369336,
+    "lon": 103.845245,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.369246,
+    "lon": 103.845231,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Park Connector, vertices within 40 m of OSM Ang Mo Kio Avenue 6"
+   }
+  ],
+  "starts": "2024-06-09",
+  "valid_until": "2028-12-31",
+  "note": "North-South Corridor and MRT works. Notice says end 2028; 31 Dec 2028 used.",
+  "source_url": "https://pcn.nparks.gov.sg/notices",
+  "kind": "closure"
+ },
+ {
+  "id": "amk-ave5-diversion",
+  "name": "Ang Mo Kio Ave 5 Park Connector at Ave 6",
+  "circles": [
+   {
+    "lat": 1.377415,
+    "lon": 103.845392,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Ave 5 Park Connector, within 150 m of its nearest point to OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.377429,
+    "lon": 103.845285,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Ave 5 Park Connector, within 150 m of its nearest point to OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.377443,
+    "lon": 103.845178,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Ave 5 Park Connector, within 150 m of its nearest point to OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.377457,
+    "lon": 103.845071,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Ave 5 Park Connector, within 150 m of its nearest point to OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.37747,
+    "lon": 103.844964,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Ave 5 Park Connector, within 150 m of its nearest point to OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.377476,
+    "lon": 103.844857,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Ave 5 Park Connector, within 150 m of its nearest point to OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.377473,
+    "lon": 103.844843,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Ave 5 Park Connector, within 150 m of its nearest point to OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.377369,
+    "lon": 103.844831,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Ave 5 Park Connector, within 150 m of its nearest point to OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.377261,
+    "lon": 103.844836,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Ave 5 Park Connector, within 150 m of its nearest point to OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.377158,
+    "lon": 103.844836,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Ave 5 Park Connector, within 150 m of its nearest point to OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.377162,
+    "lon": 103.844728,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Ave 5 Park Connector, within 150 m of its nearest point to OSM Ang Mo Kio Avenue 6"
+   },
+   {
+    "lat": 1.377166,
+    "lon": 103.84462,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Ang Mo Kio Ave 5 Park Connector, within 150 m of its nearest point to OSM Ang Mo Kio Avenue 6"
+   }
+  ],
+  "starts": "2023-04-25",
+  "valid_until": "2028-04-30",
+  "note": "Diverted to an interim path for North-South Corridor works.",
+  "source_url": "https://pcn.nparks.gov.sg/notices",
+  "kind": "closure"
+ },
+ {
+  "id": "kallang-pc-st-michaels",
+  "name": "Kallang Park Connector near St Michael's estate",
+  "circles": [
+   {
+    "lat": 1.32545,
+    "lon": 103.866067,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.325635,
+    "lon": 103.865871,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.325836,
+    "lon": 103.865691,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.326037,
+    "lon": 103.865511,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.326259,
+    "lon": 103.865359,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.326362,
+    "lon": 103.865293,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.325286,
+    "lon": 103.866231,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.325114,
+    "lon": 103.866439,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.32493,
+    "lon": 103.866637,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.324731,
+    "lon": 103.866819,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.324504,
+    "lon": 103.866963,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.32425,
+    "lon": 103.867052,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.323983,
+    "lon": 103.867086,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.323815,
+    "lon": 103.867097,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.325824,
+    "lon": 103.866368,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.326022,
+    "lon": 103.866186,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.326217,
+    "lon": 103.865999,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.326416,
+    "lon": 103.865817,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.326634,
+    "lon": 103.865658,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.326756,
+    "lon": 103.865574,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.326738,
+    "lon": 103.865561,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.326895,
+    "lon": 103.865593,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.326362,
+    "lon": 103.865293,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.326582,
+    "lon": 103.86545,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.326738,
+    "lon": 103.865561,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.325598,
+    "lon": 103.86667,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.325691,
+    "lon": 103.866563,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.325948,
+    "lon": 103.866468,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.325738,
+    "lon": 103.866299,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.325527,
+    "lon": 103.86613,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.32545,
+    "lon": 103.866067,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.325286,
+    "lon": 103.866231,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.325494,
+    "lon": 103.866402,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.325691,
+    "lon": 103.866563,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.327819,
+    "lon": 103.865803,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.327986,
+    "lon": 103.865591,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.328156,
+    "lon": 103.865404,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   },
+   {
+    "lat": 1.32837,
+    "lon": 103.865568,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Kallang Park Connector, vertices within 200 m of OSM Saint Michael's Road"
+   }
+  ],
+  "starts": "2024-10-21",
+  "valid_until": "2027-12-31",
+  "note": "Construction. Notice says 2H 2027; 31 Dec 2027 used.",
+  "source_url": "https://pcn.nparks.gov.sg/notices",
+  "kind": "closure"
+ },
+ {
+  "id": "alexandra-queensway-pc",
+  "name": "Alexandra–Queensway Park Connector",
+  "circles": [
+   {
+    "lat": 1.290588,
+    "lon": 103.801076,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.290783,
+    "lon": 103.800888,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.290977,
+    "lon": 103.800701,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.290533,
+    "lon": 103.801129,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.283535,
+    "lon": 103.801484,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.283777,
+    "lon": 103.801605,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.284017,
+    "lon": 103.801727,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.284258,
+    "lon": 103.801848,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.291293,
+    "lon": 103.80077,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.291405,
+    "lon": 103.800734,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.281685,
+    "lon": 103.802026,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.281928,
+    "lon": 103.801907,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.28217,
+    "lon": 103.801789,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.282413,
+    "lon": 103.801671,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.282657,
+    "lon": 103.801556,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.282907,
+    "lon": 103.801455,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.283173,
+    "lon": 103.801419,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.28344,
+    "lon": 103.801454,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.283535,
+    "lon": 103.801484,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.285172,
+    "lon": 103.802346,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.2848,
+    "lon": 103.802147,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.285037,
+    "lon": 103.802277,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.285172,
+    "lon": 103.802346,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.284685,
+    "lon": 103.802081,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.2848,
+    "lon": 103.802147,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.284302,
+    "lon": 103.80187,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.28454,
+    "lon": 103.801997,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.284685,
+    "lon": 103.802081,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.295729,
+    "lon": 103.804036,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.295871,
+    "lon": 103.804266,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.296012,
+    "lon": 103.804495,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.296153,
+    "lon": 103.804725,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.296344,
+    "lon": 103.804788,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.296558,
+    "lon": 103.804625,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.296646,
+    "lon": 103.804566,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.295651,
+    "lon": 103.803923,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.29573,
+    "lon": 103.804036,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.295654,
+    "lon": 103.803537,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.295626,
+    "lon": 103.803795,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.295651,
+    "lon": 103.803923,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.295729,
+    "lon": 103.803437,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.295654,
+    "lon": 103.803537,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.291455,
+    "lon": 103.800684,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.291644,
+    "lon": 103.800492,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.291835,
+    "lon": 103.800485,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.292027,
+    "lon": 103.800675,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.292268,
+    "lon": 103.800786,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.292522,
+    "lon": 103.800876,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.29278,
+    "lon": 103.800957,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.293036,
+    "lon": 103.801043,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.293291,
+    "lon": 103.801129,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.293526,
+    "lon": 103.801257,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.293751,
+    "lon": 103.801407,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.293978,
+    "lon": 103.801552,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.294205,
+    "lon": 103.801697,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.294432,
+    "lon": 103.801845,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.294658,
+    "lon": 103.801992,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.294887,
+    "lon": 103.802134,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.295095,
+    "lon": 103.802299,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.295269,
+    "lon": 103.802505,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.295444,
+    "lon": 103.80271,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.29562,
+    "lon": 103.802915,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.295781,
+    "lon": 103.80313,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.295763,
+    "lon": 103.803392,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.288188,
+    "lon": 103.803564,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.288376,
+    "lon": 103.803371,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.288113,
+    "lon": 103.803646,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.288188,
+    "lon": 103.803564,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.291405,
+    "lon": 103.800734,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.296925,
+    "lon": 103.804906,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.296646,
+    "lon": 103.804566,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.296826,
+    "lon": 103.804767,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.296925,
+    "lon": 103.804906,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.287755,
+    "lon": 103.803998,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.287949,
+    "lon": 103.80381,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.288113,
+    "lon": 103.803646,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.287216,
+    "lon": 103.804348,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.287456,
+    "lon": 103.804289,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.287649,
+    "lon": 103.804101,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.287755,
+    "lon": 103.803998,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.288837,
+    "lon": 103.802913,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.289028,
+    "lon": 103.802722,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.289215,
+    "lon": 103.802527,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.289394,
+    "lon": 103.802326,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.289584,
+    "lon": 103.802135,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.289777,
+    "lon": 103.801946,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.289963,
+    "lon": 103.80175,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.290145,
+    "lon": 103.801551,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.290327,
+    "lon": 103.801352,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.290509,
+    "lon": 103.801153,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.288603,
+    "lon": 103.803147,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.288794,
+    "lon": 103.802956,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.288525,
+    "lon": 103.803224,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.288603,
+    "lon": 103.803147,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.288406,
+    "lon": 103.803342,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.288525,
+    "lon": 103.803224,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.285241,
+    "lon": 103.802382,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.285481,
+    "lon": 103.802506,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.285717,
+    "lon": 103.802636,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.285952,
+    "lon": 103.802769,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.286187,
+    "lon": 103.802902,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.286412,
+    "lon": 103.80305,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.2866,
+    "lon": 103.803242,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.286774,
+    "lon": 103.803448,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.286936,
+    "lon": 103.803664,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.287083,
+    "lon": 103.80389,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.287178,
+    "lon": 103.804141,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.287216,
+    "lon": 103.804348,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.291033,
+    "lon": 103.800679,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   },
+   {
+    "lat": 1.291231,
+    "lon": 103.800714,
+    "radius_m": 20,
+    "coord_source": "pcn-seed PARK=Alexandra Queensway PC, whole connector (notice names no end roads)"
+   }
+  ],
+  "starts": "2025-09-15",
+  "valid_until": "2027-09-30",
+  "note": "Upgrading; alternative-route map provided. Notice says Q3 2027; last day of Q3 used.",
+  "source_url": "https://pcn.nparks.gov.sg/notices",
+  "kind": "closure"
+ },
+ {
+  "id": "bedok-pc-laguna88",
+  "name": "Bedok Park Connector, Laguna88 to Upper East Coast Rd",
+  "circles": [
+   {
+    "lat": 1.321577,
+    "lon": 103.958693,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.321524,
+    "lon": 103.958599,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.321471,
+    "lon": 103.958504,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.321414,
+    "lon": 103.958413,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.321358,
+    "lon": 103.958321,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.321305,
+    "lon": 103.958227,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.321251,
+    "lon": 103.958133,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.321198,
+    "lon": 103.958039,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.321149,
+    "lon": 103.957943,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.321099,
+    "lon": 103.957847,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.321042,
+    "lon": 103.957756,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.320986,
+    "lon": 103.957664,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.320932,
+    "lon": 103.95757,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.320877,
+    "lon": 103.957477,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.320819,
+    "lon": 103.957386,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.320766,
+    "lon": 103.957292,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.320713,
+    "lon": 103.957198,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.320662,
+    "lon": 103.957103,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.320605,
+    "lon": 103.957012,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.320499,
+    "lon": 103.956997,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.32041,
+    "lon": 103.956955,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.320352,
+    "lon": 103.956864,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.320293,
+    "lon": 103.956773,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.32024,
+    "lon": 103.95668,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.320194,
+    "lon": 103.956583,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.320141,
+    "lon": 103.956489,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.320083,
+    "lon": 103.956399,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.32008,
+    "lon": 103.956293,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.320087,
+    "lon": 103.956193,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.320041,
+    "lon": 103.956102,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319994,
+    "lon": 103.956006,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319949,
+    "lon": 103.955908,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319906,
+    "lon": 103.955809,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319862,
+    "lon": 103.95571,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319818,
+    "lon": 103.955612,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319769,
+    "lon": 103.955516,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.31973,
+    "lon": 103.955415,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319691,
+    "lon": 103.955314,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319637,
+    "lon": 103.955221,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319591,
+    "lon": 103.955124,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319553,
+    "lon": 103.955023,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319513,
+    "lon": 103.954922,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.31947,
+    "lon": 103.954824,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319426,
+    "lon": 103.954725,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319381,
+    "lon": 103.954627,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319342,
+    "lon": 103.954526,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319295,
+    "lon": 103.95443,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319247,
+    "lon": 103.954334,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319201,
+    "lon": 103.954236,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319155,
+    "lon": 103.954138,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319112,
+    "lon": 103.95404,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319074,
+    "lon": 103.953938,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.319044,
+    "lon": 103.953835,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.318998,
+    "lon": 103.953737,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.318952,
+    "lon": 103.95364,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.318905,
+    "lon": 103.953542,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.318855,
+    "lon": 103.953447,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.318797,
+    "lon": 103.953356,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.31874,
+    "lon": 103.953265,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.318642,
+    "lon": 103.953234,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   },
+   {
+    "lat": 1.318606,
+    "lon": 103.953228,
+    "radius_m": 8,
+    "coord_source": "pcn-seed PARK=Bedok Park Connector, between OneMap LAGUNA 88 (46 Eastwood Rd) and OSM Upper East Coast Road"
+   }
+  ],
+  "starts": null,
+  "valid_until": "2026-12-31",
+  "note": "Thomson-East Coast Line works; diversion signed.",
+  "source_url": "https://pcn.nparks.gov.sg/notices",
+  "kind": "closure"
+ },
+ {
+  "id": "bedok-pc-greenopal",
+  "name": "Bedok Park Connector near Bedok Reservoir View / Tampines GreenOpal",
+  "circles": [
+   {
+    "lat": 1.336574,
+    "lon": 103.93829,
+    "radius_m": 20,
+    "coord_source": "straight line between the pcn-seed PARK=Bedok Park Connector vertices nearest OneMap 772 Bedok Reservoir View and 965D Tampines St 96 (the bridge)"
+   },
+   {
+    "lat": 1.336556,
+    "lon": 103.938559,
+    "radius_m": 20,
+    "coord_source": "straight line between the pcn-seed PARK=Bedok Park Connector vertices nearest OneMap 772 Bedok Reservoir View and 965D Tampines St 96 (the bridge)"
+   },
+   {
+    "lat": 1.336538,
+    "lon": 103.938828,
+    "radius_m": 20,
+    "coord_source": "straight line between the pcn-seed PARK=Bedok Park Connector vertices nearest OneMap 772 Bedok Reservoir View and 965D Tampines St 96 (the bridge)"
+   },
+   {
+    "lat": 1.336521,
+    "lon": 103.939094,
+    "radius_m": 20,
+    "coord_source": "straight line between the pcn-seed PARK=Bedok Park Connector vertices nearest OneMap 772 Bedok Reservoir View and 965D Tampines St 96 (the bridge)"
+   }
+  ],
+  "starts": null,
+  "valid_until": "2026-12-31",
+  "note": "Bridge works; diversion signed.",
+  "source_url": "https://pcn.nparks.gov.sg/notices",
+  "kind": "closure"
+ },
+ {
+  "id": "gbtb-waterfront-promenade",
+  "name": "Gardens by the Bay Waterfront Promenade",
+  "circles": [
+   {
+    "lat": 1.28321,
+    "lon": 103.868012,
+    "radius_m": 20,
+    "coord_source": "OSM ways 1535166327,528526115,1524332359,1524336103,1524333447 (construction, bicycle=no)"
+   },
+   {
+    "lat": 1.283276,
+    "lon": 103.867908,
+    "radius_m": 20,
+    "coord_source": "OSM ways 1535166327,528526115,1524332359,1524336103,1524333447 (construction, bicycle=no)"
+   },
+   {
+    "lat": 1.283276,
+    "lon": 103.867908,
+    "radius_m": 20,
+    "coord_source": "OSM ways 1535166327,528526115,1524332359,1524336103,1524333447 (construction, bicycle=no)"
+   },
+   {
+    "lat": 1.283417,
+    "lon": 103.867677,
+    "radius_m": 20,
+    "coord_source": "OSM ways 1535166327,528526115,1524332359,1524336103,1524333447 (construction, bicycle=no)"
+   },
+   {
+    "lat": 1.283556,
+    "lon": 103.867446,
+    "radius_m": 20,
+    "coord_source": "OSM ways 1535166327,528526115,1524332359,1524336103,1524333447 (construction, bicycle=no)"
+   },
+   {
+    "lat": 1.283672,
+    "lon": 103.867204,
+    "radius_m": 20,
+    "coord_source": "OSM ways 1535166327,528526115,1524332359,1524336103,1524333447 (construction, bicycle=no)"
+   },
+   {
+    "lat": 1.283687,
+    "lon": 103.867015,
+    "radius_m": 20,
+    "coord_source": "OSM ways 1535166327,528526115,1524332359,1524336103,1524333447 (construction, bicycle=no)"
+   },
+   {
+    "lat": 1.283752,
+    "lon": 103.866856,
+    "radius_m": 20,
+    "coord_source": "OSM ways 1535166327,528526115,1524332359,1524336103,1524333447 (construction, bicycle=no)"
+   },
+   {
+    "lat": 1.283844,
+    "lon": 103.866678,
+    "radius_m": 20,
+    "coord_source": "OSM ways 1535166327,528526115,1524332359,1524336103,1524333447 (construction, bicycle=no)"
+   },
+   {
+    "lat": 1.283687,
+    "lon": 103.867015,
+    "radius_m": 20,
+    "coord_source": "OSM ways 1535166327,528526115,1524332359,1524336103,1524333447 (construction, bicycle=no)"
+   },
+   {
+    "lat": 1.283752,
+    "lon": 103.866856,
+    "radius_m": 20,
+    "coord_source": "OSM ways 1535166327,528526115,1524332359,1524336103,1524333447 (construction, bicycle=no)"
+   },
+   {
+    "lat": 1.283147,
+    "lon": 103.868111,
+    "radius_m": 20,
+    "coord_source": "OSM ways 1535166327,528526115,1524332359,1524336103,1524333447 (construction, bicycle=no)"
+   },
+   {
+    "lat": 1.28321,
+    "lon": 103.868012,
+    "radius_m": 20,
+    "coord_source": "OSM ways 1535166327,528526115,1524332359,1524336103,1524333447 (construction, bicycle=no)"
+   }
+  ],
+  "starts": "2026-05-04",
+  "valid_until": null,
+  "note": "Bay South to Bay East bridge works. Detour round the Bay South perimeter. No end date.",
+  "source_url": "https://littlebigreddot.com/gardens-by-the-bay-cycling-diversion-4-may-2026/",
+  "kind": "closure"
+ },
+ {
+  "id": "punggol-point-park",
+  "name": "Punggol Point Park",
+  "circles": [
+   {
+    "lat": 1.420981,
+    "lon": 103.911166,
+    "radius_m": 150,
+    "coord_source": "OSM way 180909679 (Punggol Point Park), centre of bounds"
+   }
+  ],
+  "starts": "2026-08-11",
+  "valid_until": "2027-12-31",
+  "note": "Park and carpark closed; toilets stay open. Use the Punggol Waterfront toilet and cooler. End date is approximate.",
+  "source_url": "https://pcn.nparks.gov.sg/files/6_Jul_2026_Punggol_Point_Park___park_closure_sign__003_.pdf",
+  "kind": "closure"
+ },
+ {
+  "id": "henderson-waves",
+  "name": "Henderson Waves",
+  "circles": [
+   {
+    "lat": 1.276761,
+    "lon": 103.814582,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Henderson Waves Bridge"
+   },
+   {
+    "lat": 1.27657,
+    "lon": 103.814773,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Henderson Waves Bridge"
+   },
+   {
+    "lat": 1.276383,
+    "lon": 103.814967,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Henderson Waves Bridge"
+   },
+   {
+    "lat": 1.275881,
+    "lon": 103.815911,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Henderson Waves Bridge"
+   },
+   {
+    "lat": 1.275793,
+    "lon": 103.816166,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Henderson Waves Bridge"
+   },
+   {
+    "lat": 1.275733,
+    "lon": 103.816339,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Henderson Waves Bridge"
+   }
+  ],
+  "starts": null,
+  "valid_until": null,
+  "note": "Walk your bike.",
+  "source_url": "https://pcn.nparks.gov.sg/sharingpcn/",
+  "kind": "no_cycling"
+ },
+ {
+  "id": "kent-ridge-canopy-walk",
+  "name": "Kent Ridge Canopy Walk",
+  "circles": [
+   {
+    "lat": 1.281502,
+    "lon": 103.792912,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Canopy walk"
+   },
+   {
+    "lat": 1.281473,
+    "lon": 103.793158,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Canopy walk"
+   },
+   {
+    "lat": 1.281248,
+    "lon": 103.793305,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Canopy walk"
+   },
+   {
+    "lat": 1.281009,
+    "lon": 103.793428,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Canopy walk"
+   },
+   {
+    "lat": 1.280818,
+    "lon": 103.793607,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Canopy walk"
+   },
+   {
+    "lat": 1.280627,
+    "lon": 103.793796,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Canopy walk"
+   },
+   {
+    "lat": 1.280453,
+    "lon": 103.793996,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Canopy walk"
+   },
+   {
+    "lat": 1.28024,
+    "lon": 103.794158,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Canopy walk"
+   },
+   {
+    "lat": 1.28003,
+    "lon": 103.794198,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Canopy walk"
+   },
+   {
+    "lat": 1.279908,
+    "lon": 103.793987,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Canopy walk"
+   },
+   {
+    "lat": 1.28003,
+    "lon": 103.794198,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Canopy walk"
+   }
+  ],
+  "starts": null,
+  "valid_until": null,
+  "note": "Walk your bike.",
+  "source_url": "https://pcn.nparks.gov.sg/sharingpcn/",
+  "kind": "no_cycling"
+ },
+ {
+  "id": "telok-blangah-forest-walk",
+  "name": "Telok Blangah Forest Walk",
+  "circles": [
+   {
+    "lat": 1.280001,
+    "lon": 103.802906,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.279992,
+    "lon": 103.803104,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.279992,
+    "lon": 103.803104,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.279986,
+    "lon": 103.803322,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.279961,
+    "lon": 103.80354,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.280022,
+    "lon": 103.803793,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.280143,
+    "lon": 103.804016,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.280183,
+    "lon": 103.804282,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.280237,
+    "lon": 103.804547,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.280137,
+    "lon": 103.804769,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.279932,
+    "lon": 103.804944,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.279782,
+    "lon": 103.805166,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.279685,
+    "lon": 103.805414,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.279627,
+    "lon": 103.805677,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.279614,
+    "lon": 103.805946,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.279605,
+    "lon": 103.806215,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.279508,
+    "lon": 103.806429,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.279363,
+    "lon": 103.80662,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.279261,
+    "lon": 103.806839,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.279221,
+    "lon": 103.807106,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.279207,
+    "lon": 103.807375,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.279178,
+    "lon": 103.807643,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.279044,
+    "lon": 103.807826,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.278779,
+    "lon": 103.807863,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.278608,
+    "lon": 103.808035,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.280237,
+    "lon": 103.804686,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.280302,
+    "lon": 103.804749,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.278608,
+    "lon": 103.808035,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.278563,
+    "lon": 103.8083,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.278594,
+    "lon": 103.808562,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.278588,
+    "lon": 103.808811,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.278651,
+    "lon": 103.809035,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.278762,
+    "lon": 103.809259,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.278504,
+    "lon": 103.80926,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.278322,
+    "lon": 103.809421,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.278371,
+    "lon": 103.809493,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.27855,
+    "lon": 103.80934,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.278786,
+    "lon": 103.809404,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.27857,
+    "lon": 103.809531,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.278473,
+    "lon": 103.809682,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.278711,
+    "lon": 103.809555,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.278959,
+    "lon": 103.80945,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   },
+   {
+    "lat": 1.279056,
+    "lon": 103.809526,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Forest Walk"
+   }
+  ],
+  "starts": null,
+  "valid_until": null,
+  "note": "Walk your bike.",
+  "source_url": "https://pcn.nparks.gov.sg/sharingpcn/",
+  "kind": "no_cycling"
+ },
+ {
+  "id": "berlayer-creek-boardwalk",
+  "name": "Berlayer Creek boardwalk",
+  "circles": [
+   {
+    "lat": 1.265792,
+    "lon": 103.806748,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.265995,
+    "lon": 103.806572,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.266189,
+    "lon": 103.806384,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.266383,
+    "lon": 103.806196,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.266577,
+    "lon": 103.806009,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.266776,
+    "lon": 103.805826,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.266975,
+    "lon": 103.805644,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.267173,
+    "lon": 103.805461,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.267372,
+    "lon": 103.805279,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.267571,
+    "lon": 103.805096,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.267766,
+    "lon": 103.80491,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.267953,
+    "lon": 103.804716,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.268141,
+    "lon": 103.804522,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.268333,
+    "lon": 103.804333,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.268533,
+    "lon": 103.804151,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.268732,
+    "lon": 103.80397,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.268933,
+    "lon": 103.803789,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.269133,
+    "lon": 103.803609,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.26933,
+    "lon": 103.803424,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.269528,
+    "lon": 103.80324,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.269758,
+    "lon": 103.8031,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.269995,
+    "lon": 103.802972,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.270236,
+    "lon": 103.80285,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.270504,
+    "lon": 103.802821,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.270772,
+    "lon": 103.802794,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.271041,
+    "lon": 103.802767,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.27131,
+    "lon": 103.802757,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.271548,
+    "lon": 103.802753,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.266577,
+    "lon": 103.806009,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.266658,
+    "lon": 103.806066,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.266669,
+    "lon": 103.806018,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.266643,
+    "lon": 103.806127,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.268244,
+    "lon": 103.804414,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.268387,
+    "lon": 103.804502,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.271548,
+    "lon": 103.802753,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.271681,
+    "lon": 103.802983,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.271928,
+    "lon": 103.80307,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   },
+   {
+    "lat": 1.272038,
+    "lon": 103.802911,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Berlayer Creek Broadwalk"
+   }
+  ],
+  "starts": null,
+  "valid_until": null,
+  "note": "Walk your bike.",
+  "source_url": "https://pcn.nparks.gov.sg/sharingpcn/",
+  "kind": "no_cycling"
+ },
+ {
+  "id": "bukit-chermin-boardwalk",
+  "name": "Bukit Chermin boardwalk",
+  "circles": [
+   {
+    "lat": 1.265671,
+    "lon": 103.806912,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Bukit Chermin Boardwalk"
+   },
+   {
+    "lat": 1.265574,
+    "lon": 103.807157,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Bukit Chermin Boardwalk"
+   },
+   {
+    "lat": 1.265421,
+    "lon": 103.807359,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Bukit Chermin Boardwalk"
+   },
+   {
+    "lat": 1.265207,
+    "lon": 103.807518,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Bukit Chermin Boardwalk"
+   },
+   {
+    "lat": 1.265112,
+    "lon": 103.807754,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Bukit Chermin Boardwalk"
+   },
+   {
+    "lat": 1.265158,
+    "lon": 103.808016,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Bukit Chermin Boardwalk"
+   },
+   {
+    "lat": 1.265025,
+    "lon": 103.808249,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Bukit Chermin Boardwalk"
+   },
+   {
+    "lat": 1.264917,
+    "lon": 103.808493,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Bukit Chermin Boardwalk"
+   },
+   {
+    "lat": 1.264913,
+    "lon": 103.80876,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Bukit Chermin Boardwalk"
+   },
+   {
+    "lat": 1.264942,
+    "lon": 103.809023,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Bukit Chermin Boardwalk"
+   },
+   {
+    "lat": 1.26506,
+    "lon": 103.809264,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Bukit Chermin Boardwalk"
+   },
+   {
+    "lat": 1.265132,
+    "lon": 103.809511,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Bukit Chermin Boardwalk"
+   }
+  ],
+  "starts": null,
+  "valid_until": null,
+  "note": "Walk your bike.",
+  "source_url": "https://pcn.nparks.gov.sg/sharingpcn/",
+  "kind": "no_cycling"
+ },
+ {
+  "id": "punggol-kelong-bridge",
+  "name": "Kelong Bridge, Punggol",
+  "circles": [
+   {
+    "lat": 1.407255,
+    "lon": 103.907705,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Kelong Bridge"
+   },
+   {
+    "lat": 1.407501,
+    "lon": 103.907814,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Kelong Bridge"
+   },
+   {
+    "lat": 1.407714,
+    "lon": 103.907979,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Kelong Bridge"
+   },
+   {
+    "lat": 1.40792,
+    "lon": 103.908154,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Kelong Bridge"
+   },
+   {
+    "lat": 1.408101,
+    "lon": 103.908352,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Kelong Bridge"
+   }
+  ],
+  "starts": null,
+  "valid_until": null,
+  "note": "Walk your bike.",
+  "source_url": "https://pcn.nparks.gov.sg/sharingpcn/",
+  "kind": "no_cycling"
+ },
+ {
+  "id": "punggol-wave-bridge",
+  "name": "Wave Bridge, Punggol",
+  "circles": [
+   {
+    "lat": 1.403383,
+    "lon": 103.913432,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Wave Bridge"
+   },
+   {
+    "lat": 1.403485,
+    "lon": 103.913405,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Wave Bridge"
+   },
+   {
+    "lat": 1.40372,
+    "lon": 103.913526,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Wave Bridge"
+   },
+   {
+    "lat": 1.40381,
+    "lon": 103.913678,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Wave Bridge"
+   }
+  ],
+  "starts": null,
+  "valid_until": null,
+  "note": "Walk your bike.",
+  "source_url": "https://pcn.nparks.gov.sg/sharingpcn/",
+  "kind": "no_cycling"
+ },
+ {
+  "id": "punggol-adventure-bridge",
+  "name": "Adventure Bridge, Punggol",
+  "circles": [
+   {
+    "lat": 1.411937,
+    "lon": 103.904173,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Adventure Bridge"
+   },
+   {
+    "lat": 1.411671,
+    "lon": 103.90413,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Adventure Bridge"
+   },
+   {
+    "lat": 1.411492,
+    "lon": 103.904102,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Adventure Bridge"
+   }
+  ],
+  "starts": null,
+  "valid_until": null,
+  "note": "Walk your bike.",
+  "source_url": "https://pcn.nparks.gov.sg/sharingpcn/",
+  "kind": "no_cycling"
+ },
+ {
+  "id": "changi-boardwalk",
+  "name": "Changi Boardwalk",
+  "circles": [
+   {
+    "lat": 1.39128,
+    "lon": 103.987761,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.390727,
+    "lon": 103.974738,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.390658,
+    "lon": 103.974543,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.390604,
+    "lon": 103.974289,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.390423,
+    "lon": 103.974094,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.390291,
+    "lon": 103.973923,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.39128,
+    "lon": 103.987761,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.39128,
+    "lon": 103.987761,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.391231,
+    "lon": 103.987814,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.391244,
+    "lon": 103.987839,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.391304,
+    "lon": 103.987735,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.391246,
+    "lon": 103.987797,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.39168,
+    "lon": 103.986574,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.391032,
+    "lon": 103.987522,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.391219,
+    "lon": 103.987327,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.391399,
+    "lon": 103.987127,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.391574,
+    "lon": 103.986921,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.39166,
+    "lon": 103.986672,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.39168,
+    "lon": 103.986574,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.390833,
+    "lon": 103.987735,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.391017,
+    "lon": 103.987538,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.390812,
+    "lon": 103.987758,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392352,
+    "lon": 103.983192,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392489,
+    "lon": 103.98296,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392638,
+    "lon": 103.982735,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392791,
+    "lon": 103.982513,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.3929,
+    "lon": 103.982337,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.3929,
+    "lon": 103.982337,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392864,
+    "lon": 103.982071,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392922,
+    "lon": 103.981841,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392914,
+    "lon": 103.981798,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392693,
+    "lon": 103.981644,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392498,
+    "lon": 103.981462,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392403,
+    "lon": 103.981218,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392381,
+    "lon": 103.980958,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392304,
+    "lon": 103.9807,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392304,
+    "lon": 103.980461,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392306,
+    "lon": 103.980243,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392417,
+    "lon": 103.980016,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392466,
+    "lon": 103.97975,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392449,
+    "lon": 103.979482,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392408,
+    "lon": 103.979221,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392451,
+    "lon": 103.978963,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392425,
+    "lon": 103.978694,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392375,
+    "lon": 103.978429,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392302,
+    "lon": 103.978171,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392922,
+    "lon": 103.981841,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392306,
+    "lon": 103.977431,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392184,
+    "lon": 103.977199,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392184,
+    "lon": 103.976941,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392247,
+    "lon": 103.976684,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392307,
+    "lon": 103.977462,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392302,
+    "lon": 103.977554,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392307,
+    "lon": 103.977462,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392273,
+    "lon": 103.978106,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392296,
+    "lon": 103.977857,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392296,
+    "lon": 103.977857,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392301,
+    "lon": 103.977588,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392243,
+    "lon": 103.976673,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.39204,
+    "lon": 103.976542,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.391898,
+    "lon": 103.976313,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.39179,
+    "lon": 103.976066,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.391695,
+    "lon": 103.975813,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.391707,
+    "lon": 103.975574,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.391579,
+    "lon": 103.975416,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.391579,
+    "lon": 103.975416,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.39167,
+    "lon": 103.975177,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.391588,
+    "lon": 103.97492,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.391503,
+    "lon": 103.974664,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.39126,
+    "lon": 103.974564,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.39108,
+    "lon": 103.974571,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.39108,
+    "lon": 103.974571,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.390857,
+    "lon": 103.974665,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.390727,
+    "lon": 103.974738,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.391721,
+    "lon": 103.986535,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.391783,
+    "lon": 103.986287,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.391871,
+    "lon": 103.986037,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.391973,
+    "lon": 103.985788,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392074,
+    "lon": 103.985542,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392263,
+    "lon": 103.985363,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392517,
+    "lon": 103.985273,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392548,
+    "lon": 103.98507,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392331,
+    "lon": 103.984924,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   },
+   {
+    "lat": 1.392284,
+    "lon": 103.984666,
+    "radius_m": 20,
+    "coord_source": "OSM ways name=Changi Village Coastal Walk / (Kelong Walk) / Creek Wall Boardwalk"
+   }
+  ],
+  "starts": null,
+  "valid_until": null,
+  "note": "Walk your bike.",
+  "source_url": "https://pcn.nparks.gov.sg/sharingpcn/",
+  "kind": "no_cycling"
+ }
+]

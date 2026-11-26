@@ -1,0 +1,10 @@
+# Xcode
+build/
+DerivedData/
+xcuserdata/
+.DS_Store
+
+# Map data build inputs (scripts/map/README.md): download + intermediate, never committed
+*.osm.pbf
+layers.pickle
+.venv/
