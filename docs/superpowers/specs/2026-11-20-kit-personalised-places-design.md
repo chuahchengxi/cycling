@@ -1,7 +1,7 @@
 # Kit — Personalised, Offline Places Along Your Route — Design
 
 Date: 2026-11-20
-Status: approved. Built: section 0 (plan 1), section 5 (offline). Amended 26 Nov 2026: iOS 18 target, places from the shared OSM extract.
+Status: approved. Built: section 0 (plan 1), section 1 (plan 2), section 5 (offline). Amended 26 Nov 2026: iOS 18 target, places from the shared OSM extract, section 6a no-bike ways.
 Builds on: Phase 2 PCN routing (`docs/superpowers/specs/2026-09-04-phase2-pcn-routing-design.md`), existing leisure sights (`Discovery.swift`, `Sight`, `RideRecorder.checkSights`).
 Research: `reports/Singapore PCN stops and reviews.md`, `reports/Singapore cycling rider personas.md` (+ `research_notes/`).
 Visual reference: Figma file `XXNkFRE4TcJ9VesSYFxnBx`, page "Cycling — Kit style", section "REDESIGN v3" (screens `v3 · 01`–`06`, components `Kit/bubble`, `Kit/timer`, `Kit/chart`, `Kit/avatar`).
@@ -151,6 +151,17 @@ Foundation Models runs on device, so it is already offline. After this, the app 
 - **Alarm:** full-screen flashing terracotta/ink "HELP!" for passers-by, with location (place, km, coordinates, time), "Hold to stop alarm", and "Call 995" (a tap, works on cell signal without internet).
 - **Loud on silent:** play the alarm through an audio session in playback mode at full app volume, which ignores the silent switch. Requires adding the `audio` background mode next to the existing `location` one so it keeps ringing with the screen locked. Apple's "Critical Alerts" permission (gets past Focus / Do Not Disturb via a notification) needs Apple to approve the app; apply for it but don't depend on it.
 - iPhone's own Crash Detection is for car crashes and has no app API; Apple Watch fall detection is separate. This feature is the app's own.
+
+### 6a. No-bike ways (decided with the user, 26 Nov 2026)
+
+Two kinds of "no cycling", treated differently:
+
+| Kind | Examples | Routing (plans and reroutes) | Warning |
+|---|---|---|---|
+| **No bikes at all** (terracotta) | Expressways and their slip roads, `bicycle=no` ways, steps | **Never**: not by the road network (already true), and never by a straight fallback leg that crosses one. A reroute that would need one is not applied. | Before the ride: Kit card + "No bike path" row (Figma `v3 · 13`). Riding off route toward an expressway or no-bike entrance: full-screen alarm (`v3 · 12`). Reroute banner says why (`v3 · 14`). |
+| **Walk your bike** (gold) | Henderson Waves, Punggol Waterway bridges, boardwalks (`no_cycling` in `closures.json`) | Used when sensible, plans and reroutes alike, with the small penalty from section 0 | A gold row before the ride; on the bridge, the "Walk your bike" banner and map label, moving time paused (`v3 · 16`) |
+
+Labels use `Kit/road label` (13 kinds, three tones: terracotta = no access, gold = caution, paper = info) and the 12×12 pixel traffic icons in Figma. This change ships the four it needs (no bikes, expressway, walk your bike, closed); the rest come with the UI rework.
 
 ### 7. Review follow-ups (decided with the user, 20 Nov 2026)
 
