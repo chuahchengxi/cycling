@@ -43,6 +43,7 @@ struct cyclingskibidiApp: App {
         Kit.selfCheck()
         Task { await KitModel.selfCheck() }
         KitLearning.selfCheck()
+        PixelArt.selfCheck()
         #endif
     }
 
