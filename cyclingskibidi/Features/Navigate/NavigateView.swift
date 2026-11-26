@@ -87,6 +87,8 @@ struct NavigateView: View {
             .ignoresSafeArea(edges: .bottom)
         }
         .onAppear(perform: begin)
+        // The alarm is full screen: the nav sheet would sit over its buttons.
+        .onChange(of: recorder.noBikeAhead == nil) { _, clear in showSheet = clear && !placing && pending == nil }
         // Every marked hazard warns on approach, whatever route is being ridden.
         .onChange(of: obstacles, initial: true) { recorder.hazards = obstacles.filter(\.isActive) }
         .sheet(isPresented: $showSheet) {

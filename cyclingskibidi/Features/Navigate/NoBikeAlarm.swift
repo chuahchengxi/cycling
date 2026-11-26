@@ -20,34 +20,38 @@ struct NoBikeAlarm: View {
     private var expressway: Bool { entrance.kind == "expressway" }
 
     var body: some View {
+        ScrollView {   // large accessibility text on a small phone must still reach the buttons
         VStack(alignment: .leading, spacing: 20) {
-            Spacer(minLength: 0)
             RoadLabel(kind: expressway ? .expressway : .noBikes)
             // Distance and what it is first (spec section 7), Kit smaller.
             Text("STOP IN \(Int(distance.rounded())) m")
                 .font(.system(size: 56, weight: .black, design: .monospaced))
                 .minimumScaleFactor(0.6).lineLimit(1)
                 .contentTransition(.numericText())
+                .accessibilityLabel("Stop in \(Int(distance.rounded())) metres")
             Text(expressway ? "Expressway ahead: bikes not allowed" : "No bikes ahead")
                 .font(.title2.bold())
             Text(entrance.name.isEmpty
                  ? (expressway ? "This slip road joins an expressway." : "Bikes aren't allowed on this way.")
                  : "This is the way onto \(entrance.name).")
                 .font(.body)
-            Spacer(minLength: 0)
             VStack(spacing: 12) {
                 button("Take the way round", filled: true, action: onWayRound)
                 button("Show me on the map", filled: false, action: onShowMap)
                 button("It's not there", filled: false, action: onNotThere)
             }
         }
-        .foregroundStyle(KitColor.ink)
         .padding(24)
+        .padding(.top, 40)
+        }
+        .foregroundStyle(KitColor.ink)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         .background(KitColor.terracotta.ignoresSafeArea())
+        .kitSurface()
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isModal)
         .onAppear {
+            UIAccessibility.post(notification: .screenChanged, argument: nil)
             UINotificationFeedbackGenerator().notificationOccurred(.error)
             AudioServicesPlayAlertSound(SystemSoundID(1005))   // short alert tone
         }
@@ -71,9 +75,8 @@ struct WalkBikeBanner: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            PixelIcon(rows: PixelArt.walkBike, size: 24)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Walk your bike").font(.headline)
+            VStack(alignment: .leading, spacing: 4) {
+                RoadLabel(kind: .walkYourBike)
                 Text("\(zone) · moving time paused").font(.subheadline)
             }
             Spacer(minLength: 0)
@@ -83,6 +86,7 @@ struct WalkBikeBanner: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(KitColor.gold)
         .overlay(Rectangle().stroke(KitColor.ink, lineWidth: 2))
+        .kitSurface()
         .accessibilityElement(children: .combine)
     }
 }
@@ -102,6 +106,7 @@ struct RerouteBlockedBanner: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(KitColor.terracotta)
         .overlay(Rectangle().stroke(KitColor.ink, lineWidth: 2))
+        .kitSurface()
         .accessibilityElement(children: .combine)
     }
 }

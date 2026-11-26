@@ -23,6 +23,8 @@ struct SheetView: View {
     var onReplan: () -> Void = {}
 
     @State private var selectedSight: Sight?
+    /// No-bike crossings and walk stretches, worked out once per line off the main actor.
+    @State private var noBike: (crossings: [(line: NoBikeLine?, along: Double, legLength: Double)], walk: [(name: String, along: Double, length: Double)]) = ([], [])
 
     private var collapsed: Bool { currentDetent == .fraction(0.28) }
 
@@ -38,7 +40,7 @@ struct SheetView: View {
                         summary
                         climb
                         elevationGraph
-                        if !route.noBikeCrossings.isEmpty || closures.active.contains(where: { $0.kind == .noCycling }) { noBikeList }
+                        if !noBike.crossings.isEmpty || !noBike.walk.isEmpty { noBikeList }
                         if closures.active.contains(where: { $0.kind == .closure }) || !closures.expired.isEmpty { closureList }
                         if !obstacles.isEmpty { obstacleList }
                         if !route.sights.isEmpty {
@@ -56,6 +58,16 @@ struct SheetView: View {
             }
         }
         .sheet(item: $selectedSight) { SightSheet(sight: $0) }
+        .task(id: route.polylineData) {
+            let (polyline, found) = (route.polyline, route.noBikeCrossings)
+            let walk = closures.active.filter { $0.kind == .noCycling }
+            let circles = walk.flatMap(\.noGoCircles), names = walk.flatMap { c in c.noGoCircles.map { _ in c.name } }
+            noBike = await Task.detached {
+                let line = polyline.map(\.cl), cum = Geo.cumulative(line)
+                return (found.map { NoBike.describe($0, on: line, cumulative: cum) },
+                        NoBike.walkStretches(on: polyline, walk: circles, names: names))
+            }.value
+        }
     }
 
     // MARK: Pieces
@@ -168,11 +180,7 @@ struct SheetView: View {
     /// leg crosses a no-bike way, gold where the rider must walk. The line is decoded once.
     @ViewBuilder
     private var noBikeList: some View {
-        let line = route.polyline.map(\.cl), cum = Geo.cumulative(line)
-        let crossings = route.noBikeCrossings.map { NoBike.describe($0, on: line, cumulative: cum) }
-        let walk = closures.active.filter { $0.kind == .noCycling }
-        let stretches = NoBike.walkStretches(on: route.polyline, walk: walk.flatMap(\.noGoCircles),
-                                             names: walk.flatMap { c in c.noGoCircles.map { _ in c.name } })
+        let (crossings, stretches) = noBike
         if !crossings.isEmpty || !stretches.isEmpty {
             VStack(alignment: .leading, spacing: 10) {
                 if let first = crossings.first {
@@ -185,6 +193,7 @@ struct SheetView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(KitColor.terracotta)
                     .overlay(Rectangle().stroke(KitColor.ink, lineWidth: 2))
+                    .kitSurface()
                     .accessibilityElement(children: .combine)
                 }
                 ForEach(Array(crossings.enumerated()), id: \.offset) { _, c in
