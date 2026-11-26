@@ -7,10 +7,12 @@ Build time only; the app never goes online. See scripts/map/README.md.
     python -I scripts/places/build.py layers.pickle
     python -I scripts/places/build.py --check          # self-checks, no data needed
 """
-import json, math, os, pickle, re, sys   # pickle: our own extract.py output, never downloaded
+import json, math, os, pickle, re, sys, unicodedata   # pickle: our own extract.py output, never downloaded
 from collections import Counter, defaultdict
 
 OUT = os.path.join(os.path.dirname(__file__), "../../cyclingskibidi/places.json")
+OVERLAY_SRC = os.path.join(os.path.dirname(__file__), "overlay.src.json")
+OVERLAY_OUT = os.path.join(os.path.dirname(__file__), "../../cyclingskibidi/places_overlay.json")
 PCN = os.path.join(os.path.dirname(__file__), "../../cyclingskibidi/pcn-seed.geojson")
 DAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
 DAY_LIST = re.compile(r"^(Mo|Tu|We|Th|Fr|Sa|Su)(-(Mo|Tu|We|Th|Fr|Sa|Su))?(,(Mo|Tu|We|Th|Fr|Sa|Su)(-(Mo|Tu|We|Th|Fr|Sa|Su))?)*$")
@@ -100,6 +102,34 @@ def thin(points, n):
     k = math.ceil((len(points) - 1) / (n - 1))
     return list(points[:-1][::k]) + [points[-1]]
 
+def fold(name):
+    """Case- and accent-insensitive form of a name, with "HC"/"FC" spelled out."""
+    n = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().lower()
+    n = re.sub(r"\s+", " ", n).strip()
+    return re.sub(r" hc$", " hawker centre", re.sub(r" fc$", " food centre", n))
+
+def resolve(src, records):
+    """Our hand-written overlay entries -> ({OSM id or x-slug: entry}, warnings).
+    A `match` attaches only when exactly one place has that name and category;
+    a hand-added place needs its own sourced coordinate. Never guesses."""
+    index = defaultdict(list)
+    for r in records: index[(fold(r["name"]), r["category"])].append(r["id"])
+    out, warn = {}, []
+    for e in src:
+        if "match" in e:
+            m = e["match"]
+            ids = index.get((fold(m["name"]), m["category"]), [])
+            # `"all": true` = a person checked that every hit is one place mapped in parts.
+            if not ids or (len(ids) > 1 and not e.get("all")):
+                warn.append(("UNRESOLVED %s" if not ids else "AMBIGUOUS %%s (%d places)" % len(ids)) % m["name"])
+                continue
+            for i in ids: out[i] = {k: v for k, v in e.items() if k not in ("match", "all")}
+        elif e.get("coord_source") and "lat" in e and "lon" in e:
+            out["x-" + re.sub(r"[^a-z0-9]+", "-", fold(e["name"])).strip("-")] = dict(e)
+        else:
+            warn.append("NO SOURCED COORDINATE %s" % e.get("name"))
+    return out, warn
+
 def metres(lat1, lon1, lat2, lon2):
     dl, dn = math.radians(lat2 - lat1), math.radians(lon2 - lon1)
     h = math.sin(dl / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dn / 2) ** 2
@@ -118,6 +148,20 @@ if "--check" in sys.argv:
     assert category({"amenity": "shelter", "shelter_type": "public_transport"}) is None
     assert category({"amenity": "toilets"}) == "toilets"
     assert thin([(i, i) for i in range(100)], 16)[-1] == (99, 99) and len(thin([(i, i) for i in range(100)], 16)) <= 16
+    recs = [{"id": "w1", "name": "Tiong Bahru Market", "category": "hawker"},
+            {"id": "w2", "name": "Ang Mo Kio Park", "category": "park"},
+            {"id": "w3", "name": "Ang Mo Kio Park", "category": "park"}]
+    out, warn = resolve([{"match": {"name": "tiong bahru market", "category": "hawker"}, "dishes": ["chwee kueh"]},
+                         {"match": {"name": "Ang Mo Kio Park", "category": "park"}, "note": "x"},
+                         {"match": {"name": "Nowhere", "category": "park"}},
+                         {"name": "Keppel Marina East green roof", "category": "attraction", "lat": 1.29, "lon": 103.87},
+                         {"name": "Sourced spot", "category": "attraction", "lat": 1.29, "lon": 103.87, "coord_source": "https://x"}], recs)
+    assert out["w1"]["dishes"] == ["chwee kueh"] and "match" not in out["w1"]
+    assert "w2" not in out and "w3" not in out                 # ambiguous: skipped
+    assert any("AMBIGUOUS" in w for w in warn) and any("UNRESOLVED" in w for w in warn)
+    out2, _ = resolve([{"match": {"name": "Ang Mo Kio Park", "category": "park"}, "all": True, "note": "y"}], recs)
+    assert out2.get("w2", {}).get("note") == "y" and out2.get("w3", {}).get("note") == "y" and "all" not in out2["w2"]   # one place in parts
+    assert "x-sourced-spot" in out and not any(k.startswith("x-keppel") for k in out)   # no coord_source, no entry
     print("places checks passed")
     sys.exit(0)
 
@@ -170,3 +214,10 @@ with open(OUT, "w") as f:   # one place per line: small, readable git diffs
     f.write("[\n" + ",\n".join(json.dumps(r, ensure_ascii=False, separators=(",", ":")) for r in records) + "\n]\n")
 print(dict(sorted(Counter(r["category"] for r in records).items())))
 print(len(records), "places,", os.path.getsize(OUT), "bytes ->", OUT)
+
+overlay, warnings = resolve(json.load(open(OVERLAY_SRC)), records)
+for w in warnings: print(w)
+with open(OVERLAY_OUT, "w") as f:   # one place per line, sorted
+    f.write("{\n" + ",\n".join(json.dumps(k) + ":" + json.dumps(overlay[k], ensure_ascii=False, separators=(",", ":"))
+                                for k in sorted(overlay)) + "\n}\n")
+print(len(overlay), "overlay entries,", len(warnings), "skipped ->", OVERLAY_OUT)
