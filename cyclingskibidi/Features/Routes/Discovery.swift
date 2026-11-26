@@ -9,20 +9,91 @@
 import SwiftUI
 import MapKit
 
+/// Our research note on a place (scripts/places/overlay.src.json), keyed by OSM ID.
+/// Field names match the JSON.
+struct PlaceNote: Decodable, Sendable {
+    var persona: [String]? = nil
+    var reasons: [String]? = nil
+    var status: String? = nil
+    var valid_until: String? = nil
+    var dishes: [String]? = nil
+    var stalls: [Stall]? = nil
+    var best_time: String? = nil
+    var note: String? = nil
+    var source: String? = nil
+    struct Stall: Decodable, Sendable { var name: String; var bib: Int?; var since: Int? }
+}
+
+/// What places.json and the overlay know about one place beyond its pin.
+struct PlaceFacts: Sendable {
+    var hours: [[Int]]?     // [day 0=Mon, from, to] minutes; nil = no hours known, treat as open
+    var area: Double        // m², 0 for points
+    var shape: [Coord]      // outline or line points; [] for points
+    var wiki: Bool
+    var note: PlaceNote?
+
+    var isLarge: Bool { area >= 10_000 }
+
+    /// Open at `date`, Singapore time. Unknown hours count as open, so a format the
+    /// build couldn't read never hides a place; a note marked closed wins through its
+    /// inclusive `valid_until` (no date = closed until the data says otherwise).
+    func isOpen(at date: Date) -> Bool {
+        if note?.status == "closed" {
+            guard let end = note?.valid_until.flatMap(Closures.day) else { return false }
+            if date < Closures.sg.date(byAdding: .day, value: 1, to: end)! { return false }
+        }
+        guard let hours else { return true }
+        let c = Closures.sg.dateComponents([.weekday, .hour, .minute], from: date)
+        let day = (c.weekday! + 5) % 7, minute = c.hour! * 60 + c.minute!   // weekday 1 = Sunday
+        return hours.contains { $0.count == 3 && $0[0] == day && $0[1] <= minute && minute < $0[2] }
+    }
+}
+
 enum Discovery {
-    /// Categories that count as a Leisure sight; stations and malls are for search only.
+    /// Categories that count as a Leisure sight; stations, malls and rest-stop amenities
+    /// (toilets, water, shelters, bike repair/parking/rental) are for search and rest stops only.
     static let leisureCategories: Set<String> = [
         "park", "nationalPark", "beach", "museum", "aquarium", "zoo", "amusementPark", "cafe",
         "marina", "stadium", "library", "attraction", "viewpoint", "hawker", "worship",
+        "bridge", "waterway", "reservoir", "heritage", "artwork", "playground",
     ]
 
-    /// Every bundled place, decoded once.
-    static let places: [Sight] = {
-        struct P: Decodable { let name, category: String; let lat, lon: Double; let address: String }
-        guard let url = Bundle.main.url(forResource: "places", withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let list = try? JSONDecoder().decode([P].self, from: data) else { return [] }
-        return list.map { Sight(name: $0.name, category: $0.category, lat: $0.lat, lon: $0.lon, address: $0.address) }
+    /// Every bundled place, decoded once: OSM places plus the overlay's hand-added ones.
+    static var places: [Sight] { bundle.places }
+    /// Hours, size, outline and our research note per place, keyed by `Sight.osmID`.
+    static var facts: [String: PlaceFacts] { bundle.facts }
+
+    private static let bundle: (places: [Sight], facts: [String: PlaceFacts]) = {
+        struct P: Decodable {
+            let id: String?; let name, category: String; let lat, lon: Double; let address: String?
+            let hours: [[Int]]?; let wiki: Bool?; let area: Double?; let shape: [[Double]]?
+        }
+        struct Hand: Decodable { let name, category: String?; let lat, lon: Double? }
+        func load<T: Decodable>(_ name: String, as: T.Type) -> T? {
+            guard let url = Bundle.main.url(forResource: name, withExtension: "json"),
+                  let data = try? Data(contentsOf: url) else { return nil }
+            return try? JSONDecoder().decode(T.self, from: data)
+        }
+        let notes = load("places_overlay", as: [String: PlaceNote].self) ?? [:]
+        var places: [Sight] = [], facts: [String: PlaceFacts] = [:]
+        for p in load("places", as: [P].self) ?? [] {
+            var s = Sight(name: p.name, category: p.category, lat: p.lat, lon: p.lon, address: p.address ?? "")
+            s.osmID = p.id
+            places.append(s)
+            guard let id = p.id else { continue }
+            facts[id] = PlaceFacts(hours: p.hours, area: p.area ?? 0,
+                                   shape: (p.shape ?? []).compactMap { $0.count == 2 ? Coord(lat: $0[0], lon: $0[1]) : nil },
+                                   wiki: p.wiki ?? false, note: notes[id])
+        }
+        // Hand-added overlay places (keys "x-…") carry their own sourced coordinate.
+        for (id, h) in load("places_overlay", as: [String: Hand].self) ?? [:] where id.hasPrefix("x-") {
+            guard let name = h.name, let category = h.category, let lat = h.lat, let lon = h.lon else { continue }
+            var s = Sight(name: name, category: category, lat: lat, lon: lon)
+            s.osmID = id
+            places.append(s)
+            facts[id] = PlaceFacts(hours: nil, area: 0, shape: [], wiki: false, note: notes[id])
+        }
+        return (places, facts)
     }()
 
     /// Pure corridor filter: keep only candidates within `corridor` metres of the
@@ -91,6 +162,12 @@ enum Discovery {
         case "hawker":  return "food court"
         case "cafe":    return "coffee"
         case "station": return "mrt lrt"
+        case "toilets": return "toilet restroom loo"
+        case "drinkingWater": return "water tap fountain"
+        case "shelter": return "shade rain"
+        case "repair": return "pump"
+        case "bikeRental": return "hire rent"
+        case "heritage": return "historic monument"
         default:        return ""
         }
     }
@@ -117,6 +194,18 @@ enum Discovery {
         case "worship":             return ("building.fill", "Place of worship")
         case "station":             return ("tram.fill", "Station")
         case "mall":                return ("bag.fill", "Mall")
+        case "bridge":              return ("road.lanes", "Bridge")
+        case "waterway":            return ("water.waves", "River or canal")
+        case "reservoir":           return ("water.waves", "Reservoir")
+        case "heritage":            return ("scroll.fill", "Heritage")
+        case "artwork":             return ("paintpalette.fill", "Public art")
+        case "playground":          return ("figure.play", "Playground")
+        case "toilets":             return ("toilet.fill", "Toilets")
+        case "drinkingWater":       return ("drop.fill", "Drinking water")
+        case "shelter":             return ("umbrella.fill", "Shelter")
+        case "repair":              return ("wrench.and.screwdriver.fill", "Bike repair station")
+        case "bikeParking":         return ("parkingsign", "Bike parking")
+        case "bikeRental":          return ("bicycle", "Bike rental")
         default:                    return ("mappin.and.ellipse", "Point of interest")
         }
     }
@@ -150,6 +239,26 @@ enum Discovery {
         assert(icon(for: "MKPOICategoryPark").label == "Park", "old MapKit categories must still map")
         // Real data: the bundle knows Gardens by the Bay.
         assert(!search("gardens by the bay", near: line[0]).isEmpty, "Gardens by the Bay missing from places.json")
+
+        // Old saves (no osmID) still decode.
+        let old = #"{"id":"6F9619FF-8B86-D011-B42D-00C04FC964FF","name":"Park","category":"park","lat":1.3,"lon":103.8,"offsetAlong":0,"address":"","phone":"","url":""}"#
+        let decoded = try? JSONDecoder().decode(Sight.self, from: Data(old.utf8))
+        assert(decoded != nil && decoded?.osmID == nil, "old Sight must decode")
+        // Hours: Monday 10:00 SGT open for Mo-Fr 08:00-20:00, closed at 21:00; past-midnight span open at 01:00 Tuesday.
+        let mon10 = Closures.sg.date(from: DateComponents(year: 2026, month: 11, day: 23, hour: 10))!
+        let f = PlaceFacts(hours: [[0, 480, 1200]], area: 0, shape: [], wiki: false, note: nil)
+        assert(f.isOpen(at: mon10) && !f.isOpen(at: mon10.addingTimeInterval(11 * 3600)), "Mo 08-20 wrong")
+        let late = PlaceFacts(hours: [[0, 1080, 1440], [1, 0, 120]], area: 0, shape: [], wiki: false, note: nil)
+        assert(late.isOpen(at: mon10.addingTimeInterval(15 * 3600)), "18:00-02:00 must be open at 01:00 Tuesday")
+        assert(PlaceFacts(hours: nil, area: 0, shape: [], wiki: false, note: nil).isOpen(at: mon10), "no hours = open")
+        // Overlay closure, inclusive end date.
+        var shut = PlaceNote(); shut.status = "closed"; shut.valid_until = "2026-11-23"
+        assert(!PlaceFacts(hours: nil, area: 0, shape: [], wiki: false, note: shut).isOpen(at: mon10), "closed through its end day")
+        assert(PlaceFacts(hours: nil, area: 0, shape: [], wiki: false, note: shut).isOpen(at: mon10.addingTimeInterval(86_400)), "open after it")
+        // Real data.
+        assert(places.contains { $0.category == "toilets" } && places.contains { $0.category == "drinkingWater" }, "rest-stop amenities missing")
+        assert(facts.values.contains { $0.note?.dishes?.isEmpty == false }, "overlay missing or not joined")
+        assert(!search("toilets", near: line[0]).isEmpty, "amenities must be searchable")
     }
 }
 

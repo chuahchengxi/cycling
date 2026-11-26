@@ -68,6 +68,9 @@ struct CreditsView: View {
                     Text("© OpenStreetMap contributors. Map data is available under the Open Database Licence (ODbL); see openstreetmap.org/copyright.")
                     Text("Map tiles are drawn by this app from that data and ship inside it, so the map works offline.")
                 }
+                Section("Place notes") {
+                    Text("Place notes, dishes and timings are this app's own research from public sources, each cited in the app's data. Stall names follow the Michelin Bib Gourmand Singapore 2026 list.")
+                }
                 Section("Elevation") {
                     Text("Terrain Tiles (Mapzen, hosted by AWS Open Data), from SRTM and other public sources.")
                 }
