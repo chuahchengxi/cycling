@@ -20,6 +20,8 @@ struct cyclingskibidiApp: App {
     }()
 
     init() {
+        // 1.7 MB of no-bike ways: decode it off the main actor before the first plan needs it.
+        Task.detached { _ = NoBike.lines }
         #if DEBUG
         Geo.selfCheck()
         GeoJSON.selfCheck()
@@ -35,6 +37,7 @@ struct cyclingskibidiApp: App {
         Routing.selfCheck()
         RideRecorder.selfCheck()
         RideRecorder.selfCheckState()
+        RideRecorder.selfCheckNoBike()
         FlowLayout.selfCheck()
         Discovery.selfCheck()
         CreateRouteFlow.selfCheck()

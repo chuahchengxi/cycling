@@ -58,6 +58,12 @@ struct NavigateView: View {
                                    distance: recorder.distanceToManeuver,
                                    offRoute: recorder.offRoute,
                                    rerouting: recorder.rerouting)
+                    if let reason = recorder.rerouteBlockedReason {
+                        RerouteBlockedBanner(reason: reason)
+                    }
+                    if let zone = recorder.walkingThrough {
+                        WalkBikeBanner(zone: zone).transition(.move(edge: .top).combined(with: .opacity))
+                    }
                     if let failure = recorder.rerouteFailure {
                         RerouteFailureBanner(message: failure) { recorder.dismissRerouteFailure() }
                     }
@@ -71,10 +77,13 @@ struct NavigateView: View {
                 sideButtons.padding(.bottom, geo.safeAreaInsets.bottom + Self.collapsedSheet + 12)
             }
             .overlay { passBySight }
+            .overlay { noBikeAlarm }
             .overlay(alignment: .bottom) { if placing { placementBar } }
             .animation(.default, value: recorder.passingSight?.id)
             .animation(.default, value: placing)
             .animation(.default, value: recorder.nearHazard == nil)
+            .animation(.default, value: recorder.noBikeAhead == nil)
+            .animation(.default, value: recorder.walkingThrough)
             .ignoresSafeArea(edges: .bottom)
         }
         .onAppear(perform: begin)
@@ -115,6 +124,21 @@ struct NavigateView: View {
                     .padding(.horizontal, 20)
             }
             .transition(.opacity)
+        }
+    }
+
+    /// Full-screen expressway alarm (Figma v3 · 12) while an off-route rider closes on an entrance.
+    @ViewBuilder
+    private var noBikeAlarm: some View {
+        if let ahead = recorder.noBikeAhead {
+            NoBikeAlarm(entrance: ahead.entrance, distance: ahead.distance,
+                        onWayRound: { recorder.rerouteNow() },
+                        onShowMap: {
+                            recorder.dismissNoBike()
+                            focus = .region(MKCoordinateRegion(center: ahead.entrance.coordinate, latitudinalMeters: 400, longitudinalMeters: 400))
+                        },
+                        onNotThere: { recorder.silenceNoBike() })
+                .transition(.opacity)
         }
     }
 

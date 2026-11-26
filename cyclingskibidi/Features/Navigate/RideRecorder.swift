@@ -45,6 +45,23 @@ final class RideRecorder {
     /// and the banner says so. Cleared when the rider rejoins or a good reroute applies.
     private(set) var rerouteBlockedReason: String?
 
+    // No-bike ways (spec 6a)
+    /// The no-bike entrance an off-route rider is closing on, for the full-screen alarm.
+    private(set) var noBikeAhead: (entrance: NoBikeEntrance, distance: Double)?
+    /// Entrances the rider said aren't there ("It's not there"), by `NoBikeEntrance.key`; this ride only.
+    private(set) var silencedNoBike: Set<String> = []
+    /// The walk-your-bike zone the rider is in; moving time pauses while set.
+    private(set) var walkingThrough: String?
+    var noBikeEntrances: [NoBikeEntrance] = NoBike.entrances
+    var walkZones: [(circle: NoGoCircle, name: String)] = []
+    static let entranceRadius = 60.0
+    /// An alarmed entrance re-arms once the rider is this far from it.
+    static let entranceRearm = 120.0
+    /// Metres outside a walk circle: walk mode starts at the edge and ends 15 m out (hysteresis for GPS noise).
+    static let walkEnter = 0.0, walkExit = 15.0
+    private var entranceLast: [String: Double] = [:]
+    private var entranceAlarmed: Set<String> = []
+
     // Sights along this route, and the one to surface right now as the rider
     // reaches it. The view binds a card to `passingSight` and clears it on close.
     private(set) var sights: [Sight] = []
@@ -127,6 +144,8 @@ final class RideRecorder {
         joinedRoute = false
         announced.removeAll()
         sights = route.sights
+        walkZones = Closures.bundled().filter { $0.kind == .noCycling && $0.isActive(on: Closures.now) }
+            .flatMap { c in c.noGoCircles.map { ($0, c.name) } }
         passedSights.removeAll()
         passingSight = nil
         kitBefore = loadProfile(); kitDecided = []; kitSummary = nil
@@ -203,6 +222,7 @@ final class RideRecorder {
         stepIndex = 0; distanceAlong = 0; offRoute = false; joinedRoute = false; announced.removeAll()
         sights = []; passedSights.removeAll(); passingSight = nil
         rerouteFailure = nil; rerouteBlockedReason = nil
+        noBikeAhead = nil; silencedNoBike = []; walkingThrough = nil; entranceLast = [:]; entranceAlarmed = []
         nearHazard = nil; warnedHazards.removeAll()
         // A ride cannot inherit the previous ride's pace or distance.
         rollingSpeed = 0; lastRecorded = nil; offRouteStreak = 0
@@ -258,7 +278,9 @@ final class RideRecorder {
         }
 
         // Time stopped at a junction is not riding time.
-        if raw > 0.5, dt > 0, dt < 30 { movingSeconds += dt }
+        checkWalk(at: loc.coordinate)
+        // Pushing a bike over a walk-your-bike bridge isn't riding either.
+        if raw > 0.5, dt > 0, dt < 30, walkingThrough == nil { movingSeconds += dt }
 
         track.append(TrackPoint(lat: loc.coordinate.latitude,
                                 lon: loc.coordinate.longitude,
@@ -311,8 +333,9 @@ final class RideRecorder {
             joinedRoute = true
             offRouteStreak = 0
             if offRoute { offRoute = false }
-            rerouteBlockedReason = nil
+            if rerouteBlockedReason != nil { rerouteBlockedReason = nil }
         }
+        checkNoBike(at: fix, offRoute: offRoute)
     }
 
     /// The banner always shows the turn the rider is riding towards, so the
@@ -365,6 +388,53 @@ final class RideRecorder {
             passingSight = sight
             return
         }
+    }
+
+    /// The expressway alarm (Figma v3 · 12): only while off route, since the planned line is
+    /// no-bike-free by construction, and only when closing on an entrance within
+    /// `entranceRadius`. Riding beside an expressway is normal; entering one is the danger.
+    /// Once per approach, never for a silenced entrance.
+    func checkNoBike(at fix: CLLocationCoordinate2D, offRoute: Bool) {
+        let degLat = Self.entranceRearm / 111_195
+        var seen: Set<String> = []
+        for e in noBikeEntrances where abs(e.lat - fix.latitude) <= degLat && abs(e.lon - fix.longitude) <= degLat * 1.01 {
+            let d = Geo.distance(fix, e.coordinate)
+            guard d <= Self.entranceRearm else { continue }
+            seen.insert(e.key)
+            let prev = entranceLast[e.key]
+            entranceLast[e.key] = d
+            if noBikeAhead?.entrance.key == e.key { noBikeAhead?.distance = d }
+            guard offRoute, d <= Self.entranceRadius, let prev, d < prev - 1,
+                  !silencedNoBike.contains(e.key), !entranceAlarmed.contains(e.key), noBikeAhead == nil else { continue }
+            entranceAlarmed.insert(e.key)
+            noBikeAhead = (e, d)
+            announce(e.kind == "expressway" ? "Stop. Expressway ahead. Bikes are not allowed." : "Stop. No bikes ahead.")
+        }
+        // Out of range: forget it, so the next approach alarms again.
+        for k in Set(entranceLast.keys).subtracting(seen) { entranceLast[k] = nil; entranceAlarmed.remove(k) }
+        if let a = noBikeAhead, !seen.contains(a.entrance.key) || !offRoute { noBikeAhead = nil }
+    }
+
+    func dismissNoBike() { noBikeAhead = nil }
+    /// "It's not there": silence this entrance for the rest of the ride.
+    func silenceNoBike() {
+        if let a = noBikeAhead { silencedNoBike.insert(a.entrance.key) }
+        noBikeAhead = nil
+    }
+    /// "Take the way round": reroute from here now (a reroute across a no-bike way is refused).
+    func rerouteNow() {
+        noBikeAhead = nil
+        guard let fix = location, !rerouting else { return }
+        offRoute = false
+        markOffRoute(from: fix)
+    }
+
+    /// Walk-your-bike mode (Figma v3 · 16), with hysteresis: on at the circle's edge,
+    /// off only once `walkExit` metres outside it.
+    func checkWalk(at fix: CLLocationCoordinate2D) {
+        func outside(_ z: (circle: NoGoCircle, name: String)) -> Double { Geo.distance(fix, z.circle.coord.cl) - z.circle.radiusMeters }
+        if let name = walkingThrough, let zone = walkZones.first(where: { $0.name == name }), outside(zone) <= Self.walkExit { return }
+        walkingThrough = walkZones.first { outside($0) <= Self.walkEnter }?.name
     }
 
     /// Warn this far from a marked hazard; re-arm it once the rider is beyond `hazardRearm`.
@@ -421,7 +491,11 @@ final class RideRecorder {
                 self?.rerouteFailure = "Couldn't find a way around that closure."
                 return
             }
-            self.applyReroute(plan)
+            // On route, so a refused reroute isn't "turn back": say there's no safe way round.
+            if !self.applyReroute(plan) {
+                self.rerouteBlockedReason = nil
+                self.rerouteFailure = "Couldn't find a way around that closure without an expressway or a no-bike way."
+            }
         }
     }
 
@@ -430,14 +504,15 @@ final class RideRecorder {
     /// Swap in a freshly planned route, resetting the navigation state that
     /// tracked the old line. Shared by every reroute path so they never drift
     /// on which fields get reset.
-    private func applyReroute(_ plan: RoutePlan) {
+    @discardableResult
+    private func applyReroute(_ plan: RoutePlan) -> Bool {
         // Never swap in a line that crosses an expressway or another no-bike way. The old
         // line was safe, so the rider can turn back to it; offRoute stays set, so this
         // doesn't loop into another reroute until they rejoin and leave again.
         guard plan.noBikeCrossings.isEmpty else {
             rerouteBlockedReason = "Turn back to your route: no bike path ahead"
             announce(rerouteBlockedReason ?? "")
-            return
+            return false
         }
         rerouteBlockedReason = nil
         polyline = plan.polyline.coordinates
@@ -458,6 +533,7 @@ final class RideRecorder {
         passingSight = nil
         onReroute?(plan)
         announce("Route updated. \(plan.steps.first?.instruction ?? "")")
+        return true
     }
 
     private func announce(_ text: String) {
@@ -468,6 +544,65 @@ final class RideRecorder {
     }
 
     #if DEBUG
+
+    /// Expressway alarm and walk-your-bike mode (plan 2b Task 4).
+    static func selfCheckNoBike() {
+        let r = RideRecorder()
+        r.voiceEnabled = false
+        let metre = 1 / 111_195.0
+        let slip = NoBikeEntrance(kind: "expressway", name: "Toy Expressway", lat: 1.3, lon: 103.8)
+        let other = NoBikeEntrance(kind: "nobike", name: "Toy Lane", lat: 1.31, lon: 103.8)
+        r.noBikeEntrances = [slip, other]
+        func at(_ m: Double, _ e: NoBikeEntrance = slip) -> CLLocationCoordinate2D { .init(latitude: e.lat - m * metre, longitude: e.lon) }
+
+        // On route, 20 m and closing: never.
+        r.checkNoBike(at: at(40), offRoute: false); r.checkNoBike(at: at(20), offRoute: false)
+        assert(r.noBikeAhead == nil, "an on-route rider must never get the expressway alarm")
+        // Off route, closing 50 → 30 m: alarm at about 30 m.
+        r.checkNoBike(at: at(50), offRoute: true); r.checkNoBike(at: at(30), offRoute: true)
+        assert(r.noBikeAhead?.entrance.key == slip.key && abs((r.noBikeAhead?.distance ?? 0) - 30) < 1, "approaching an entrance off route must alarm: \(String(describing: r.noBikeAhead))")
+        // Once per approach: dismiss, keep closing, no second alarm; leave past 120 m, come back: again.
+        r.dismissNoBike()
+        r.checkNoBike(at: at(20), offRoute: true)
+        assert(r.noBikeAhead == nil, "one alarm per approach")
+        r.checkNoBike(at: at(200), offRoute: true); r.checkNoBike(at: at(50), offRoute: true); r.checkNoBike(at: at(40), offRoute: true)
+        assert(r.noBikeAhead != nil, "a new approach alarms again")
+        // "It's not there": silent for the rest of the ride; a different entrance still alarms.
+        r.silenceNoBike()
+        r.checkNoBike(at: at(200), offRoute: true); r.checkNoBike(at: at(50), offRoute: true); r.checkNoBike(at: at(30), offRoute: true)
+        assert(r.noBikeAhead == nil && r.silencedNoBike.contains(slip.key), "a silenced entrance stays silent")
+        r.checkNoBike(at: at(50, other), offRoute: true); r.checkNoBike(at: at(30, other), offRoute: true)
+        assert(r.noBikeAhead?.entrance.key == other.key, "another entrance still alarms")
+        r.dismissNoBike()
+        // Off route, 50 m away and moving away: no alarm.
+        let r2 = RideRecorder(); r2.voiceEnabled = false; r2.noBikeEntrances = [slip]
+        r2.checkNoBike(at: at(50), offRoute: true); r2.checkNoBike(at: at(55), offRoute: true)
+        assert(r2.noBikeAhead == nil, "moving away from an entrance must not alarm")
+        // Off route alongside an expressway with no entrance within 60 m: no alarm.
+        let beside = CLLocationCoordinate2D(latitude: 1.3, longitude: 103.8 + 100 * metre)
+        r2.checkNoBike(at: beside, offRoute: true)
+        r2.checkNoBike(at: .init(latitude: 1.3 + 30 * metre, longitude: 103.8 + 100 * metre), offRoute: true)
+        assert(r2.noBikeAhead == nil, "riding beside an expressway is not entering it")
+
+        // Walk mode, with hysteresis at the edge.
+        let bridge = NoGoCircle(coord: Coord(lat: 1.28, lon: 103.81), radiusMeters: 50)
+        r.walkZones = [(bridge, "Toy Waves")]
+        func edge(_ outside: Double) -> CLLocationCoordinate2D { .init(latitude: 1.28 + (50 + outside) * metre, longitude: 103.81) }
+        r.checkWalk(at: edge(-10))
+        assert(r.walkingThrough == "Toy Waves", "inside a walk zone is walk mode")
+        for o in [5.0, -2, 5, -2, 5] { r.checkWalk(at: edge(o)); assert(r.walkingThrough != nil, "GPS noise at the edge flipped walk mode") }
+        r.checkWalk(at: edge(20))
+        assert(r.walkingThrough == nil, "20 m outside ends walk mode")
+        // Moving time is paused while walking.
+        r.phase = .running
+        r.checkWalk(at: edge(-10))
+        let t0 = Date.now
+        func fix(_ dt: Double) -> CLLocation {
+            CLLocation(coordinate: edge(-10), altitude: 0, horizontalAccuracy: 5, verticalAccuracy: 5, course: 0, speed: 1.5, timestamp: t0.addingTimeInterval(dt))
+        }
+        r.consume(fix(0)); r.consume(fix(5))
+        assert(r.movingSeconds == 0, "walking a bike is not moving time: \(r.movingSeconds)")
+    }
     nonisolated static func selfCheck() {
         assert(band(at: 500) == nil, "beyond the first tier, say nothing")
         assert(band(at: 380) == 0, "heads-up")
@@ -545,7 +680,7 @@ final class RideRecorder {
         var bad = RoutePlan()
         bad.polyline = [Coord(lat: 1.4, lon: 103.9), Coord(lat: 1.41, lon: 103.9)]
         bad.noBikeCrossings = [Coord(lat: 1.405, lon: 103.9)]
-        r.applyReroute(bad)
+        assert(!r.applyReroute(bad), "applyReroute must report a refused plan, so rerouteAround can say so")
         assert(r.polyline.map(\.latitude) == before.map(\.latitude), "a reroute across a no-bike way replaced the line")
         assert(r.rerouteBlockedReason == "Turn back to your route: no bike path ahead", "blocked reroute must say why")
         assert(r.offRoute, "a blocked reroute must not count as rejoining, or it would reroute again at once")
