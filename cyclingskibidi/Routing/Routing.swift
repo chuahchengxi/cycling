@@ -49,7 +49,9 @@ enum Routing {
     /// avoided; `closures` adds any not yet saved (a mark made a moment ago).
     static func plan(through waypoints: [Coord],
                      mode: RideMode = .moderate,
-                     closures: [NoGoCircle] = []) async throws -> RoutePlan {
+                     closures: [NoGoCircle] = [],
+                     context: Set<RideContext> = [],
+                     start: Date = .now) async throws -> RoutePlan {
         guard waypoints.count >= 2 else { return RoutePlan() }
 
         var plan = RoutePlan()
@@ -75,9 +77,11 @@ enum Routing {
         case .moderate, .leisure:
             let base = await PCNDataset.graph()
             // Penalising touches every node; keep it off the main actor like A*.
-            let graph = await Task.detached { [closed, walk] in base.penalised(closed: closed, walk: walk) }.value
+            // "How I'm riding today" steers round crowded / dismount stretches; Fast ignores it.
+            let avoid = Kit.avoidCircles(for: context, at: start)
+            let graph = await Task.detached { [closed, walk] in base.penalised(closed: closed, walk: walk, avoid: avoid) }.value
             let result = await PCNRouting.stitched(
-                waypoints: waypoints, graph: graph, base: base, closed: closed,
+                waypoints: waypoints, graph: graph, base: base, closed: closed, avoid: avoid,
                 gap: { [closed, walk] a, b in roads?.route(a, b, profile: .quiet, closed: closed, walk: walk) ?? [a, b] })
             poly = result.poly
             plan.offConnectorSegments = result.offSegments

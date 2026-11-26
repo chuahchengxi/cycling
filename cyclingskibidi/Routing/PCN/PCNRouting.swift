@@ -27,6 +27,7 @@ enum PCNRouting {
         graph: PCNGraph,
         base: PCNGraph? = nil,
         closed: [NoGoCircle] = [],
+        avoid: [NoGoCircle] = [],
         gap: @Sendable (Coord, Coord) async -> [Coord]
     ) async -> (poly: [Coord], offSegments: [[Coord]], offMeters: Double) {
         guard waypoints.count >= 2 else { return ([], [], 0) }
@@ -57,7 +58,7 @@ enum PCNRouting {
                 continue
             }
             var onPCN = open
-            if !closed.isEmpty, let avoid = graph.path(from: entry, to: exit),
+            if !closed.isEmpty || !avoid.isEmpty, let avoid = graph.path(from: entry, to: exit),
                !avoid.contains(where: isClosed),
                base.pathLength(avoid) <= PCNGraph.maxDetourRatio * base.pathLength(open) {
                 onPCN = avoid
@@ -258,5 +259,13 @@ extension PCNRouting {
         let r6 = await stitched(waypoints: [nearCorner, west], graph: g1.penalised(closed: [shut], walk: []), base: g1,
                                 closed: [shut], gap: { [$0, $1] })
         assert(!r6.poly.contains { $0 == corner } && r6.poly.first == nearCorner, "entry spur into closure: \(r6.poly)")
+        // 7. Ride context: an avoid circle on one side of the square sends the route the other way (within the cap)…
+        let r7 = await stitched(waypoints: [west, north], graph: sq.penalised(closed: [], walk: [], avoid: [shut]), base: sq,
+                                avoid: [shut], gap: { [$0, $1] })
+        assert(r7.offSegments.isEmpty && !r7.poly.contains(where: inside), "avoid circle should bend the route: \(r7.poly)")
+        // …but past the +30 % cap the short side is ridden, no gap leg (avoid is a preference, not a closure).
+        let r8 = await stitched(waypoints: [west, north], graph: lg.penalised(closed: [], walk: [], avoid: [shut]), base: lg,
+                                avoid: [shut], gap: { [$0, $1] })
+        assert(r8.offSegments.isEmpty && r8.poly.contains { $0 == corner }, "over the cap the short side stays: \(r8.poly)")
     }
 }

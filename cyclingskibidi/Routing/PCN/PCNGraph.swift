@@ -108,14 +108,17 @@ nonisolated struct PCNGraph: Sendable {
     /// Extra cost on edges touching a closure / a no-cycling (walk) zone.
     static let closedExtraMeters: Double = 1500
     static let walkExtraMeters: Double = 100
+    /// Extra cost near crowded or dismount places when the rider's context asks to avoid them.
+    static let avoidExtraMeters: Double = 600
     /// A detour round a closure is taken only up to this ratio of the open route.
     static let maxDetourRatio: Double = 1.3
 
-    /// A copy with closure and walk-zone costs added to every edge with an endpoint inside a circle.
+    /// A copy with closure and walk-zone costs added to every edge with an endpoint inside a circle,
+    /// plus `avoidExtraMeters` on top for an endpoint inside an `avoid` circle (never a removal).
     /// ponytail: endpoint-only test; edges longer than ~50 m (max in seed 857 m) can miss a small
     /// circle. Split long edges at graph build if that shows up.
-    func penalised(closed: [NoGoCircle], walk: [NoGoCircle]) -> PCNGraph {
-        guard !closed.isEmpty || !walk.isEmpty else { return self }
+    func penalised(closed: [NoGoCircle], walk: [NoGoCircle], avoid: [NoGoCircle] = []) -> PCNGraph {
+        guard !closed.isEmpty || !walk.isEmpty || !avoid.isEmpty else { return self }
         func inside(_ c: Coord, _ n: NoGoCircle) -> Bool {   // cheap latitude reject before the haversine
             abs(c.lat - n.coord.lat) * Self.metresPerDegree <= n.radiusMeters && Geo.distance(c.cl, n.coord.cl) <= n.radiusMeters
         }
@@ -125,10 +128,14 @@ nonisolated struct PCNGraph: Sendable {
             if walk.contains(where: { inside(c, $0) }) { return Self.walkExtraMeters }
             return 0
         }
+        func avoided(_ k: GridKey) -> Bool { avoid.contains { inside(coord[k]!, $0) } }
         let extras = coord.keys.reduce(into: [GridKey: Double]()) { if case let e = extra($1), e > 0 { $0[$1] = e } }
+        let avoids = avoid.isEmpty ? [] : Set(coord.keys.filter(avoided))
         var g = self
         for (a, list) in adj {
-            g.adj[a] = list.map { (b, w) in (b, w + max(extras[a] ?? 0, extras[b] ?? 0)) }
+            g.adj[a] = list.map { (b, w) in
+                (b, w + max(extras[a] ?? 0, extras[b] ?? 0) + (avoids.contains(a) || avoids.contains(b) ? Self.avoidExtraMeters : 0))
+            }
         }
         return g
     }
@@ -166,5 +173,9 @@ extension PCNGraph {
         let w2 = shut.adj[junction]!.first!.1
         assert(abs(w2 - w - closedExtraMeters) < 1, "closed penalty off: \(w2 - w)")
         assert(g.penalised(closed: [], walk: []).nodeCount == g.nodeCount, "empty penalty must keep the graph")
+        // An avoid circle (ride context) adds exactly avoidExtraMeters: a cost, never a removal.
+        let quiet = g.penalised(closed: [], walk: [], avoid: [NoGoCircle(coord: Coord(lat: 1.300, lon: 103.802), radiusMeters: 10)])
+        let w3 = quiet.adj[junction]!.first!.1
+        assert(abs(w3 - w - avoidExtraMeters) < 1, "avoid penalty off: \(w3 - w)")
     }
 }

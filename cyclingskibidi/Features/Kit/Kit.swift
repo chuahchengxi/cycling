@@ -89,6 +89,24 @@ nonisolated enum Kit {
         return (quick, ranked)
     }
 
+    /// Circles to steer round for "How I'm riding today": Keep it quiet avoids crowds
+    /// (weekend crowds on Sat/Sun, evening crowds 17:00–22:00); With kids avoids crowds
+    /// and dismount stretches. Visiting Singapore doesn't bend the route (plan 5).
+    static func avoidCircles(for context: Set<RideContext>, at start: Date,
+                             facts: [String: PlaceFacts] = Discovery.facts, places: [Sight] = Discovery.places) -> [NoGoCircle] {
+        guard context.contains(.quiet) || context.contains(.kids) else { return [] }
+        let c = Closures.sg.dateComponents([.weekday, .hour], from: start)
+        let weekend = c.weekday == 1 || c.weekday == 7, evening = (17..<22).contains(c.hour ?? 0)
+        var avoid: Set<String> = []
+        if weekend { avoid.insert("crowded_weekend") }
+        if evening { avoid.insert("crowded_evening") }
+        if context.contains(.kids) { avoid.insert("dismount") }
+        return places.compactMap { p in
+            guard let reasons = p.osmID.flatMap({ facts[$0]?.note?.reasons }), !avoid.isDisjoint(with: reasons) else { return nil }
+            return NoGoCircle(coord: Coord(lat: p.lat, lon: p.lon), radiusMeters: 150)
+        }
+    }
+
     private static func firstSentence(_ text: String) -> String? {
         let first = text.components(separatedBy: ". ").first ?? text
         let trimmed = first.trimmingCharacters(in: .whitespaces).trimmingCharacters(in: CharacterSet(charactersIn: "."))
@@ -180,6 +198,28 @@ extension Kit {
 
         // Counts.
         assert(targetCount(lengthMeters: 5_000) == 3 && targetCount(lengthMeters: 20_000) == 5 && targetCount(lengthMeters: 40_000) == 10, "target counts")
+
+        // "How I'm riding today" -> avoid circles from the overlay's reasons, at the planned time.
+        func tagged(_ id: String, _ lon: Double, _ reasons: [String]) -> (Sight, PlaceFacts) {
+            var n = PlaceNote(); n.reasons = reasons
+            return (p(id, lon), facts(note: n))
+        }
+        let tagged3 = [tagged("wk", 103.81, ["crowded_weekend"]), tagged("ev", 103.82, ["crowded_evening"]), tagged("dm", 103.83, ["dismount"])]
+        let tPlaces = tagged3.map(\.0), tFacts = Dictionary(uniqueKeysWithValues: tagged3.map { ($0.0.osmID!, $0.1) })
+        func at(_ day: Int, _ hour: Int) -> Date { Closures.sg.date(from: DateComponents(year: 2026, month: 11, day: day, hour: hour))! }
+        func circles(_ ctx: Set<RideContext>, _ date: Date) -> [String] {
+            avoidCircles(for: ctx, at: date, facts: tFacts, places: tPlaces).map { c in
+                assert(c.radiusMeters == 150, "150 m circles"); return tPlaces.first { $0.coordinate.latitude == c.coord.lat && $0.coordinate.longitude == c.coord.lon }!.osmID!
+            }.sorted()
+        }
+        assert(circles([.quiet], at(28, 10)) == ["wk"], "quiet, Saturday 10:00: \(circles([.quiet], at(28, 10)))")
+        let tue10 = Closures.sg.date(from: DateComponents(year: 2026, month: 12, day: 1, hour: 10))!
+        let tue18 = Closures.sg.date(from: DateComponents(year: 2026, month: 12, day: 1, hour: 18))!
+        assert(circles([.quiet], tue10).isEmpty, "quiet, Tuesday 10:00: none")
+        assert(circles([.quiet], tue18) == ["ev"], "quiet, evening")
+        assert(circles([.kids], at(28, 10)) == ["dm", "wk"], "kids: dismount and crowds: \(circles([.kids], at(28, 10)))")
+        assert(circles([.kids], tue10) == ["dm"], "kids on a quiet weekday: dismount only")
+        assert(circles([.visiting], at(28, 10)).isEmpty && circles([], at(28, 10)).isEmpty, "visiting / nothing: no circles")
 
         // Real data: East Coast Park, food lover -> a hawker centre among the picks. Fast -> nothing.
         let ecp = [Coord(lat: 1.2995, lon: 103.9000), Coord(lat: 1.3020, lon: 103.9150),

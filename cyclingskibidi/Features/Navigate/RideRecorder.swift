@@ -394,7 +394,8 @@ final class RideRecorder {
         Task { [weak self] in
             defer { self?.rerouting = false }
             // Routing.plan always avoids every "Path closed" the rider has marked.
-            guard let plan = try? await Routing.plan(through: [Coord(fix), destination], mode: self?.mode ?? .moderate),
+            guard let plan = try? await Routing.plan(through: [Coord(fix), destination], mode: self?.mode ?? .moderate,
+                                                      context: Self.storedProfile().today),
                   !plan.polyline.isEmpty, let self else { return }
             self.applyReroute(plan)
         }
@@ -414,7 +415,7 @@ final class RideRecorder {
         Task { [weak self] in
             defer { self?.rerouting = false }
             guard let plan = try? await Routing.plan(through: [Coord(start), destination], mode: self?.mode ?? .moderate,
-                                                      closures: [nogo]),
+                                                      closures: [nogo], context: Self.storedProfile().today),
                   !plan.polyline.isEmpty, let self else {
                 self?.rerouteFailure = "Couldn't find a way around that closure."
                 return

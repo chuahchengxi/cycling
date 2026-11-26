@@ -291,7 +291,7 @@ struct RouteBuilderView: View {
         let currentWaypoints = waypoints
         planTask = Task {
             do {
-                let fresh = try await Routing.plan(through: currentWaypoints, mode: currentMode)
+                let fresh = try await Routing.plan(through: currentWaypoints, mode: currentMode, context: profile.today)
                 guard gen == generation else { return }
                 plan = fresh
                 planning = false
