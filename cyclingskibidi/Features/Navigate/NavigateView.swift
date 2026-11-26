@@ -87,11 +87,10 @@ struct NavigateView: View {
             .ignoresSafeArea(edges: .bottom)
         }
         .onAppear(perform: begin)
-        // The alarm is full screen: the nav sheet would sit over its buttons.
-        .onChange(of: recorder.noBikeAhead == nil) { _, clear in showSheet = clear && !placing && pending == nil }
         // Every marked hazard warns on approach, whatever route is being ridden.
         .onChange(of: obstacles, initial: true) { recorder.hazards = obstacles.filter(\.isActive) }
-        .sheet(isPresented: $showSheet) {
+        .sheet(isPresented: Binding(   // the full-screen alarm hides the nav sheet, whoever asks for it back
+            get: { showSheet && recorder.noBikeAhead == nil }, set: { showSheet = $0 })) {
             navSheet
                 .presentationDetents([.height(150), .fraction(0.45), .large], selection: $detent)
                 .presentationBackgroundInteraction(.enabled)

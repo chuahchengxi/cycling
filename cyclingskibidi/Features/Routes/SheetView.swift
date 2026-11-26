@@ -60,7 +60,7 @@ struct SheetView: View {
             }
         }
         .sheet(item: $selectedSight) { SightSheet(sight: $0) }
-        .task(id: route.polylineData) {
+        .task(id: [route.polylineData?.hashValue ?? 0] + closures.active.map(\.id.hashValue)) {
             let (polyline, found) = (route.polyline, route.noBikeCrossings)
             let walk = closures.active.filter { $0.kind == .noCycling }
             let circles = walk.flatMap(\.noGoCircles), names = walk.flatMap { c in c.noGoCircles.map { _ in c.name } }

@@ -61,7 +61,9 @@ final class RideRecorder {
     static let walkEnter = 0.0, walkExit = 15.0
     private var entranceLast: [String: Double] = [:]
     private var entranceAlarmed: Set<String> = []
+    /// ponytail: course from the last 2 m+ of movement; tune on real rides if GPS heading noise misses real entries.
     private var noBikeLastFix: CLLocationCoordinate2D?
+    private var noBikeClosest = Double.infinity
 
     // Sights along this route, and the one to surface right now as the rider
     // reaches it. The view binds a card to `passingSight` and clears it on close.
@@ -340,7 +342,7 @@ final class RideRecorder {
             if offRoute { offRoute = false }
             if rerouteBlockedReason != nil { rerouteBlockedReason = nil }
         }
-        checkNoBike(at: fix, offLine: joinedRoute && s.lateral > 40)
+        checkNoBike(at: fix)
     }
 
     /// The banner always shows the turn the rider is riding towards, so the
@@ -395,16 +397,17 @@ final class RideRecorder {
         }
     }
 
-    /// The expressway alarm (Figma v3 · 12). `offLine` is this fix's own position against the
-    /// current line (not the latched `offRoute`, which a successful reroute resets within a
-    /// second). The planned line is no-bike-free by construction, so a rider on it never alarms.
-    /// Alarms when the rider, off the line, is within `entranceRadius`, closing, and heading at
-    /// the entrance (course within `headingTolerance` of its bearing); riding past one to the side is normal.
-    /// Once per approach, never for a silenced entrance. A showing alarm stays until a button,
-    /// or the rider moves away from the entrance or out of range.
-    /// ponytail: course from the last 2 m+ of movement; tune on real rides if GPS heading noise misses real entries.
-    static let headingTolerance = 30.0
-    func checkNoBike(at fix: CLLocationCoordinate2D, offLine: Bool) {
+    /// The expressway alarm (Figma v3 · 12). The planned line is no-bike-free by construction,
+    /// so an entrance within `onLineMetres` of it is one the route passes legally (a slip road
+    /// joining the road being ridden) and never alarms; that test is on the entrance, so a fresh
+    /// reroute starting at the rider can't hide one. Otherwise it alarms when the rider is within
+    /// `entranceRadius`, closing, and heading into it: the entrance lies within `crossTrackMetres`
+    /// of the rider's course line ahead. Riding past one to the side is normal. Once per approach,
+    /// never for a silenced entrance. A showing alarm stays until a button, until the rider has
+    /// really moved away (`awayMetres` beyond the closest point; GPS jitter while stopped isn't
+    /// that), or until out of range.
+    static let onLineMetres = 25.0, crossTrackMetres = 10.0, awayMetres = 15.0
+    func checkNoBike(at fix: CLLocationCoordinate2D) {
         let degLat = Self.entranceRearm / 111_195
         let moved = noBikeLastFix.map { Geo.distance($0, fix) } ?? 0
         let heading = moved > 2 ? noBikeLastFix.map { Geo.bearing(from: $0, to: fix) } : nil
@@ -417,14 +420,18 @@ final class RideRecorder {
             let prev = entranceLast[e.key]
             entranceLast[e.key] = d
             if noBikeAhead?.entrance.key == e.key {
-                if let prev, d > prev + 3 { noBikeAhead = nil } else { noBikeAhead?.distance = d }   // moving away: clear
+                noBikeClosest = min(noBikeClosest, d)
+                if d > noBikeClosest + Self.awayMetres { noBikeAhead = nil } else { noBikeAhead?.distance = d }
                 continue
             }
-            guard offLine, d <= Self.entranceRadius, let prev, d < prev - 1, let heading,
-                  Self.angle(heading, Geo.bearing(from: fix, to: e.coordinate)) <= Self.headingTolerance,
+            guard d <= Self.entranceRadius, let prev, d < prev - 1, let heading,
                   !silencedNoBike.contains(e.key), !entranceAlarmed.contains(e.key), noBikeAhead == nil else { continue }
+            let off = Self.angle(heading, Geo.bearing(from: fix, to: e.coordinate)) * .pi / 180
+            guard off < .pi / 2, d * sin(off) <= Self.crossTrackMetres else { continue }
+            if polyline.count >= 2, let s = Geo.snap(e.coordinate, to: polyline, cumulative: cumulative), s.lateral <= Self.onLineMetres { continue }
             entranceAlarmed.insert(e.key)
             noBikeAhead = (e, d)
+            noBikeClosest = d
             announce(e.kind == "expressway" ? "Stop. Expressway ahead. Bikes are not allowed." : "Stop. No bikes ahead.")
         }
         // Out of range: forget it, so the next approach alarms again.
@@ -576,12 +583,15 @@ final class RideRecorder {
         r.noBikeEntrances = [slip, other]
         func at(_ m: Double, _ e: NoBikeEntrance = slip) -> CLLocationCoordinate2D { .init(latitude: e.lat - m * metre, longitude: e.lon) }
 
-        func step(_ c: CLLocationCoordinate2D, offLine: Bool = true) { r.checkNoBike(at: c, offLine: offLine) }
-        // On the line, 20 m and closing: never.
-        step(at(40), offLine: false); step(at(20), offLine: false)
-        assert(r.noBikeAhead == nil, "an on-line rider must never get the expressway alarm")
-        // Off the line, heading at it, closing 50 → 30 m: alarm at about 30 m.
+        func step(_ c: CLLocationCoordinate2D) { r.checkNoBike(at: c) }
+        // An entrance on the planned line (a slip road joining the road ridden): never.
+        r.polyline = [at(300), CLLocationCoordinate2D(latitude: slip.lat + 300 * metre, longitude: slip.lon)]
+        r.cumulative = Geo.cumulative(r.polyline)
+        step(at(40)); step(at(20))
+        assert(r.noBikeAhead == nil, "an entrance on the planned line must never alarm")
+        // Off the line (the line runs elsewhere), heading at it, closing 50 → 30 m: alarm at about 30 m.
         r.reset(); r.noBikeEntrances = [slip, other]
+        r.polyline = []; r.cumulative = []
         step(at(50)); step(at(30))
         assert(r.noBikeAhead?.entrance.key == slip.key && abs((r.noBikeAhead?.distance ?? 0) - 30) < 1, "approaching an entrance off route must alarm: \(String(describing: r.noBikeAhead))")
         // A successful reroute mid-approach must not switch the alarm off (the gate is this fix's position).
@@ -594,8 +604,11 @@ final class RideRecorder {
         assert(r.noBikeAhead == nil, "one alarm per approach")
         step(at(200)); step(at(50)); step(at(40))
         assert(r.noBikeAhead != nil, "a new approach alarms again")
-        // Turning away clears a showing alarm.
-        step(at(48))
+        // Stopped with GPS jitter (±8 m): the alarm stays.
+        step(at(46)); step(at(38)); step(at(47))
+        assert(r.noBikeAhead != nil, "GPS jitter while stopped must not clear the alarm")
+        // Really turning away (15 m past the closest point) clears it.
+        step(at(60))
         assert(r.noBikeAhead == nil, "moving away from the entrance clears the alarm")
         // "It's not there": silent for the rest of the ride; a different entrance still alarms.
         step(at(200)); step(at(50)); step(at(40)); r.silenceNoBike()
@@ -606,14 +619,24 @@ final class RideRecorder {
         r.dismissNoBike()
         // Off the line, 50 m away and moving away: no alarm.
         let r2 = RideRecorder(); r2.voiceEnabled = false; r2.noBikeEntrances = [slip]
-        r2.checkNoBike(at: at(50), offLine: true); r2.checkNoBike(at: at(55), offLine: true)
+        r2.checkNoBike(at: at(50)); r2.checkNoBike(at: at(55))
         assert(r2.noBikeAhead == nil, "moving away from an entrance must not alarm")
         // Riding north past an entrance 30 m to one side: closing, but not heading into it.
         let r3 = RideRecorder(); r3.voiceEnabled = false; r3.noBikeEntrances = [slip]
-        for m in [50.0, 35, 20, 5] {
-            r3.checkNoBike(at: .init(latitude: 1.3 - m * metre, longitude: 103.8 + 30 * metre / cos(1.3 * .pi / 180)), offLine: true)
+        for side in [30.0, 20, 15] {
+            r3.reset(); r3.noBikeEntrances = [slip]
+            for m in [50.0, 35, 20, 5] {
+                r3.checkNoBike(at: .init(latitude: 1.3 - m * metre, longitude: 103.8 + side * metre / cos(1.3 * .pi / 180)))
+            }
+            assert(r3.noBikeAhead == nil, "passing an entrance \(side) m to the side is not entering it")
         }
-        assert(r3.noBikeAhead == nil, "passing an entrance 30 m to the side is not entering it")
+
+        // A fresh reroute that starts at the rider (and bends away) can't hide an entrance the rider keeps heading into.
+        let r4 = RideRecorder(); r4.voiceEnabled = false; r4.noBikeEntrances = [slip]
+        var bend = RoutePlan(); bend.polyline = [Coord(at(55)), Coord(lat: slip.lat - 55 * metre, lon: slip.lon - 300 * metre)]
+        r4.applyReroute(bend)
+        r4.checkNoBike(at: at(55)); r4.checkNoBike(at: at(45)); r4.checkNoBike(at: at(35))
+        assert(r4.noBikeAhead != nil, "a fresh reroute suppressed an alarm for an entrance the rider is heading into")
 
         // Walk mode, with hysteresis at the edge.
         let bridge = NoGoCircle(coord: Coord(lat: 1.28, lon: 103.81), radiusMeters: 50)
