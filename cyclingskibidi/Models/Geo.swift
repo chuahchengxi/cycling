@@ -131,7 +131,7 @@ extension Array where Element == StoredStep {
 /// A leisure point of interest sitting near the route line, flattened for
 /// storage. `offsetAlong` is metres from the route start at the sight's closest
 /// approach — it orders the list and fires the pass-by card.
-struct Sight: Codable, Identifiable, Sendable {
+nonisolated struct Sight: Codable, Identifiable, Sendable {
     var id: UUID = UUID()
     var name: String = ""
     /// A places.json category ("park", "hawker"…); older saves hold an MKPointOfInterestCategory rawValue.
@@ -313,7 +313,7 @@ enum Geo {
     }
 
     /// Evenly spaced sample of a line, for elevation lookups and graphs.
-    static func sample(_ poly: [CLLocationCoordinate2D], count: Int) -> [CLLocationCoordinate2D] {
+    nonisolated static func sample(_ poly: [CLLocationCoordinate2D], count: Int) -> [CLLocationCoordinate2D] {
         guard poly.count > count, count > 1 else { return poly }
         let cum = cumulative(poly)
         guard let total = cum.last, total > 0 else { return poly }

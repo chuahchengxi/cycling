@@ -69,7 +69,7 @@ struct CreditsView: View {
                     Text("Map tiles are drawn by this app from that data and ship inside it, so the map works offline.")
                 }
                 Section("Place notes") {
-                    Text("Place notes, dishes and timings are this app's own research from public sources, each cited in the app's data. Stall names follow the Michelin Bib Gourmand Singapore 2026 list.")
+                    Text("Place notes, dishes and timings are this app's own research from public sources, each cited in the app's data. Named stalls are on the Michelin Bib Gourmand Singapore 2026 list, or have a cited founding year.")
                 }
                 Section("Elevation") {
                     Text("Terrain Tiles (Mapzen, hosted by AWS Open Data), from SRTM and other public sources.")

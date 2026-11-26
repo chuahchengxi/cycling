@@ -58,12 +58,13 @@ struct RouteDetailView: View {
             checkClosures()
         }
         .task {
-            // Leisure routes gather the sights along the line once, then reuse
-            // them on every open and during the ride.
-            guard route.mode == .leisure, route.sights.isEmpty, route.polyline.count > 1 else { return }
-            let found = Discovery.sights(along: route.polyline, mode: route.mode)
-            guard !found.isEmpty else { return }
-            route.sightData = Blob.encode(found)
+            // Leisure sights are found afresh on every open: what's open and what's
+            // closed depends on when you ride, not on when the route was planned.
+            // The ride uses what this saves.
+            guard route.mode == .leisure, route.polyline.count > 1 else { return }
+            let (line, mode) = (route.polyline, route.mode)
+            let found = await Task.detached { Discovery.sights(along: line, mode: mode) }.value
+            route.sightData = found.isEmpty ? nil : Blob.encode(found)
             try? context.save()
         }
         .sheet(isPresented: $sheetShown, onDismiss: {
@@ -131,7 +132,8 @@ struct RouteDetailView: View {
             if let plan = try? await Routing.plan(through: route.waypoints, mode: route.mode), plan.polyline.count > 1 {
                 route.apply(plan)   // new line, turns and climb chart together
                 // Sights follow the new line: found afresh for Leisure, offline.
-                let sights = route.mode == .leisure ? Discovery.sights(along: route.polyline, mode: route.mode) : route.sights
+                let (line, mode) = (route.polyline, route.mode)
+                let sights = mode == .leisure ? await Task.detached { Discovery.sights(along: line, mode: mode) }.value : route.sights
                 route.sightData = sights.isEmpty ? nil : Blob.encode(sights)
                 try? context.save()
                 checkClosures()

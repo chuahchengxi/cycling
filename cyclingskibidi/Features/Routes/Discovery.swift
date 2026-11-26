@@ -11,7 +11,7 @@ import MapKit
 
 /// Our research note on a place (scripts/places/overlay.src.json), keyed by OSM ID.
 /// Field names match the JSON.
-struct PlaceNote: Decodable, Sendable {
+nonisolated struct PlaceNote: Decodable, Sendable {
     var persona: [String]? = nil
     var reasons: [String]? = nil
     var status: String? = nil
@@ -20,12 +20,12 @@ struct PlaceNote: Decodable, Sendable {
     var stalls: [Stall]? = nil
     var best_time: String? = nil
     var note: String? = nil
-    var source: String? = nil
+    var sources: [String]? = nil   // every URL is in reports/*.md; each fact is in one of them
     struct Stall: Decodable, Sendable { var name: String; var bib: Int?; var since: Int? }
 }
 
 /// What places.json and the overlay know about one place beyond its pin.
-struct PlaceFacts: Sendable {
+nonisolated struct PlaceFacts: Sendable {
     var hours: [[Int]]?     // [day 0=Mon, from, to] minutes; nil = no hours known, treat as open
     var area: Double        // m², 0 for points
     var shape: [Coord]      // outline or line points; [] for points
@@ -49,7 +49,7 @@ struct PlaceFacts: Sendable {
     }
 }
 
-enum Discovery {
+nonisolated enum Discovery {
     /// Categories that count as a Leisure sight; stations, malls and rest-stop amenities
     /// (toilets, water, shelters, bike repair/parking/rental) are for search and rest stops only.
     static let leisureCategories: Set<String> = [
@@ -156,7 +156,34 @@ enum Discovery {
             if inside(s.coordinate, walk), f?.note?.reasons?.contains("park_and_walk") != true { return false }
             return true
         }
-        return spread(kept, polyline: coords, cumulative: cumulative, facts: facts, limit: limit)
+        return spread(onePerPlace(kept, polyline: coords, cumulative: cumulative, facts: facts),
+                      polyline: coords, cumulative: cumulative, facts: facts, limit: limit)
+    }
+
+    /// A research note 2, Wikipedia 1, else 0: how much a sight is worth a slot.
+    private static func notability(_ s: Sight, _ facts: [String: PlaceFacts]) -> Int {
+        let f = s.osmID.flatMap { facts[$0] }
+        return f?.note != nil ? 2 : f?.wiki == true ? 1 : 0
+    }
+
+    /// One sight per place: a park and its zones ("East Coast Park (Zone B)", "… Zone C")
+    /// or same-named pieces of one river share a name once the zone is cut off. Keeps the
+    /// most notable, then the one nearest the line; route order is kept.
+    static func onePerPlace(_ sights: [Sight], polyline: [CLLocationCoordinate2D], cumulative: [Double],
+                            facts: [String: PlaceFacts]) -> [Sight] {
+        func base(_ name: String) -> String {
+            name.lowercased()
+                .replacingOccurrences(of: #"\s*\([^)]*\)\s*$"#, with: "", options: .regularExpression)
+                .replacingOccurrences(of: #"\s+zone\s+\w+$"#, with: "", options: .regularExpression)
+        }
+        func lateral(_ s: Sight) -> Double { Geo.snap(s.coordinate, to: polyline, cumulative: cumulative)?.lateral ?? .infinity }
+        var best: [String: Sight] = [:]
+        for s in sights {
+            let k = base(s.name)
+            guard let b = best[k] else { best[k] = s; continue }
+            if (notability(s, facts), -lateral(s)) > (notability(b, facts), -lateral(b)) { best[k] = s }
+        }
+        return best.values.sorted { $0.offsetAlong < $1.offsetAlong }
     }
 
     /// At most `limit` sights, spread along the line: the route is cut into `limit`
@@ -166,10 +193,7 @@ enum Discovery {
     static func spread(_ sights: [Sight], polyline: [CLLocationCoordinate2D], cumulative: [Double],
                        facts: [String: PlaceFacts], limit: Int) -> [Sight] {
         guard sights.count > limit, limit > 0, let length = cumulative.last, length > 0 else { return sights }
-        func notability(_ s: Sight) -> Int {
-            let f = s.osmID.flatMap { facts[$0] }
-            return f?.note != nil ? 2 : f?.wiki == true ? 1 : 0
-        }
+        func notability(_ s: Sight) -> Int { Discovery.notability(s, facts) }
         let lateral = sights.map { Geo.snap($0.coordinate, to: polyline, cumulative: cumulative)?.lateral ?? .infinity }
         let ranked = sights.indices.sorted { (notability(sights[$0]), -lateral[$0]) > (notability(sights[$1]), -lateral[$1]) }
         var picked: [Int] = [], used = Set<Int>()
@@ -312,6 +336,7 @@ enum Discovery {
         // Real data.
         assert(places.contains { $0.category == "toilets" } && places.contains { $0.category == "drinkingWater" }, "rest-stop amenities missing")
         assert(facts.values.contains { $0.note?.dishes?.isEmpty == false }, "overlay missing or not joined")
+        assert(facts.values.allSatisfy { $0.note == nil || $0.note?.sources?.isEmpty == false }, "every note must carry its sources")
         assert(!search("toilets", near: line[0]).isEmpty, "amenities must be searchable")
 
         // Places a rider really passes. 10 km west→east line at lat 1.30.
@@ -348,6 +373,15 @@ enum Discovery {
         let unnamed = sights(along: long, in: [p("Playground", 103.81, cat: "playground"), p("Kidztopia", 103.82, cat: "playground")],
                              facts: [:], closed: [], walk: [])
         assert(unnamed.map(\.name) == ["Kidztopia"], "unnamed places must not be sights: \(unnamed.map(\.name))")
+        // One place, one slot: a park and its zones (or same-named pieces) count once, the most notable kept.
+        var zoned = [p("East Coast Park (Zone B)", 103.81), p("East Coast Park", 103.83), p("East Coast Park Zone C", 103.85), p("Pelton Canal", 103.86), p("Pelton Canal", 103.87)]
+        zoned[1].osmID = "ecp"
+        let once = sights(along: long, in: zoned,
+                          facts: ["East Coast Park (Zone B)": none, "ecp": PlaceFacts(hours: nil, area: 0, shape: [], wiki: true, note: nil),
+                                  "East Coast Park Zone C": none, "Pelton Canal": none], closed: [], walk: [])
+        assert(once.map(\.name) == ["East Coast Park", "Pelton Canal"], "one slot per place: \(once.map(\.name))")
+        // Off the main thread: the whole sweep runs from a detached task (compiles = it's nonisolated).
+        Task.detached { _ = Discovery.sights(along: long, in: [], facts: [:], closed: [], walk: []) }
     }
 }
 

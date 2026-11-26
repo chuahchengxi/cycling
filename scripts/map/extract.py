@@ -27,12 +27,13 @@ def area_kind(t):
 # Points of interest for scripts/places/build.py: tags kept, and what makes an object worth keeping.
 POI_TAGS = ("name", "name:en", "amenity", "leisure", "tourism", "historic", "man_made", "waterway", "landuse",
             "natural", "shop", "railway", "station", "shelter_type", "highway", "opening_hours", "wikipedia",
-            "wikidata", "addr:housenumber", "addr:street")
-POI_KEYS = ("amenity", "leisure", "tourism", "historic", "man_made", "landuse", "natural", "shop", "railway")
+            "wikidata", "addr:housenumber", "addr:street", "water", "attraction", "building")
+POI_KEYS = ("amenity", "leisure", "tourism", "historic", "man_made", "landuse", "natural", "shop", "railway", "attraction")
 
 def poi_tags(t):
     """The kept tags if this object may be a place (named with a POI key, or any amenity/leisure), else None."""
-    if not (("name" in t and any(k in t for k in POI_KEYS)) or "amenity" in t or "leisure" in t): return None
+    named_poi = "name" in t and (any(k in t for k in POI_KEYS) or t.get("building") == "train_station")
+    if not (named_poi or "amenity" in t or "leisure" in t): return None
     return {k: t[k] for k in POI_TAGS if k in t}
 
 def ring_area_m2(ring):
@@ -45,6 +46,7 @@ class H(osmium.SimpleHandler):
     def __init__(self):
         super().__init__()
         self.roads, self.areas, self.lines, self.coast, self.labels, self.pois = [], [], [], [], [], []
+        self.border = {}   # way id -> points of Singapore's national boundary (see sg_polygon)
 
     def node(self, n):
         t = n.tags
@@ -66,6 +68,8 @@ class H(osmium.SimpleHandler):
         if hw in ROADS:
             keep = {k: t[k] for k in ("highway", "oneway", "oneway:bicycle", "bicycle", "access", "name", "area", "bridge", "tunnel") if k in t}
             self.roads.append((keep, pts, [n.ref for n in w.nodes]))
+        if w.id in BORDER_WAYS:
+            self.border[w.id] = pts
         if t.get("natural") == "coastline":
             self.coast.append(pts)
         rw, ww, aw = t.get("railway"), t.get("waterway"), t.get("aeroway")
@@ -100,8 +104,41 @@ class H(osmium.SimpleHandler):
             oid = ("w%d" if a.from_way() else "r%d") % a.orig_id()
             self.pois.append((oid, pt, lon, lat, outer, area))
 
+class Border(osmium.SimpleHandler):
+    """Member ways of Singapore's national boundary relation (ISO3166-1=SG)."""
+    def __init__(self): super().__init__(); self.ways = set()
+    def relation(self, r):
+        t = r.tags
+        if t.get("boundary") == "administrative" and t.get("admin_level") == "2" and t.get("ISO3166-1") == "SG":
+            self.ways |= {m.ref for m in r.members if m.type == "w"}
+
+def sg_polygon(border):
+    """Singapore as one polygon: everything south of the OSM Singapore-Malaysia line.
+    The extract is clipped, so only the boundary's strait ways are present (its sea ways
+    are outside the box); they join into one west-east chain, closed off south of the
+    box (there's no other land in it south of the line)."""
+    ways = list(border.values())
+    if not ways: return []
+    chain = ways.pop(0)
+    while ways:   # join by shared end points
+        for i, w in enumerate(ways):
+            if w[0] == chain[-1]: chain += w[1:]
+            elif w[-1] == chain[0]: chain = w + chain[1:]
+            elif w[-1] == chain[-1]: chain += w[::-1][1:]
+            elif w[0] == chain[0]: chain = w[::-1] + chain[1:]
+            else: continue
+            ways.pop(i); break
+        else:
+            sys.exit("Singapore boundary ways don't join into one line")
+    if chain[0][0] > chain[-1][0]: chain = chain[::-1]
+    south = min(p[1] for p in chain) - 1
+    return [(chain + [(chain[-1][0], south), (chain[0][0], south)], [])]
+
+b = Border(); b.apply_file(sys.argv[1])
+BORDER_WAYS = b.ways
 h = H()
 h.apply_file(sys.argv[1], locations=True)
-pickle.dump({"roads": h.roads, "areas": h.areas, "lines": h.lines, "coast": h.coast, "labels": h.labels, "pois": h.pois},
+h.sg = sg_polygon(h.border)
+pickle.dump({"roads": h.roads, "areas": h.areas, "lines": h.lines, "coast": h.coast, "labels": h.labels, "pois": h.pois, "sg": h.sg},
             open(sys.argv[2], "wb"))
 print({k: len(v) for k, v in vars(h).items() if isinstance(v, list)})

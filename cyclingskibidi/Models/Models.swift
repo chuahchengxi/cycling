@@ -87,7 +87,7 @@ enum RideMode: String, Codable, CaseIterable, Identifiable, Sendable {
 
     /// Planning speed used to estimate route duration — not a target, just
     /// the assumption `Routing.plan` bakes into the ETA for this mode.
-    var planningSpeedKmh: Double {
+    nonisolated var planningSpeedKmh: Double {
         switch self {
         case .fast:     return 20
         case .moderate: return 18

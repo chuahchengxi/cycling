@@ -17,15 +17,17 @@ PCN = os.path.join(os.path.dirname(__file__), "../../cyclingskibidi/pcn-seed.geo
 DAYS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
 DAY_LIST = re.compile(r"^(Mo|Tu|We|Th|Fr|Sa|Su)(-(Mo|Tu|We|Th|Fr|Sa|Su))?(,(Mo|Tu|We|Th|Fr|Sa|Su)(-(Mo|Tu|We|Th|Fr|Sa|Su))?)*$")
 SPAN = re.compile(r"^(\d\d):(\d\d)-(\d\d):(\d\d)$")
-HAWKER_NAME = re.compile(r"hawker|food cent(re|er)|market|food village", re.I)
+HAWKER_NAME = re.compile(r"\b(hawker|food (cent(re|er)|court)|food village)\b", re.I)
+MARKET_NAME = re.compile(r"\bmarket\b", re.I)                 # only for amenity=marketplace
+RIVERISH = re.compile(r"\b(river|canal|sungei|drain)\b", re.I)
 # Unnamed places of these kinds take this name, and are kept only near a park connector.
 NAMELESS = {"playground": "Playground", "toilets": "Toilets", "drinkingWater": "Drinking water",
             "shelter": "Shelter", "repair": "Bike repair station", "bikeParking": "Bike parking",
             "bikeRental": "Bike rental"}
 NEAR_PCN_M = 1000
 LARGE_M2 = 10_000
-SHAPE_POINTS = 16
-RIVER_POINTS = 64     # a river is many km long; 16 points would leave gaps wider than the 100 m corridor
+AREA_CELL = 0.001     # ~111 m: an outline keeps one point per cell, so no stretch of edge is far from a kept point
+RIVER_CELL = 0.0006   # ~67 m: rivers use the 100 m corridor, so finer
 
 def category(t):
     """App category for an OSM tag set, first match wins; None = not a place we ship."""
@@ -42,10 +44,14 @@ def category(t):
     if t.get("railway") == "station" and t.get("station") in ("subway", "light_rail"): return "station"
     if t.get("shop") == "mall": return "mall"
     if amenity in ("marketplace", "restaurant") and HAWKER_NAME.search(name): return "hawker"
+    if amenity == "marketplace" and MARKET_NAME.search(name): return "hawker"
     if t.get("man_made") == "bridge":   # road overpasses aren't sights
         return None if re.search(r"flyover|viaduct|interchange", name, re.I) else "bridge"
     if t.get("waterway") in ("river", "canal"): return "waterway"
-    if t.get("landuse") in ("reservoir", "basin") or t.get("natural") in ("water", "wetland"): return "reservoir"
+    if t.get("landuse") in ("reservoir", "basin") or t.get("natural") == "wetland": return "reservoir"
+    if t.get("natural") == "water":   # a lake or reservoir, not the water area of a river or canal
+        riverish = t.get("water") in ("river", "canal", "stream", "drain", "ditch") or RIVERISH.search(name)
+        return None if riverish else "reservoir"
     if "historic" in t: return "heritage"
     if tourism == "artwork": return "artwork"
     if leisure == "playground": return "playground"
@@ -56,6 +62,10 @@ def category(t):
     if amenity == "bicycle_repair_station": return "repair"
     if amenity == "bicycle_parking": return "bikeParking"
     if amenity == "bicycle_rental": return "bikeRental"
+    if "attraction" in t: return "attraction"                    # e.g. attraction=big_wheel (Singapore Flyer)
+    if t.get("man_made") == "pier": return "viewpoint"           # jetties
+    if t.get("landuse") == "cemetery" and re.search(r"\bwar\b", name, re.I): return "heritage"
+    if t.get("building") == "train_station" and re.search(r"railway station", name, re.I): return "heritage"
     return None
 
 def parse_hours(s):
@@ -97,11 +107,38 @@ def parse_hours(s):
                 if b > 0: out.append([(d + 1) % 7, 0, b])
     return sorted(out) or None
 
-def thin(points, n):
-    """At most n points: every k-th, always ending on the last."""
-    if len(points) <= n: return list(points)
-    k = math.ceil((len(points) - 1) / (n - 1))
-    return list(points[:-1][::k]) + [points[-1]]
+def grid_thin(points, cell):
+    """The first (lon, lat) point in each `cell`-degree grid square, in order:
+    every original point stays within about a cell of a kept one."""
+    seen, out = set(), []
+    for lo, la in points:
+        k = (math.floor(la / cell), math.floor(lo / cell))
+        if k not in seen: seen.add(k); out.append((lo, la))
+    return out
+
+def chains(ways):
+    """Indices of ways grouped into chains that share an end point (one river)."""
+    parent = list(range(len(ways)))
+    def root(i):
+        while parent[i] != i: parent[i] = parent[parent[i]]; i = parent[i]
+        return i
+    ends = {}
+    for i, w in enumerate(ways):
+        for p in (w[0], w[-1]):
+            if p in ends: parent[root(i)] = root(ends[p])
+            else: ends[p] = i
+    groups = defaultdict(list)
+    for i in range(len(ways)): groups[root(i)].append(i)
+    return sorted(groups.values())
+
+def inside(lon, lat, polys):
+    """Point in any (outer ring, holes) polygon of (lon, lat) rings (ray casting)."""
+    def ring(r):
+        hit = False
+        for (x1, y1), (x2, y2) in zip(r, r[1:] + r[:1]):
+            if (y1 > lat) != (y2 > lat) and lon < x1 + (lat - y1) * (x2 - x1) / (y2 - y1): hit = not hit
+        return hit
+    return any(ring(o) and not any(ring(h) for h in hs) for o, hs in polys)
 
 def fold(name):
     """Case- and accent-insensitive form of a name, with "HC"/"FC" spelled out."""
@@ -151,7 +188,6 @@ if "--check" in sys.argv:
     assert category({"man_made": "bridge", "name": "Bedok Reservoir Flyover"}) is None          # road overpasses aren't sights
     assert category({"man_made": "bridge", "name": "Labrador Viaduct"}) is None
     assert category({"man_made": "bridge", "name": "Jubilee Bridge"}) == "bridge"
-    assert thin([(i, i) for i in range(100)], 16)[-1] == (99, 99) and len(thin([(i, i) for i in range(100)], 16)) <= 16
     recs = [{"id": "w1", "name": "Tiong Bahru Market", "category": "hawker"},
             {"id": "w2", "name": "Ang Mo Kio Park", "category": "park"},
             {"id": "w3", "name": "Ang Mo Kio Park", "category": "park"}]
@@ -166,6 +202,31 @@ if "--check" in sys.argv:
     out2, _ = resolve([{"match": {"name": "Ang Mo Kio Park", "category": "park"}, "all": True, "note": "y"}], recs)
     assert out2.get("w2", {}).get("note") == "y" and out2.get("w3", {}).get("note") == "y" and "all" not in out2["w2"]   # one place in parts
     assert "x-sourced-spot" in out and not any(k.startswith("x-keppel") for k in out)   # no coord_source, no entry
+    # Review fixes. Hawker names need whole words; "market" only for real marketplaces.
+    assert category({"amenity": "restaurant", "name": "Manhattan Fish Market"}) is None
+    assert category({"amenity": "restaurant", "name": "Happy Seafood Village"}) is None
+    assert category({"amenity": "marketplace", "name": "Tekka Market"}) == "hawker"
+    # natural=water is a reservoir or lake, not a stretch of river or canal.
+    assert category({"natural": "water", "water": "river", "name": "Pandan River"}) is None
+    assert category({"natural": "water", "name": "Alexandra Canal"}) is None
+    assert category({"natural": "water", "name": "Swan Lake"}) == "reservoir"
+    assert category({"landuse": "reservoir", "name": "Bedok Reservoir"}) == "reservoir"
+    # Places the old rules never reached.
+    assert category({"attraction": "big_wheel", "name": "Singapore Flyer"}) == "attraction"
+    assert category({"man_made": "pier", "name": "Bedok Jetty"}) == "viewpoint"
+    assert category({"landuse": "cemetery", "name": "Kranji War Memorial"}) == "heritage"
+    assert category({"landuse": "cemetery", "name": "Choa Chu Kang Cemetery"}) is None
+    assert category({"building": "train_station", "name": "Bukit Timah Railway Station"}) == "heritage"
+    # Outlines thinned by distance, not by count: every original point stays near a kept one.
+    line = [(103.8 + i * 0.0001, 1.3) for i in range(300)]          # ~3.3 km, 11 m apart
+    kept = grid_thin(line, AREA_CELL)
+    assert len(kept) < len(line) / 4
+    assert max(min(metres(la, lo, b, a) for a, b in kept) for lo, la in line) <= 130
+    # Rivers: only ways that touch are one river.
+    assert sorted(len(c) for c in chains([[(0, 0), (1, 0)], [(1, 0), (2, 0)], [(50, 50), (51, 50)]])) == [1, 2]
+    # Singapore only.
+    sg = [([(103.6, 1.2), (104.1, 1.2), (104.1, 1.47), (103.6, 1.47)], [])]
+    assert inside(103.8, 1.3, sg) and not inside(103.76, 1.49, sg)
     print("places checks passed")
     sys.exit(0)
 
@@ -184,8 +245,10 @@ def near_pcn(lat, lon):
                for di in range(-2, 3) for dj in range(-2, 3) for a, b in pcn_cells.get((ci + di, cj + dj), ()))
 
 L = pickle.load(open(sys.argv[1], "rb"))
-records, seen, rivers = [], set(), {}
+SG = L.get("sg") or sys.exit("no Singapore boundary in the pickle: re-run scripts/map/extract.py")
+records, seen, rivers = [], set(), defaultdict(list)
 for oid, t, lon, lat, shape, area in L["pois"]:
+    if not inside(lon, lat, SG): continue      # the extract also covers Johor
     cat = category(t)
     if not cat: continue
     name = t.get("name:en") or t.get("name")
@@ -194,10 +257,8 @@ for oid, t, lon, lat, shape, area in L["pois"]:
         if not near_pcn(lat, lon): continue
     elif not name:
         continue
-    if cat == "waterway":   # one river is many OSM ways: merge them by name, keep the longest way's middle
-        r = rivers.setdefault(name, {"id": oid, "pts": [], "best": 0, "lat": lat, "lon": lon})
-        r["pts"] += shape
-        if len(shape) > r["best"]: r.update(best=len(shape), lat=lat, lon=lon, id=min(r["id"], oid))
+    if cat == "waterway":   # one river is many OSM ways: joined below, but only where they touch
+        rivers[name].append((oid, lon, lat, shape))
         continue
     key = (name.lower(), cat, round(lat, 3), round(lon, 3))
     if key in seen: continue
@@ -208,11 +269,16 @@ for oid, t, lon, lat, shape, area in L["pois"]:
     if hours: rec["hours"] = hours
     if "wikipedia" in t or "wikidata" in t: rec["wiki"] = True
     if area: rec["area"] = round(area)
-    if area >= LARGE_M2 and shape: rec["shape"] = [[round(a, 6), round(o, 6)] for o, a in thin(shape, SHAPE_POINTS)]
+    if area >= LARGE_M2 and shape: rec["shape"] = [[round(a, 6), round(o, 6)] for o, a in grid_thin(shape, AREA_CELL)]
     records.append(rec)
-for name, r in rivers.items():
-    records.append({"id": r["id"], "name": name, "category": "waterway", "lat": round(r["lat"], 6), "lon": round(r["lon"], 6),
-                    "address": "", "shape": [[round(a, 6), round(o, 6)] for o, a in thin(r["pts"], RIVER_POINTS)]})
+for name, ways in rivers.items():
+    for chain in chains([w[3] for w in ways]):
+        part = [ways[i] for i in chain]
+        oid, lon, lat, _ = max(part, key=lambda w: len(w[3]))              # pin: middle of the longest way
+        first = min(part, key=lambda w: int(w[0][1:]))[0]                  # stable id: the lowest way id
+        pts = [p for w in part for p in w[3]]
+        records.append({"id": first, "name": name, "category": "waterway", "lat": round(lat, 6), "lon": round(lon, 6),
+                        "address": "", "shape": [[round(a, 6), round(o, 6)] for o, a in grid_thin(pts, RIVER_CELL)]})
 records.sort(key=lambda r: r["id"])
 with open(OUT, "w") as f:   # one place per line: small, readable git diffs
     f.write("[\n" + ",\n".join(json.dumps(r, ensure_ascii=False, separators=(",", ":")) for r in records) + "\n]\n")
