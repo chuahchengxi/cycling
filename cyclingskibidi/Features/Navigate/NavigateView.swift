@@ -32,7 +32,7 @@ struct NavigateView: View {
     var body: some View {
         Group {
             if let ride = trip.finished {
-                FinishedView(ride: ride) {
+                FinishedView(ride: ride, kitNote: recorder.kitSummary) {
                     trip.clear()
                     dismiss()
                 }
@@ -111,7 +111,7 @@ struct NavigateView: View {
             ZStack {
                 Color.black.opacity(0.25).ignoresSafeArea()
                     .onTapGesture { recorder.passingSight = nil }
-                PassBySightCard(sight: sight) { recorder.passingSight = nil }
+                PassBySightCard(sight: sight, onVerdict: { recorder.kitVerdict(sight, stopped: $0) }) { recorder.passingSight = nil }
                     .padding(.horizontal, 20)
             }
             .transition(.opacity)
@@ -300,6 +300,7 @@ struct NavigateView: View {
 /// already owns a persistent sheet).
 struct PassBySightCard: View {
     let sight: Sight
+    var onVerdict: ((_ stopped: Bool) -> Void)? = nil
     let onClose: () -> Void
 
     var body: some View {
@@ -316,6 +317,19 @@ struct PassBySightCard: View {
                 }
             }
             SightDetail(sight: sight)
+            if let onVerdict {
+                // Kit learns from these (Figma v3 · 04).
+                HStack(spacing: 10) {
+                    Button { onVerdict(true) } label: {
+                        Label("Stop here", systemImage: "flag.checkered").frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    Button { onVerdict(false) } label: {
+                        Label("Skip", systemImage: "xmark").frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
         }
         .padding(18)
         .background(.regularMaterial, in: .rect(cornerRadius: 22))

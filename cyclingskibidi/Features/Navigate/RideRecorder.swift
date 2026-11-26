@@ -47,6 +47,12 @@ final class RideRecorder {
     private(set) var sights: [Sight] = []
     var passingSight: Sight?
 
+    // Kit learning on this ride: the profile as it started, the categories the rider
+    // already said Stop/Skip to, and the line for the finished page.
+    private var kitBefore = RiderProfile()
+    private var kitDecided: Set<String> = []
+    private(set) var kitSummary: String?
+
     /// Every hazard the rider has marked (kept in step with the store by the
     /// view). Each one warns as the rider nears it, on every route.
     var hazards: [Obstacle] = []
@@ -115,6 +121,7 @@ final class RideRecorder {
         sights = route.sights
         passedSights.removeAll()
         passingSight = nil
+        kitBefore = Self.storedProfile(); kitDecided = []; kitSummary = nil
         rerouteFailure = nil
         nearHazard = nil
         warnedHazards.removeAll()
@@ -161,7 +168,32 @@ final class RideRecorder {
         ride.ascentMeters = climb.up
         ride.descentMeters = climb.down
         ride.trackData = Blob.encode(track)
+        // Real stops at picks teach Kit too, unless the rider already said Stop/Skip to that kind.
+        var profile = Self.storedProfile()
+        for s in KitLearning.detectedStops(track: track, picks: sights) where kitDecided.insert(s.category).inserted {
+            KitLearning.record(s.category, stopped: true, in: &profile)
+        }
+        Self.store(profile)
+        kitSummary = KitLearning.summary(before: kitBefore, after: profile)
         return ride
+    }
+
+    /// "Stop here" / "Skip" on a pick: nudge that category and close the card.
+    func kitVerdict(_ sight: Sight, stopped: Bool) {
+        var profile = Self.storedProfile()
+        KitLearning.record(sight.category, stopped: stopped, in: &profile)
+        Self.store(profile)
+        kitDecided.insert(sight.category)
+        passingSight = nil
+    }
+
+    /// The same value the views bind with @AppStorage(RiderProfile.storageKey).
+    private static func storedProfile() -> RiderProfile {
+        UserDefaults.standard.string(forKey: RiderProfile.storageKey).flatMap(RiderProfile.decode) ?? RiderProfile()
+    }
+
+    private static func store(_ profile: RiderProfile) {
+        UserDefaults.standard.set(profile.encoded, forKey: RiderProfile.storageKey)
     }
 
     func reset() {
