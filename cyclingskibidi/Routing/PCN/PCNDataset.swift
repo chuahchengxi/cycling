@@ -24,7 +24,7 @@ enum PCNDataset {
         if let building { return await building.value }
         let task = Task.detached(priority: .userInitiated) { () -> PCNGraph in
             let data = seedData() ?? Data()
-            return PCNGraph(polylines: GeoJSON.polylines(data))
+            return PCNGraph(named: GeoJSON.named(data))
         }
         building = task
         let g = await task.value
@@ -67,6 +67,8 @@ extension PCNDataset {
         let inside = r.poly.filter { c in shut.contains { Geo.distance(c.cl, $0.coord.cl) <= $0.radiusMeters } }
         assert(inside.isEmpty, "Bedok route rides \(inside.count) closed vertices")
         // Timing is printed, not asserted: a cold simulator or the debugger would make it flaky.
+        let turns = PCNRouting.steps(from: r.poly, pcn: g, roads: await RoadNetwork.graph())
+        print("Bedok turns: \(turns.count - 2) vs \(PCNRouting.steps(from: r.poly).count - 2) bends; " + turns.map(\.instruction).joined(separator: " | "))
         print("Bedok closure check: \(Int(Geo.cumulative(r.poly.coordinates).last ?? 0)) m, \(r.offSegments.count) gap legs, \(Int(Date.now.timeIntervalSince(t0) * 1000)) ms")
     }
 }

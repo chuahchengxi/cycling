@@ -32,6 +32,8 @@ nonisolated struct RoadGraph: Sendable {
     let len: [UInt16]              // half-metres
     let cls: [UInt8]
     private let cells: [Int64: [Int32]]
+    /// Distinct neighbours per node, either direction (one-way streets count once).
+    let degree: [UInt8]
 
     var nodeCount: Int { lat.count }
     static let cellDeg = 0.002     // ~220 m buckets for nearest-node lookups
@@ -58,6 +60,25 @@ nonisolated struct RoadGraph: Sendable {
         var cells: [Int64: [Int32]] = [:]
         for i in 0..<n { cells[Self.cell(Double(lat[i]) / 1e6, Double(lon[i]) / 1e6), default: []].append(Int32(i)) }
         self.cells = cells
+        var degree = [UInt8](repeating: 0, count: n)
+        for u in 0..<n {
+            let row = Int(first[u])..<Int(first[u + 1])
+            degree[u] = UInt8(min(255, Set(row.map { to[$0] }).count))
+            // u -> v with no v -> u: one-way, so v gains u as a neighbour too.
+            for e in row {
+                let v = Int(to[e])
+                if !(Int(first[v])..<Int(first[v + 1])).contains(where: { to[$0] == UInt32(u) }) { degree[v] &+= 1 }
+            }
+        }
+        self.degree = degree
+    }
+
+    /// Class of the edge u -> v (see roads.py), if there is one either way.
+    func edgeClass(_ u: Int, _ v: Int) -> UInt8? {
+        func find(_ a: Int, _ b: Int) -> UInt8? {
+            (Int(first[a])..<Int(first[a + 1])).first { to[$0] == UInt32(b) }.map { cls[$0] }
+        }
+        return find(u, v) ?? find(v, u)
     }
 
     private static func cell(_ la: Double, _ lo: Double) -> Int64 {
@@ -74,6 +95,12 @@ nonisolated struct RoadGraph: Sendable {
         var out: [Int32] = []
         for a in la0...la1 { for b in lo0...lo1 { out += cells[a << 32 | b & 0xffff_ffff] ?? [] } }
         return out
+    }
+
+    /// The node at exactly this vertex (route vertices are node coords), if any.
+    func node(at c: Coord) -> Int? {
+        let la = Int32((c.lat * 1e6).rounded()), lo = Int32((c.lon * 1e6).rounded())
+        return candidates(near: c, radius: 1).first { lat[Int($0)] == la && lon[Int($0)] == lo }.map(Int.init)
     }
 
     /// The nearest node within `radius` metres, if any.

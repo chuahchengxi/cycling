@@ -93,7 +93,8 @@ enum Routing {
 
         let cl = poly.coordinates
         plan.distance = Geo.cumulative(cl).last ?? 0
-        plan.steps = PCNRouting.steps(from: poly)
+        let pcn = mode == .fast ? nil : await PCNDataset.graph()
+        plan.steps = PCNRouting.steps(from: poly, pcn: pcn, roads: roads)
         plan.elevations = Elevation.profile(along: cl)
         plan.expected = duration(distance: plan.distance, ascent: plan.ascent, mode: mode)
         plan.polyline = zip(cl, plan.elevations.isEmpty ? [] : resample(plan.elevations, to: cl.count))

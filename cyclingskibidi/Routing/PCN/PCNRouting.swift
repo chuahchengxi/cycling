@@ -89,27 +89,79 @@ enum PCNRouting {
         return (poly, offSegments, offMeters)
     }
 
-    /// A turn list from bare geometry — the PCN path has no street names, so
-    /// steps are synthesised from the polyline's own bends. Reuses Geo's bearing
-    /// maths, the same classification the MapKit path uses.
+    /// A turn list from the line's own bends. Reuses Geo's bearing maths, the
+    /// same classification the MapKit path uses. With the graphs the line was
+    /// routed on, a bend is only announced near a real junction (a choice for the
+    /// rider) or where the line changes network, and says what it turns onto:
+    /// the connector's name, else the kind of path.
     /// ponytail: emits a step only on a >minTurn bend spaced >minSpacing apart, so
     /// dense connector vertices don't spam the turn list. Both tuned on-device.
     static let minTurn: Double = 25       // degrees
     static let minSpacing: Double = 30    // metres
+    /// A bend this close to a junction (along the line) is that junction's turn:
+    /// windowed bearings put the bend a few metres off the junction vertex.
+    static let junctionWindow: Double = 15
 
-    static func steps(from poly: [Coord]) -> [StoredStep] {
+    private enum Spot: Equatable {
+        case pcn(GridKey), road(Int), none
+        func sameNetwork(_ o: Spot) -> Bool {
+            switch (self, o) { case (.pcn, .pcn), (.road, .road): return true; default: return false }
+        }
+    }
+
+    static func steps(from poly: [Coord], pcn: PCNGraph? = nil, roads: RoadGraph? = nil) -> [StoredStep] {
         let coords = poly.coordinates
         guard coords.count >= 2 else { return [] }
         let cum = Geo.cumulative(coords)
+        let spots: [Spot] = poly.map { c in
+            if let k = pcn?.node(at: c) { return .pcn(k) }
+            if let i = roads?.node(at: c) { return .road(i) }
+            return .none
+        }
+        // Junction, network seam or unknown ground: somewhere a turn can be a choice.
+        let choice: [Bool] = spots.indices.map { i in
+            if i > 0, spots[i - 1].sameNetwork(spots[i]) == false { return true }
+            if i + 1 < spots.count, spots[i + 1].sameNetwork(spots[i]) == false { return true }
+            switch spots[i] {
+            case .none:          return true
+            case .pcn(let k):    return (pcn?.degree(k) ?? 3) >= 3
+            case .road(let r):   return Int(roads?.degree[r] ?? 3) >= 3
+            }
+        }
+        func nearChoice(_ i: Int) -> Bool {
+            var j = i; while j >= 0, cum[i] - cum[j] <= junctionWindow { if choice[j] { return true }; j -= 1 }
+            j = i + 1; while j < cum.count, cum[j] - cum[i] <= junctionWindow { if choice[j] { return true }; j += 1 }
+            return false
+        }
+        /// What the rider turns onto at vertex i: (spoken target, street name).
+        func onto(_ i: Int) -> (String, String)? {
+            switch (spots[i], spots[i + 1]) {
+            case (_, .pcn(let k)):
+                if let n = pcn?.name[k] { return (n, n) }
+                return ("the park connector", "")
+            case (.road(let u), .road(let v)):
+                guard let c = roads?.edgeClass(u, v) else { return nil }
+                return (c == 0 ? "the cycleway" : c == 1 ? "the path" : "the road", "")
+            default:
+                return nil
+            }
+        }
+
         var out: [StoredStep] = [step(.depart, "Start", at: coords[0], offset: 0)]
         var lastAt = 0.0
         for i in 1..<(coords.count - 1) {
             guard let inB = Geo.exitBearing(Array(coords[...i])),
                   let outB = Geo.entryBearing(Array(coords[i...])) else { continue }
             let angle = Geo.turn(from: inB, to: outB)
-            guard abs(angle) >= minTurn, cum[i] - lastAt >= minSpacing else { continue }
+            guard abs(angle) >= minTurn, cum[i] - lastAt >= minSpacing, nearChoice(i) else { continue }
             let m = Maneuver.classify(turn: angle)
-            out.append(step(m, phrase(m), at: coords[i], offset: cum[i]))
+            var text = phrase(m), road = ""
+            if m != .uTurn, let (target, name) = onto(i) {
+                let into = !target.contains("Connector") && (target.contains("Park") || target.contains("Garden"))
+                text += (into ? " into " : " onto ") + target
+                road = name
+            }
+            out.append(step(m, text, road: road, at: coords[i], offset: cum[i]))
             lastAt = cum[i]
         }
         out.append(step(.arrive, "Arrive", at: coords.last!, offset: cum.last ?? 0))
@@ -129,8 +181,8 @@ enum PCNRouting {
         }
     }
 
-    private static func step(_ m: Maneuver, _ text: String, at c: CLLocationCoordinate2D, offset: Double) -> StoredStep {
-        StoredStep(instruction: text, road: "", distance: 0, maneuverOffset: offset,
+    private static func step(_ m: Maneuver, _ text: String, road: String = "", at c: CLLocationCoordinate2D, offset: Double) -> StoredStep {
+        StoredStep(instruction: text, road: road, distance: 0, maneuverOffset: offset,
                    maneuverRaw: m.rawValue, lat: c.latitude, lon: c.longitude)
     }
 }
@@ -157,6 +209,19 @@ extension PCNRouting {
                                  Coord(lat: 1.302, lon: 103.802)])
         assert(steps.first?.maneuver == .depart && steps.last?.maneuver == .arrive)
         assert(steps.contains { $0.maneuver == .left }, "left turn not detected")
+
+        // With the graph: a bend with no other way to go is not announced; at a
+        // real junction the turn names the connector it turns onto.
+        let w = Coord(lat: 1.30, lon: 103.80), j = Coord(lat: 1.30, lon: 103.802)
+        let n = Coord(lat: 1.302, lon: 103.802), s = Coord(lat: 1.298, lon: 103.802)
+        let bend = PCNGraph(named: [("Ulu Pandan Park Connector", [w, j]), ("Ulu Pandan Park Connector", [j, n])])
+        assert(PCNRouting.steps(from: [w, j, n], pcn: bend).count == 2, "a plain bend must not be a turn")
+        let tee = PCNGraph(named: [("Ulu Pandan Park Connector", [w, j]), ("Whampoa Park Connector", [j, n]), (nil, [j, s])])
+        let t = PCNRouting.steps(from: [w, j, n], pcn: tee)
+        assert(t.count == 3 && t[1].instruction == "Turn left onto Whampoa Park Connector" && t[1].road == "Whampoa Park Connector",
+               "junction turn unnamed: \(t.map(\.instruction))")
+        let u = PCNRouting.steps(from: [w, j, s], pcn: tee)
+        assert(u[1].instruction == "Turn right onto the park connector", "unnamed connector: \(u.map(\.instruction))")
 
         // Closures.
         let west = Coord(lat: 1.300, lon: 103.800), corner = Coord(lat: 1.300, lon: 103.802), north = Coord(lat: 1.302, lon: 103.802)

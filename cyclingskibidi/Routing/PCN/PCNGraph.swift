@@ -30,14 +30,22 @@ nonisolated struct PCNGraph: Sendable {
     let cell: Double                                   // grid size in degrees
     private(set) var coord: [GridKey: Coord] = [:]     // node -> representative vertex
     private(set) var adj: [GridKey: [(GridKey, Double)]] = [:]
+    /// Spoken connector name per node, first feature to reach it wins.
+    /// ponytail: per node, not per edge; at a junction the name comes from the node after it.
+    private(set) var name: [GridKey: String] = [:]
 
     init(polylines: [[Coord]], snapTolerance: Double = PCNGraph.defaultSnapTolerance) {
+        self.init(named: polylines.map { (nil, $0) }, snapTolerance: snapTolerance)
+    }
+
+    init(named lines: [(name: String?, line: [Coord])], snapTolerance: Double = PCNGraph.defaultSnapTolerance) {
         self.cell = snapTolerance / PCNGraph.metresPerDegree
-        for line in polylines {
+        for (label, line) in lines {
             var prev: GridKey?
             for v in line {
                 let k = Self.key(v, cell: cell)
                 if coord[k] == nil { coord[k] = v }
+                if let label, name[k] == nil { name[k] = label }
                 if let p = prev, p != k {
                     addEdge(p, k, weight: Geo.distance(coord[p]!.cl, v.cl))
                 }
@@ -50,6 +58,15 @@ nonisolated struct PCNGraph: Sendable {
     var isEmpty: Bool { coord.isEmpty }
 
     func coord(of k: GridKey) -> Coord? { coord[k] }
+
+    /// The node this exact vertex is, if it is one (path vertices are node coords).
+    func node(at c: Coord) -> GridKey? {
+        let k = Self.key(c, cell: cell)
+        return coord[k] == c ? k : nil
+    }
+
+    /// Distinct neighbours: 3+ means a real junction, a choice for the rider.
+    func degree(_ k: GridKey) -> Int { Set((adj[k] ?? []).map(\.0)).count }
 
     static func key(_ c: Coord, cell: Double) -> GridKey {
         GridKey(la: Int((c.lat / cell).rounded()), lo: Int((c.lon / cell).rounded()))
