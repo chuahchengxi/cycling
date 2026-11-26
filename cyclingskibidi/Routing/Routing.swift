@@ -21,6 +21,8 @@ struct RoutePlan: Sendable {
     var offConnectorSegments: [[Coord]] = []
     /// Total off-connector distance, for the "1.2 km off-connector" summary.
     var offConnectorMeters: Double = 0
+    /// Where a straight fallback leg crosses an expressway or another no-bike way (spec 6a).
+    var noBikeCrossings: [Coord] = []
 
     var ascent: Double { Geo.climb(elevations).up }
     var descent: Double { Geo.climb(elevations).down }
@@ -51,7 +53,8 @@ enum Routing {
                      mode: RideMode = .moderate,
                      closures: [NoGoCircle] = [],
                      context: Set<RideContext> = [],
-                     start: Date = .now) async throws -> RoutePlan {
+                     start: Date = .now,
+                     noBikeLines: [NoBikeLine] = NoBike.lines) async throws -> RoutePlan {
         guard waypoints.count >= 2 else { return RoutePlan() }
 
         var plan = RoutePlan()
@@ -94,9 +97,10 @@ enum Routing {
         // Empty graph: straight legs between the pins, all off-connector, so a route still appears.
         if poly.count < 2 {
             poly = waypoints
-            plan.offConnectorSegments = [poly]
+            plan.offConnectorSegments = zip(poly, poly.dropFirst()).map { [$0, $1] }   // straight legs, tested below
             plan.offConnectorMeters = Geo.cumulative(poly.coordinates).last ?? 0
         }
+        plan.noBikeCrossings = NoBike.crossings(inOffSegments: plan.offConnectorSegments, lines: noBikeLines)
 
         let cl = poly.coordinates
         plan.distance = Geo.cumulative(cl).last ?? 0
@@ -162,6 +166,7 @@ extension Route {
         descentMeters = plan.descent
         expectedSeconds = Routing.duration(distance: distanceMeters, ascent: ascentMeters, mode: mode)
         difficulty = .rated(distanceMeters: distanceMeters, ascentMeters: ascentMeters)
+        noBikeData = plan.noBikeCrossings.isEmpty ? nil : Blob.encode(plan.noBikeCrossings)
     }
 
     /// The mode's current-speed estimate for this route, recomputed from its
@@ -212,3 +217,24 @@ extension Routing {
                "the persisted expectedSeconds should stay untouched for compatibility")
     }
 }
+
+extension Routing {
+    /// Plan-level no-bike checks (spec 6a), async because planning is.
+    static func selfCheckNoBike() async {
+        // Pins out in the strait: no road within reach, so the leg is straight, across a toy expressway.
+        let toy = [NoBikeLine(kind: "expressway", name: "Toy", pts: [Coord(lat: 1.19, lon: 103.905), Coord(lat: 1.21, lon: 103.905)])]
+        let sea = try? await plan(through: [Coord(lat: 1.20, lon: 103.90), Coord(lat: 1.20, lon: 103.91)], mode: .fast, noBikeLines: toy)
+        assert(sea?.noBikeCrossings.count == 1, "a straight fallback leg across a no-bike line must be flagged: \(sea?.noBikeCrossings ?? [])")
+
+        // The road network crosses the PIE at Toa Payoh on a bridge or underpass: never flagged.
+        let real = try? await plan(through: [Coord(lat: 1.3283, lon: 103.8466), Coord(lat: 1.3318, lon: 103.8466)], mode: .fast)
+        assert(real?.noBikeCrossings.isEmpty == true && (real?.polyline.count ?? 0) > 2,
+               "a real network route across the PIE must not be flagged: \(real?.noBikeCrossings ?? [])")
+
+        // Saved routes: none saved = none shown; crossings round-trip.
+        assert(Route(name: "Old").noBikeCrossings.isEmpty, "a route saved before no-bike data must show no warning")
+        var p = RoutePlan(); p.noBikeCrossings = [Coord(lat: 1.3, lon: 103.8)]
+        assert(Route.make(name: "X", mode: .moderate, waypoints: [], plan: p).noBikeCrossings.count == 1)
+    }
+}
+

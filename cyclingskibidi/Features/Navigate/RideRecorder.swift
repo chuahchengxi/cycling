@@ -41,6 +41,9 @@ final class RideRecorder {
     /// Set when a manual reroute (e.g. around a marked closure) can't find a
     /// route; the current route is kept as-is. Cleared by `dismissRerouteFailure()`.
     private(set) var rerouteFailure: String?
+    /// Set when the only reroute found needs a no-bike way (spec 6a): the old line is kept
+    /// and the banner says so. Cleared when the rider rejoins or a good reroute applies.
+    private(set) var rerouteBlockedReason: String?
 
     // Sights along this route, and the one to surface right now as the rider
     // reaches it. The view binds a card to `passingSight` and clears it on close.
@@ -127,7 +130,7 @@ final class RideRecorder {
         passedSights.removeAll()
         passingSight = nil
         kitBefore = loadProfile(); kitDecided = []; kitSummary = nil
-        rerouteFailure = nil
+        rerouteFailure = nil; rerouteBlockedReason = nil
         nearHazard = nil
         warnedHazards.removeAll()
     }
@@ -199,7 +202,7 @@ final class RideRecorder {
         track = []; distance = 0; movingSeconds = 0; speed = 0; maxSpeed = 0
         stepIndex = 0; distanceAlong = 0; offRoute = false; joinedRoute = false; announced.removeAll()
         sights = []; passedSights.removeAll(); passingSight = nil
-        rerouteFailure = nil
+        rerouteFailure = nil; rerouteBlockedReason = nil
         nearHazard = nil; warnedHazards.removeAll()
         // A ride cannot inherit the previous ride's pace or distance.
         rollingSpeed = 0; lastRecorded = nil; offRouteStreak = 0
@@ -308,6 +311,7 @@ final class RideRecorder {
             joinedRoute = true
             offRouteStreak = 0
             if offRoute { offRoute = false }
+            rerouteBlockedReason = nil
         }
     }
 
@@ -427,6 +431,15 @@ final class RideRecorder {
     /// tracked the old line. Shared by every reroute path so they never drift
     /// on which fields get reset.
     private func applyReroute(_ plan: RoutePlan) {
+        // Never swap in a line that crosses an expressway or another no-bike way. The old
+        // line was safe, so the rider can turn back to it; offRoute stays set, so this
+        // doesn't loop into another reroute until they rejoin and leave again.
+        guard plan.noBikeCrossings.isEmpty else {
+            rerouteBlockedReason = "Turn back to your route: no bike path ahead"
+            announce(rerouteBlockedReason ?? "")
+            return
+        }
+        rerouteBlockedReason = nil
         polyline = plan.polyline.coordinates
         cumulative = Geo.cumulative(polyline)
         steps = plan.steps
@@ -523,6 +536,21 @@ final class RideRecorder {
         r.applyReroute(plan)
         r.reset()
         assert(r.hazards.count == 1, "a reroute or a new ride forgot the marked hazards")
+
+        // A reroute that needs a no-bike way is never applied: the old line stays, the
+        // banner says why, and the rider stays off route (no immediate second reroute).
+        r.applyReroute(plan)
+        let before = r.polyline
+        r.offRoute = true
+        var bad = RoutePlan()
+        bad.polyline = [Coord(lat: 1.4, lon: 103.9), Coord(lat: 1.41, lon: 103.9)]
+        bad.noBikeCrossings = [Coord(lat: 1.405, lon: 103.9)]
+        r.applyReroute(bad)
+        assert(r.polyline.map(\.latitude) == before.map(\.latitude), "a reroute across a no-bike way replaced the line")
+        assert(r.rerouteBlockedReason == "Turn back to your route: no bike path ahead", "blocked reroute must say why")
+        assert(r.offRoute, "a blocked reroute must not count as rejoining, or it would reroute again at once")
+        r.applyReroute(plan)
+        assert(r.rerouteBlockedReason == nil, "a good reroute clears the reason")
     }
     #endif
 }

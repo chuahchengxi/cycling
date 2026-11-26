@@ -38,7 +38,8 @@ struct SheetView: View {
                         summary
                         climb
                         elevationGraph
-                        if !closures.active.isEmpty || !closures.expired.isEmpty { closureList }
+                        if !route.noBikeCrossings.isEmpty || !walkStretches.isEmpty { noBikeList }
+                        if closures.active.contains(where: { $0.kind == .closure }) || !closures.expired.isEmpty { closureList }
                         if !obstacles.isEmpty { obstacleList }
                         if !route.sights.isEmpty {
                             KitCard(count: route.sights.count, byModel: kitByModel)
@@ -133,7 +134,7 @@ struct SheetView: View {
     private var closureList: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Closures on this route").font(.headline)
-            ForEach(closures.active) { c in
+            ForEach(closures.active.filter { $0.kind == .closure }) { c in
                 HStack(spacing: 12) {
                     Image(systemName: c.kind == .closure ? "nosign" : "figure.walk")
                         .foregroundStyle(c.kind == .closure ? .red : .orange)
@@ -159,6 +160,49 @@ struct SheetView: View {
                 Label("\(c.name): was closed until \(c.untilText ?? "recently")", systemImage: "clock.arrow.circlepath")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    /// Walk-your-bike stretches on this line, from the no-cycling closures it touches.
+    private var walkStretches: [(name: String, along: Double, length: Double)] {
+        let walk = closures.active.filter { $0.kind == .noCycling }
+        return NoBike.walkStretches(on: route.polyline, walk: walk.flatMap(\.noGoCircles),
+                                    names: walk.flatMap { c in c.noGoCircles.map { _ in c.name } })
+    }
+
+    /// No bike path and walk-your-bike rows (Figma v3 · 13): terracotta where a straight
+    /// leg crosses a no-bike way, gold where the rider must walk.
+    private var noBikeList: some View {
+        let crossings = route.noBikeCrossings.map { NoBike.describe($0, on: route.polyline) }
+        return VStack(alignment: .leading, spacing: 10) {
+            if let first = crossings.first {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("KIT · NO BIKE PATH HERE").font(.caption.weight(.bold)).tracking(1)
+                    Text("No bike path for \(Int(first.legLength.rounded())) m near \(first.line.map { $0.name.isEmpty ? "an expressway" : $0.name } ?? "an expressway"), and the road beside it is an expressway. Walk the footpath, or move your end point.")
+                        .font(.subheadline)
+                }
+                .foregroundStyle(KitColor.ink)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(KitColor.terracotta)
+                .overlay(Rectangle().stroke(KitColor.ink, lineWidth: 2))
+                .accessibilityElement(children: .combine)
+            }
+            ForEach(Array(crossings.enumerated()), id: \.offset) { _, c in
+                HStack(spacing: 12) {
+                    RoadLabel(kind: .noBikes)
+                    Text("No bike path · \(Fmt.km(c.along))").font(.subheadline.weight(.semibold))
+                }
+            }
+            ForEach(Array(walkStretches.enumerated()), id: \.offset) { _, w in
+                HStack(spacing: 12) {
+                    RoadLabel(kind: .walkYourBike)
+                    VStack(alignment: .leading) {
+                        Text("\(w.name) · \(Fmt.km(w.along))").font(.subheadline.weight(.semibold))
+                        Text("No cycling here: walk your bike \(Int(w.length.rounded())) m.").font(.caption).foregroundStyle(.secondary)
+                    }
+                }
             }
         }
     }

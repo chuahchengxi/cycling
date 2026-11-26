@@ -186,6 +186,8 @@ final class Route {
     /// Leisure sights within a corridor of the line, as [Sight]. Filled once on
     /// the route brief and reused by the ride; nil until then.
     var sightData: Data?
+    /// Where a straight leg crosses a no-bike way, as [Coord]; nil = none (and on older saves).
+    var noBikeData: Data?
 
     init(name: String = "Untitled route") {
         self.name = name
@@ -204,6 +206,7 @@ final class Route {
     var steps: [StoredStep] { Blob.decode([StoredStep].self, stepData) ?? [] }
     var elevations: [Double] { Blob.decode([Double].self, elevationData) ?? [] }
     var sights: [Sight] { Blob.decode([Sight].self, sightData) ?? [] }
+    var noBikeCrossings: [Coord] { Blob.decode([Coord].self, noBikeData) ?? [] }
 
     var distanceKM: Double { distanceMeters / 1000 }
 }
