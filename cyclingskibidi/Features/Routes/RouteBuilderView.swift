@@ -41,6 +41,7 @@ struct RouteBuilderView: View {
     @State private var sightsLoading = false
     @State private var selectedSight: Sight?
     @State private var editingInterests = false
+    @AppStorage(RiderProfile.storageKey) private var profileRaw = ""
 
     /// Search the bundled places, so a route can start from a name instead of a lucky tap.
     @State private var query = ""
@@ -65,7 +66,7 @@ struct RouteBuilderView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { naming = true }
-                        .disabled(plan.polyline.isEmpty || planning || (mode == .leisure && sightsLoading))
+                        .disabled(plan.polyline.isEmpty || planning || (mode != .fast && sightsLoading))
                 }
             }
             .searchable(text: $query, prompt: "Search for a place")
@@ -83,6 +84,7 @@ struct RouteBuilderView: View {
             .sheet(item: $selectedSight) { SightSheet(sight: $0) }
             .sheet(isPresented: $editingInterests) { InterestsSheet() }
             .onChange(of: mode) { _, _ in replan() }
+            .onChange(of: profileRaw) { _, _ in replan() }   // "For you" edits re-pick
         }
     }
 
@@ -186,7 +188,7 @@ struct RouteBuilderView: View {
                 }
             }
 
-            if mode == .leisure { placesSection }
+            if mode != .fast { placesSection }
 
             HStack {
                 Button(role: .destructive) {
@@ -250,7 +252,7 @@ struct RouteBuilderView: View {
                                 Button { selectedSight = sight } label: {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(sight.name).font(.footnote.weight(.semibold)).lineLimit(1)
-                                        Text("\(Discovery.icon(for: sight.category).label) · \(Fmt.km(sight.offsetAlong))")
+                                        Text(sight.note ?? "\(Discovery.icon(for: sight.category).label) · \(Fmt.km(sight.offsetAlong))")
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
                                     }
@@ -280,8 +282,9 @@ struct RouteBuilderView: View {
         let gen = generation
         guard waypoints.count >= 2 else { plan = RoutePlan(); planning = false; sights = nil; sightsLoading = false; return }
         planning = true
-        if mode != .leisure { sights = nil; sightsLoading = false }
+        if mode == .fast { sights = nil; sightsLoading = false }
         let currentMode = mode
+        let profile = RiderProfile.decode(profileRaw) ?? RiderProfile()
         let currentWaypoints = waypoints
         planTask = Task {
             do {
@@ -289,11 +292,11 @@ struct RouteBuilderView: View {
                 guard gen == generation else { return }
                 plan = fresh
                 planning = false
-                if currentMode == .leisure, !fresh.polyline.isEmpty {
+                if currentMode != .fast, !fresh.polyline.isEmpty {
                     sights = nil
                     sightsLoading = true
                     let line = fresh.polyline
-                    let found = await Task.detached { Discovery.sights(along: line, mode: currentMode) }.value
+                    let found = await Task.detached { Kit.picks(along: line, mode: currentMode, profile: profile).quick }.value
                     guard gen == generation else { return }
                     sights = found
                     sightsLoading = false

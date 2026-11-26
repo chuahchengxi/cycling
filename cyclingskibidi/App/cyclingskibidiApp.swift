@@ -40,6 +40,7 @@ struct cyclingskibidiApp: App {
         CreateRouteFlow.selfCheck()
         Obstacle.selfCheck()
         RiderProfile.selfCheck()
+        Kit.selfCheck()
         #endif
     }
 

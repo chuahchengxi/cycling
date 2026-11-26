@@ -18,6 +18,8 @@ struct RouteDetailView: View {
     @Environment(Trip.self) private var trip
     @Environment(\.modelContext) private var context
     @Query private var obstacles: [Obstacle]
+    @AppStorage(RiderProfile.storageKey) private var profileRaw = ""
+    private var profile: RiderProfile { RiderProfile.decode(profileRaw) ?? RiderProfile() }
 
     @State private var sheetShown = true
     @State private var startPending = false
@@ -58,12 +60,12 @@ struct RouteDetailView: View {
             checkClosures()
         }
         .task {
-            // Leisure sights are found afresh on every open: what's open and what's
+            // Kit's picks are found afresh on every open: what's open and what's
             // closed depends on when you ride, not on when the route was planned.
             // The ride uses what this saves.
-            guard route.mode == .leisure, route.polyline.count > 1 else { return }
-            let (line, mode) = (route.polyline, route.mode)
-            let found = await Task.detached { Discovery.sights(along: line, mode: mode) }.value
+            guard route.mode != .fast, route.polyline.count > 1 else { return }
+            let (line, mode, profile) = (route.polyline, route.mode, profile)
+            let found = await Task.detached { Kit.picks(along: line, mode: mode, profile: profile).quick }.value
             route.sightData = found.isEmpty ? nil : Blob.encode(found)
             try? context.save()
         }
@@ -132,8 +134,8 @@ struct RouteDetailView: View {
             if let plan = try? await Routing.plan(through: route.waypoints, mode: route.mode), plan.polyline.count > 1 {
                 route.apply(plan)   // new line, turns and climb chart together
                 // Sights follow the new line: found afresh for Leisure, offline.
-                let (line, mode) = (route.polyline, route.mode)
-                let sights = mode == .leisure ? await Task.detached { Discovery.sights(along: line, mode: mode) }.value : route.sights
+                let (line, mode, profile) = (route.polyline, route.mode, profile)
+                let sights = mode != .fast ? await Task.detached { Kit.picks(along: line, mode: mode, profile: profile).quick }.value : route.sights
                 route.sightData = sights.isEmpty ? nil : Blob.encode(sights)
                 try? context.save()
                 checkClosures()

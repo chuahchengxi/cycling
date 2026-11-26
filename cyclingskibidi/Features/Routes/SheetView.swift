@@ -193,7 +193,7 @@ struct SheetView: View {
                             .font(.title3).frame(width: 30).foregroundStyle(.green)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(sight.name).font(.subheadline.weight(.semibold))
-                            Text(Discovery.icon(for: sight.category).label)
+                            Text(sight.note ?? Discovery.icon(for: sight.category).label)
                                 .font(.caption).foregroundStyle(.secondary)
                         }
                         Spacer(minLength: 8)

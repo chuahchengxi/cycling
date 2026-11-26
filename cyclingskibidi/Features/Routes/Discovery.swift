@@ -131,11 +131,11 @@ nonisolated enum Discovery {
     /// Leisure places a rider on this line really passes: near it (see `sightsAlong`),
     /// open when they get there at the mode's planning speed from `start`, not inside an
     /// active closure, not inside a no-cycling zone unless it's a park-and-walk place,
-    /// and at most `limit` of them spread along the whole route.
+    /// and at most `limit` of them spread along the whole route (nil: every one, for Kit to rank).
     /// `closed`/`walk` nil = the bundled closures active at `start`.
     static func sights(along polyline: [Coord], mode: RideMode = .leisure, start: Date = .now,
                        in places: [Sight] = Discovery.places, facts: [String: PlaceFacts] = Discovery.facts,
-                       closed: [NoGoCircle]? = nil, walk: [NoGoCircle]? = nil, limit: Int = 20) -> [Sight] {
+                       closed: [NoGoCircle]? = nil, walk: [NoGoCircle]? = nil, limit: Int? = 20) -> [Sight] {
         // A thinned line is plenty for a 100-300 m corridor and keeps the snap cheap.
         let coords = Geo.sample(polyline.map(\.cl), count: 400)
         guard coords.count >= 2, let inBox = box(coords, pad: largeCorridor) else { return [] }
@@ -159,12 +159,13 @@ nonisolated enum Discovery {
             if inside(s.coordinate, walk), f?.note?.reasons?.contains("park_and_walk") != true { return false }
             return true
         }
-        return spread(onePerPlace(kept, polyline: coords, cumulative: cumulative, facts: facts),
-                      polyline: coords, cumulative: cumulative, facts: facts, limit: limit)
+        let one = onePerPlace(kept, polyline: coords, cumulative: cumulative, facts: facts)
+        guard let limit else { return one }
+        return spread(one, polyline: coords, cumulative: cumulative, limit: limit) { Double(notability($0, facts)) }
     }
 
     /// A research note 2, Wikipedia 1, else 0: how much a sight is worth a slot.
-    private static func notability(_ s: Sight, _ facts: [String: PlaceFacts]) -> Int {
+    static func notability(_ s: Sight, _ facts: [String: PlaceFacts]) -> Int {
         let f = s.osmID.flatMap { facts[$0] }
         return f?.note != nil ? 2 : f?.wiki == true ? 1 : 0
     }
@@ -190,16 +191,15 @@ nonisolated enum Discovery {
     }
 
     /// At most `limit` sights, spread along the line: the route is cut into `limit`
-    /// equal stretches and each gives its most notable sight (a research note 2,
-    /// Wikipedia 1, else 0; ties to the one nearer the line); slots left over go to
-    /// the most notable of the rest. Returned in route order.
+    /// equal stretches and each gives its best-scoring sight (ties to the one nearer
+    /// the line); slots left over go to the best of the rest. Returned in route order.
     static func spread(_ sights: [Sight], polyline: [CLLocationCoordinate2D], cumulative: [Double],
-                       facts: [String: PlaceFacts], limit: Int) -> [Sight] {
+                       limit: Int, score: (Sight) -> Double) -> [Sight] {
         guard limit > 0 else { return [] }
         guard sights.count > limit, let length = cumulative.last, length > 0 else { return sights }
-        func notability(_ s: Sight) -> Int { Discovery.notability(s, facts) }
+        let scores = sights.map(score)
         let lateral = sights.map { Geo.snap($0.coordinate, to: polyline, cumulative: cumulative)?.lateral ?? .infinity }
-        let ranked = sights.indices.sorted { (notability(sights[$0]), -lateral[$0]) > (notability(sights[$1]), -lateral[$1]) }
+        let ranked = sights.indices.sorted { (scores[$0], -lateral[$0]) > (scores[$1], -lateral[$1]) }
         var picked: [Int] = [], used = Set<Int>()
         for i in ranked {
             let bin = min(limit - 1, Int(sights[i].offsetAlong / (length / Double(limit))))

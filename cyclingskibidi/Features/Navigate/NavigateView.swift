@@ -305,7 +305,10 @@ struct PassBySightCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text(sight.name).font(.title3.bold())
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(sight.name).font(.title3.bold())
+                    if let note = sight.note { Text(note).font(.subheadline).foregroundStyle(.secondary) }
+                }
                 Spacer(minLength: 8)
                 Button(action: onClose) {
                     Image(systemName: "xmark.circle.fill")
