@@ -40,6 +40,7 @@ struct RouteBuilderView: View {
     @State private var sights: [Sight]?
     @State private var sightsLoading = false
     @State private var selectedSight: Sight?
+    @State private var editingInterests = false
 
     /// Search the bundled places, so a route can start from a name instead of a lucky tap.
     @State private var query = ""
@@ -80,6 +81,7 @@ struct RouteBuilderView: View {
                 Button("OK") { error = nil }
             } message: { Text(error ?? "") }
             .sheet(item: $selectedSight) { SightSheet(sight: $0) }
+            .sheet(isPresented: $editingInterests) { InterestsSheet() }
             .onChange(of: mode) { _, _ in replan() }
         }
     }
@@ -142,10 +144,16 @@ struct RouteBuilderView: View {
     private var controls: some View {
         VStack(spacing: 12) {
             if waypoints.count >= 2 {
-                Picker("Mode", selection: $mode) {
-                    ForEach(RideMode.allCases) { Text($0.rawValue).tag($0) }
+                HStack {
+                    Picker("Mode", selection: $mode) {
+                        ForEach(RideMode.allCases) { Text($0.rawValue).tag($0) }
+                    }
+                    .pickerStyle(.segmented)
+                    if mode != .fast {
+                        Button { editingInterests = true } label: { Label("For you", systemImage: "heart") }
+                            .buttonStyle(.bordered)
+                    }
                 }
-                .pickerStyle(.segmented)
             }
 
             if mode == .leisure, let region = mapRegion {

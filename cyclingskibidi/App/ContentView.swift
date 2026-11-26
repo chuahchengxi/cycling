@@ -34,6 +34,8 @@ struct ContentView: View {
     @State private var trip = Trip()
     @State private var path = NavigationPath()
     @Query private var obstacles: [Obstacle]
+    @AppStorage(RiderProfile.storageKey) private var profileRaw = ""
+    @State private var askInterests = false
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -43,6 +45,14 @@ struct ContentView: View {
         .fullScreenCover(item: $trip.route) { route in
             NavigateView(route: route)
                 .environment(trip)
+        }
+        // First launch: ask once. Continue always writes the profile, so it never shows again.
+        .sheet(isPresented: $askInterests) { InterestsSheet() }
+        .onAppear {
+            askInterests = profileRaw.isEmpty
+            #if DEBUG
+            if Demo.screen != nil { askInterests = false }   // demo screenshots skip onboarding
+            #endif
         }
         .task { _ = await PCNDataset.graph() }
         .task { _ = await RoadNetwork.graph() }

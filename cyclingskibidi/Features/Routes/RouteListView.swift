@@ -64,6 +64,7 @@ struct RouteListView: View {
     @State private var showingStats = false
     @State private var showingMarks = false
     @State private var showingCredits = false
+    @State private var showingInterests = false
 
     private var filtered: [Route] {
         routes.filter { r in
@@ -102,6 +103,7 @@ struct RouteListView: View {
         .sheet(isPresented: $showingStats) { StatsView() }
         .sheet(isPresented: $showingMarks) { MarksView() }
         .sheet(isPresented: $showingCredits) { CreditsView() }
+        .sheet(isPresented: $showingInterests) { InterestsSheet() }
     }
 
     // MARK: Pieces
@@ -142,6 +144,7 @@ struct RouteListView: View {
         }
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
+                Button { showingInterests = true } label: { Label("Your interests", systemImage: "heart") }
                 Button { showingMarks = true } label: { Label("Your marks", systemImage: "exclamationmark.triangle") }
                 Button { showingCredits = true } label: { Label("Credits", systemImage: "info.circle") }
             } label: { Label("More", systemImage: "ellipsis.circle") }
