@@ -52,6 +52,11 @@ final class RideRecorder {
     private var kitBefore = RiderProfile()
     private var kitDecided: Set<String> = []
     private(set) var kitSummary: String?
+    /// Where the profile lives: the same value the views bind with @AppStorage. Checks swap in memory.
+    var loadProfile: () -> RiderProfile = {
+        UserDefaults.standard.string(forKey: RiderProfile.storageKey).flatMap(RiderProfile.decode) ?? RiderProfile()
+    }
+    var saveProfile: (RiderProfile) -> Void = { UserDefaults.standard.set($0.encoded, forKey: RiderProfile.storageKey) }
 
     /// Every hazard the rider has marked (kept in step with the store by the
     /// view). Each one warns as the rider nears it, on every route.
@@ -121,7 +126,7 @@ final class RideRecorder {
         sights = route.sights
         passedSights.removeAll()
         passingSight = nil
-        kitBefore = Self.storedProfile(); kitDecided = []; kitSummary = nil
+        kitBefore = loadProfile(); kitDecided = []; kitSummary = nil
         rerouteFailure = nil
         nearHazard = nil
         warnedHazards.removeAll()
@@ -169,31 +174,23 @@ final class RideRecorder {
         ride.descentMeters = climb.down
         ride.trackData = Blob.encode(track)
         // Real stops at picks teach Kit too, unless the rider already said Stop/Skip to that kind.
-        var profile = Self.storedProfile()
+        var profile = loadProfile()
         for s in KitLearning.detectedStops(track: track, picks: sights) where kitDecided.insert(s.category).inserted {
             KitLearning.record(s.category, stopped: true, in: &profile)
         }
-        Self.store(profile)
+        saveProfile(profile)
         kitSummary = KitLearning.summary(before: kitBefore, after: profile)
         return ride
     }
 
-    /// "Stop here" / "Skip" on a pick: nudge that category and close the card.
+    /// "Stop here" / "Skip" on a pick: nudge that category, once per kind of place per
+    /// ride (the first answer counts), and close the card.
     func kitVerdict(_ sight: Sight, stopped: Bool) {
-        var profile = Self.storedProfile()
-        KitLearning.record(sight.category, stopped: stopped, in: &profile)
-        Self.store(profile)
-        kitDecided.insert(sight.category)
         passingSight = nil
-    }
-
-    /// The same value the views bind with @AppStorage(RiderProfile.storageKey).
-    private static func storedProfile() -> RiderProfile {
-        UserDefaults.standard.string(forKey: RiderProfile.storageKey).flatMap(RiderProfile.decode) ?? RiderProfile()
-    }
-
-    private static func store(_ profile: RiderProfile) {
-        UserDefaults.standard.set(profile.encoded, forKey: RiderProfile.storageKey)
+        guard kitDecided.insert(sight.category).inserted else { return }
+        var profile = loadProfile()
+        KitLearning.record(sight.category, stopped: stopped, in: &profile)
+        saveProfile(profile)
     }
 
     func reset() {
@@ -395,7 +392,7 @@ final class RideRecorder {
             defer { self?.rerouting = false }
             // Routing.plan always avoids every "Path closed" the rider has marked.
             guard let plan = try? await Routing.plan(through: [Coord(fix), destination], mode: self?.mode ?? .moderate,
-                                                      context: Self.storedProfile().today),
+                                                      context: self?.loadProfile().today ?? []),
                   !plan.polyline.isEmpty, let self else { return }
             self.applyReroute(plan)
         }
@@ -415,7 +412,7 @@ final class RideRecorder {
         Task { [weak self] in
             defer { self?.rerouting = false }
             guard let plan = try? await Routing.plan(through: [Coord(start), destination], mode: self?.mode ?? .moderate,
-                                                      closures: [nogo], context: Self.storedProfile().today),
+                                                      closures: [nogo], context: self?.loadProfile().today ?? []),
                   !plan.polyline.isEmpty, let self else {
                 self?.rerouteFailure = "Couldn't find a way around that closure."
                 return
@@ -443,8 +440,8 @@ final class RideRecorder {
         announced.removeAll()
         // Re-measure the sights along the new line; ones it no longer passes drop out.
         // 150 m: these were already chosen when planning (routes saved before the 100 m rule used 150 m).
+        // Places already passed stay passed (same IDs), so they don't pop up again.
         sights = Discovery.sightsAlong(sights, polyline: polyline, cumulative: cumulative, small: 150)
-        passedSights.removeAll()
         passingSight = nil
         onReroute?(plan)
         announce("Route updated. \(plan.steps.first?.instruction ?? "")")
@@ -493,6 +490,21 @@ final class RideRecorder {
         assert(r.plannedDuration == 42, "applyReroute() did not refresh plannedDuration from the new plan")
         assert(r.sights.map(\.name) == ["On the new line", "Near the old line"] && r.sights[0].offsetAlong > 500,
                "a reroute must keep the sights on the new line, re-measured: \(r.sights.map(\.name))")
+        // A place already passed doesn't pop up again on the new line.
+        r.passedSights = [r.sights[0].id]
+        r.applyReroute(plan)
+        r.checkSights(at: r.sights[0].offsetAlong)
+        assert(r.passingSight == nil, "a passed place must not pop up again after a reroute")
+
+        // Kit learns once per kind of place per ride, however many cafés are skipped.
+        var saved = RiderProfile()
+        r.loadProfile = { saved }
+        r.saveProfile = { saved = $0 }
+        let cafe1 = Sight(name: "Café one", category: "cafe", lat: 1.3, lon: 103.8), cafe2 = Sight(name: "Café two", category: "cafe", lat: 1.3, lon: 103.8)
+        r.kitVerdict(cafe1, stopped: false)
+        r.kitVerdict(cafe2, stopped: false)
+        r.kitVerdict(cafe1, stopped: false)
+        assert(saved.weights["cafe"] == -0.25, "one step per kind per ride: \(saved.weights)")
 
         // A marked hazard warns on approach, clears once passed, and warns again next time.
         let pothole = Obstacle(kind: .pothole, at: .init(latitude: 1.3, longitude: 103.8))

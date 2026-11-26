@@ -153,8 +153,10 @@ struct RouteDetailView: View {
         route.sightData = found.quick.isEmpty ? nil : Blob.encode(found.quick)
         try? context.save()
         Task {
+            // Not once the ride has started: it already copied the quick picks, and the
+            // saved route should show what's being ridden.
             guard let better = await KitModel.refine(line: line, quick: found.quick, candidates: found.candidates, profile: profile),
-                  route.polyline == line else { return }
+                  route.polyline == line, trip.route == nil else { return }
             route.sightData = Blob.encode(better)
             kitByModel = true
             try? context.save()

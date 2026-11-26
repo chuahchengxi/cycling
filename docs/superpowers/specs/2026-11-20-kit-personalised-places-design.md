@@ -45,7 +45,7 @@ Places along a route today are **not personalised and not accurate**: some aren'
 ## Constraints
 
 - **iOS 18 and later** (decided with the user, 26 Nov 2026; replaces the earlier 27.2 target). Anything newer sits behind `#available` with a fallback that works on iOS 18:
-  - Kit's model picks (Foundation Models) run only on iOS 26+ with Apple Intelligence on. Every device first gets the approach A picks; the model's picks replace them when ready. On iOS 18–25 approach A is the whole feature, so it must be good on its own.
+  - Kit's model picks (Foundation Models) run only on iOS 26+ with Apple Intelligence on. Every device first gets the approach A picks; the model's picks replace them only when they are better (see the model stage). On iOS 18–25 approach A is the whole feature, so it must be good on its own.
   - Liquid Glass falls back to the standard material on iOS 18–25.
   - Fall detection, alarms, fonts and Kit's UI use only iOS 18 APIs.
 - Project defaults to MainActor isolation; avoid blocking async bridges (see memory: use fire-and-forget `Task {}`).
@@ -61,7 +61,7 @@ Places along a route today are **not personalised and not accurate**: some aren'
 | **B. Foundation Models picks from a pre-filtered candidate list and writes notes** | Handles subtle preferences; slower, non-deterministic, needs fallback | **Chosen by the user** ("slower is fine at leisure pace") |
 | C. Pre-rank per interest in the build script | Least app code; can't fit the rider's own line or fitness | Rejected |
 
-Guardrails that make B safe: (1) hard filters run in code before the model sees anything; (2) the model returns only candidate IDs via `@Generable` structured output — it cannot introduce places; (3) notes are generated from the candidate's own facts; (4) devices without Apple Intelligence (or on model error/timeout) use approach A.
+Guardrails that make B safe: (1) hard filters run in code before the model sees anything; (2) the model returns only candidate IDs via `@Generable` structured output — it cannot introduce places; (3) notes always come from our template, never from the model (amended 26 Nov 2026: on-device trials showed the model pasting facts, writing "none" and borrowing other places' facts); (4) devices without Apple Intelligence (or on model error/timeout) use approach A.
 
 ## Decisions made with the user
 
@@ -105,7 +105,7 @@ Guardrails that make B safe: (1) hard filters run in code before the model sees 
 
 - **Onboarding sheet** (Figma `v3 · 01`, to be updated for the two-axis split): "What I like" chips, "How I'm riding today" chips, and rider level (Beginner / Regular / Strong). Editable later in settings and per-route in the builder.
 - **Candidate stage (code):** places within the corridor, after hard filters, scored roughly by persona match + notability (`wikipedia`) + overlay reason codes + spacing; top ~40 sent to the model as compact lines (`id | name | category | km along | facts`).
-- **Model stage (Foundation Models, on device):** `LanguageModelSession` with instructions describing Kit and the rider profile; `@Generable` result `{ picks: [{ id, note }] }` with a target count (~5 per 20 km, rider-adjustable later). Notes must use only the supplied facts. Validate every returned ID against the candidates; drop unknown IDs.
+- **Model stage (Foundation Models, on device):** `LanguageModelSession` with instructions describing Kit and the rider profile, the approach A picks given as a draft; `@Generable` result `{ ids: [String] }` with a target count (~5 per 20 km, rider-adjustable later). Validate every returned ID against the candidates; drop unknown IDs; notes come from the template. The model's picks replace the approach A picks only when their summed score is strictly higher, they are no more bunched, and every strong approach A pick (score ≥ 4) is still in (amended 26 Nov 2026, from a measured trial: the model was worse than approach A in ~20 of 36 answers).
 - **Fallback (approach A):** if the model is unavailable, errors, or exceeds a timeout, take the top-scored candidates and fill notes from a template ("Toilets and water · km 11").
 - **Ride context axis** changes the route, not the places: With kids → avoid climbs, gravel, roads; Visiting Singapore → favour iconic views and pass rental points; Keep it quiet → avoid stretches with `crowded_*` reason codes at the planned time.
 - **Learning:** Stop / Skip on Kit's pass-by card and detected stops (stationary ≥ 3 min within 50 m of a pick) adjust per-category weights stored on device; the finished screen shows what Kit learned.
