@@ -76,9 +76,13 @@ def parse_hours(s):
     s = s.strip()
     if s == "24/7": return None
     week = {}
-    for rule in (r.strip() for r in s.split(";")):
-        if not rule or rule[:2] in ("PH", "SH"): continue
+    for rule in (re.sub(r",\s+", ",", r.strip()) for r in s.split(";")):
         head, _, rest = rule.partition(" ")
+        if head and all(x in ("PH", "SH") or DAY_LIST.match(x) for x in head.split(",")):   # drop holiday tokens
+            kept = [x for x in head.split(",") if x not in ("PH", "SH")]
+            if not kept: continue                       # a holiday-only rule
+            head = ",".join(kept)
+        if not rule: continue
         if DAY_LIST.match(head):
             days = set()
             for part in head.split(","):
@@ -105,6 +109,7 @@ def parse_hours(s):
             else:                                   # past midnight: the rest spills into the next day
                 out.append([d, a, 1440])
                 if b > 0: out.append([(d + 1) % 7, 0, b])
+    if not out and week and not any(week.values()): return []   # "off" everywhere: closed, not unknown
     return sorted(out) or None
 
 def grid_thin(points, cell):
@@ -130,6 +135,24 @@ def chains(ways):
     groups = defaultdict(list)
     for i in range(len(ways)): groups[root(i)].append(i)
     return sorted(groups.values())
+
+BIG_ROADS = ("motorway", "motorway_link", "trunk", "trunk_link")
+
+def road_grid(roads, lines):
+    """Vertices of expressway/trunk bridges and taxiways, in a ~110 m grid: what a road bridge carries."""
+    g = defaultdict(list)
+    pts = [p for t, ps, _ in roads if t.get("highway") in BIG_ROADS and t.get("bridge") not in (None, "no") for p in ps]
+    pts += [p for kind, ps in lines if kind == "taxiway" for p in ps]
+    for lo, la in pts: g[(math.floor(la / AREA_CELL), math.floor(lo / AREA_CELL))].append((lo, la))
+    return g
+
+def carries_big_road(outline, grid):
+    """True when an expressway, trunk or taxiway vertex lies inside this (lon, lat) outline."""
+    if len(outline) < 3: return False
+    los, las = [p[0] for p in outline], [p[1] for p in outline]
+    cells = [(a, b) for a in range(math.floor(min(las) / AREA_CELL), math.floor(max(las) / AREA_CELL) + 1)
+                    for b in range(math.floor(min(los) / AREA_CELL), math.floor(max(los) / AREA_CELL) + 1)]
+    return any(inside(lo, la, [(outline, [])]) for c in cells for lo, la in grid.get(c, ()))
 
 def inside(lon, lat, polys):
     """Point in any (outer ring, holes) polygon of (lon, lat) rings (ray casting)."""
@@ -161,7 +184,13 @@ def resolve(src, records):
             if not ids or (len(ids) > 1 and not e.get("all")):
                 warn.append(("UNRESOLVED %s" if not ids else "AMBIGUOUS %%s (%d places)" % len(ids)) % m["name"])
                 continue
-            for i in ids: out[i] = {k: v for k, v in e.items() if k not in ("match", "all")}
+            note = {k: v for k, v in e.items() if k not in ("match", "all", "opening_hours")}
+            if "opening_hours" in e:   # our sourced hours replace OSM's; "unknown" = OSM's are wrong, none known
+                note["osm_hours_wrong"] = True
+                if e["opening_hours"] != "unknown":
+                    note["hours"] = parse_hours(e["opening_hours"])
+                    assert note["hours"] is not None, "overlay hours not understood: %s" % e["opening_hours"]
+            for i in ids: out[i] = note
         elif e.get("coord_source") and "lat" in e and "lon" in e:
             out["x-" + re.sub(r"[^a-z0-9]+", "-", fold(e["name"])).strip("-")] = dict(e)
         else:
@@ -181,6 +210,9 @@ if "--check" in sys.argv:
     assert parse_hours("Mo-Su 06:00-14:00; We off") == [[d, 360, 840] for d in (0, 1, 3, 4, 5, 6)]
     assert parse_hours("sunrise-sunset") is None              # unknown -> treated as open
     assert parse_hours("Mo-Fr 08:00-17:00; PH off") == [[d, 480, 1020] for d in range(5)]   # PH rules ignored
+    assert parse_hours("Mo-Su 08:00-18:00; PH,Su off") == [[d, 480, 1080] for d in range(6)]   # PH dropped, Su still off
+    assert parse_hours("off") == [] and parse_hours("Mo-Su off") == []                       # closed, not "unknown"
+    assert parse_hours("Mo, We-Sa 10:00-18:00") == [[d, 600, 1080] for d in (0, 2, 3, 4, 5)]  # space after a comma
     assert category({"amenity": "restaurant", "name": "Old Airport Road Food Centre"}) == "hawker"
     assert category({"amenity": "restaurant", "name": "Swensen's"}) is None
     assert category({"amenity": "shelter", "shelter_type": "public_transport"}) is None
@@ -202,6 +234,12 @@ if "--check" in sys.argv:
     out2, _ = resolve([{"match": {"name": "Ang Mo Kio Park", "category": "park"}, "all": True, "note": "y"}], recs)
     assert out2.get("w2", {}).get("note") == "y" and out2.get("w3", {}).get("note") == "y" and "all" not in out2["w2"]   # one place in parts
     assert "x-sourced-spot" in out and not any(k.startswith("x-keppel") for k in out)   # no coord_source, no entry
+    # A note's own sourced hours replace OSM's; "unknown" drops OSM's (then treated as open).
+    hrs, _ = resolve([{"match": {"name": "Mosque", "category": "worship"}, "opening_hours": "Sa-Th 10:00-12:00"},
+                      {"match": {"name": "Garden", "category": "park"}, "opening_hours": "unknown"}],
+                     [{"id": "w1", "name": "Mosque", "category": "worship"}, {"id": "w2", "name": "Garden", "category": "park"}])
+    assert hrs["w1"]["osm_hours_wrong"] and hrs["w1"]["hours"] == [[d, 600, 720] for d in (0, 1, 2, 3, 5, 6)]
+    assert hrs["w2"]["osm_hours_wrong"] and "hours" not in hrs["w2"] and "opening_hours" not in hrs["w2"]
     # Review fixes. Hawker names need whole words; "market" only for real marketplaces.
     assert category({"amenity": "restaurant", "name": "Manhattan Fish Market"}) is None
     assert category({"amenity": "restaurant", "name": "Happy Seafood Village"}) is None
@@ -224,6 +262,11 @@ if "--check" in sys.argv:
     assert max(min(metres(la, lo, b, a) for a, b in kept) for lo, la in line) <= 130
     # Rivers: only ways that touch are one river.
     assert sorted(len(c) for c in chains([[(0, 0), (1, 0)], [(1, 0), (2, 0)], [(50, 50), (51, 50)]])) == [1, 2]
+    # A bridge whose outline carries an expressway or taxiway is a road bridge, not a sight.
+    sq = [(103.80, 1.30), (103.81, 1.30), (103.81, 1.31), (103.80, 1.31)]
+    big_roads = road_grid([({"highway": "motorway", "bridge": "yes"}, [(103.805, 1.305), (103.9, 1.4)], [])], [])
+    assert carries_big_road(sq, big_roads) and not carries_big_road([(x + 1, y) for x, y in sq], big_roads)
+    assert not carries_big_road(sq, road_grid([({"highway": "primary", "bridge": "yes"}, [(103.805, 1.305)], [])], []))
     # Singapore only.
     sg = [([(103.6, 1.2), (104.1, 1.2), (104.1, 1.47), (103.6, 1.47)], [])]
     assert inside(103.8, 1.3, sg) and not inside(103.76, 1.49, sg)
@@ -247,6 +290,7 @@ def near_pcn(lat, lon):
 L = pickle.load(open(sys.argv[1], "rb"))
 SG = L.get("sg") or sys.exit("no Singapore boundary in the pickle: re-run scripts/map/extract.py")
 records, seen, rivers = [], set(), defaultdict(list)
+BIG = road_grid(L["roads"], L["lines"])
 for oid, t, lon, lat, shape, area in L["pois"]:
     if not inside(lon, lat, SG): continue      # the extract also covers Johor
     cat = category(t)
@@ -257,6 +301,7 @@ for oid, t, lon, lat, shape, area in L["pois"]:
         if not near_pcn(lat, lon): continue
     elif not name:
         continue
+    if cat == "bridge" and carries_big_road(shape or [], BIG): continue   # expressway or taxiway bridge
     if cat == "waterway":   # one river is many OSM ways: joined below, but only where they touch
         rivers[name].append((oid, lon, lat, shape))
         continue
@@ -266,7 +311,7 @@ for oid, t, lon, lat, shape, area in L["pois"]:
     rec = {"id": oid, "name": name, "category": cat, "lat": round(lat, 6), "lon": round(lon, 6),
            "address": " ".join(x for x in (t.get("addr:housenumber"), t.get("addr:street")) if x)}
     hours = parse_hours(t["opening_hours"]) if "opening_hours" in t else None
-    if hours: rec["hours"] = hours
+    if hours is not None: rec["hours"] = hours                 # [] = always closed
     if "wikipedia" in t or "wikidata" in t: rec["wiki"] = True
     if area: rec["area"] = round(area)
     if area >= LARGE_M2 and shape: rec["shape"] = [[round(a, 6), round(o, 6)] for o, a in grid_thin(shape, AREA_CELL)]

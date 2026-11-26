@@ -409,7 +409,8 @@ final class RideRecorder {
         joinedRoute = false
         announced.removeAll()
         // Re-measure the sights along the new line; ones it no longer passes drop out.
-        sights = Discovery.sightsAlong(sights, polyline: polyline, cumulative: cumulative)
+        // 150 m: these were already chosen when planning (routes saved before the 100 m rule used 150 m).
+        sights = Discovery.sightsAlong(sights, polyline: polyline, cumulative: cumulative, small: 150)
         passedSights.removeAll()
         passingSight = nil
         onReroute?(plan)
@@ -452,10 +453,12 @@ final class RideRecorder {
         var plan = RoutePlan()
         plan.polyline = [Coord(lat: 1.3, lon: 103.8), Coord(lat: 1.31, lon: 103.8)]
         plan.expected = 42
-        r.sights = [Sight(name: "On the new line", lat: 1.305, lon: 103.8), Sight(name: "Far away", lat: 1.305, lon: 103.9)]
+        // "Near the old line" sits ~120 m off: the planning corridor was 150 m before, so a reroute keeps it.
+        r.sights = [Sight(name: "On the new line", lat: 1.305, lon: 103.8), Sight(name: "Near the old line", lat: 1.306, lon: 103.8011),
+                    Sight(name: "Far away", lat: 1.305, lon: 103.9)]
         r.applyReroute(plan)
         assert(r.plannedDuration == 42, "applyReroute() did not refresh plannedDuration from the new plan")
-        assert(r.sights.map(\.name) == ["On the new line"] && r.sights[0].offsetAlong > 500,
+        assert(r.sights.map(\.name) == ["On the new line", "Near the old line"] && r.sights[0].offsetAlong > 500,
                "a reroute must keep the sights on the new line, re-measured: \(r.sights.map(\.name))")
 
         // A marked hazard warns on approach, clears once passed, and warns again next time.

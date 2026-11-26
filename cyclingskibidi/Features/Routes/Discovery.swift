@@ -20,6 +20,8 @@ nonisolated struct PlaceNote: Decodable, Sendable {
     var stalls: [Stall]? = nil
     var best_time: String? = nil
     var note: String? = nil
+    var hours: [[Int]]? = nil            // our sourced hours, used when osm_hours_wrong
+    var osm_hours_wrong: Bool? = nil     // true: ignore OSM's hours (ours, or unknown = open)
     var sources: [String]? = nil   // every URL is in reports/*.md; each fact is in one of them
     struct Stall: Decodable, Sendable { var name: String; var bib: Int?; var since: Int? }
 }
@@ -81,9 +83,10 @@ nonisolated enum Discovery {
             s.osmID = p.id
             places.append(s)
             guard let id = p.id else { continue }
-            facts[id] = PlaceFacts(hours: p.hours, area: p.area ?? 0,
+            let note = notes[id]
+            facts[id] = PlaceFacts(hours: note?.osm_hours_wrong == true ? note?.hours : p.hours, area: p.area ?? 0,
                                    shape: (p.shape ?? []).compactMap { $0.count == 2 ? Coord(lat: $0[0], lon: $0[1]) : nil },
-                                   wiki: p.wiki ?? false, note: notes[id])
+                                   wiki: p.wiki ?? false, note: note)
         }
         // Hand-added overlay places (keys "x-…") carry their own sourced coordinate.
         for (id, h) in load("places_overlay", as: [String: Hand].self) ?? [:] where id.hasPrefix("x-") {
@@ -106,14 +109,14 @@ nonisolated enum Discovery {
     /// along the route that point sits, drop duplicates (same name at the same
     /// spot), and order by that distance.
     static func sightsAlong(_ candidates: [Sight], polyline: [CLLocationCoordinate2D], cumulative: [Double],
-                            facts: [String: PlaceFacts] = Discovery.facts) -> [Sight] {
+                            facts: [String: PlaceFacts] = Discovery.facts, small: Double = smallCorridor) -> [Sight] {
         guard polyline.count >= 2 else { return [] }
         var kept: [Sight] = []
         var seen: Set<String> = []
         for var c in candidates {
             guard !c.name.isEmpty else { continue }
             let f = c.osmID.flatMap { facts[$0] }
-            let corridor = f?.isLarge == true ? largeCorridor : smallCorridor
+            let corridor = f?.isLarge == true ? max(largeCorridor, small) : small
             let points = [c.coordinate] + (f?.shape ?? []).map(\.cl)
             guard let s = points.compactMap({ Geo.snap($0, to: polyline, cumulative: cumulative) }).min(by: { $0.lateral < $1.lateral }),
                   s.lateral <= corridor else { continue }
@@ -192,7 +195,8 @@ nonisolated enum Discovery {
     /// the most notable of the rest. Returned in route order.
     static func spread(_ sights: [Sight], polyline: [CLLocationCoordinate2D], cumulative: [Double],
                        facts: [String: PlaceFacts], limit: Int) -> [Sight] {
-        guard sights.count > limit, limit > 0, let length = cumulative.last, length > 0 else { return sights }
+        guard limit > 0 else { return [] }
+        guard sights.count > limit, let length = cumulative.last, length > 0 else { return sights }
         func notability(_ s: Sight) -> Int { Discovery.notability(s, facts) }
         let lateral = sights.map { Geo.snap($0.coordinate, to: polyline, cumulative: cumulative)?.lateral ?? .infinity }
         let ranked = sights.indices.sorted { (notability(sights[$0]), -lateral[$0]) > (notability(sights[$1]), -lateral[$1]) }
@@ -213,15 +217,19 @@ nonisolated enum Discovery {
             w.count > 3 && w.hasSuffix("s") ? String(w.dropLast()) : String(w)   // "temples" finds "temple"
         }
         let fold = { (s: String) in s.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: nil) }
+        let folded = words.map(fold)
         return places
-            .filter { p in
-                guard !leisureOnly || leisureCategories.contains(p.category) else { return false }
+            .compactMap { p -> (Sight, Bool, Double)? in
+                guard !leisureOnly || leisureCategories.contains(p.category) else { return nil }
                 let hay = fold(p.name + " " + icon(for: p.category).label + " " + keywords(p.category))
-                return words.allSatisfy { hay.contains(fold($0)) }
+                guard folded.allSatisfy(hay.contains) else { return nil }
+                // Whole words rank first, so "park" isn't buried under "Bike parking".
+                let hayWords = Set(hay.split { !$0.isLetter && !$0.isNumber }.map { w in
+                    w.count > 3 && w.hasSuffix("s") ? String(w.dropLast()) : String(w) })
+                return (p, folded.allSatisfy(hayWords.contains), Geo.distance(center, p.coordinate))
             }
-            .map { ($0, Geo.distance(center, $0.coordinate)) }
-            .filter { $0.1 <= metres }
-            .sorted { $0.1 < $1.1 }
+            .filter { $0.2 <= metres }
+            .sorted { ($0.1 ? 0 : 1, $0.2) < ($1.1 ? 0 : 1, $1.2) }
             .prefix(limit).map(\.0)
     }
 
@@ -314,6 +322,11 @@ nonisolated enum Discovery {
         assert(hits.map(\.name) == ["Thian Hock Keng"], "keyword search wrong: \(hits.map(\.name))")
         assert(search("cafe kopi", near: line[0], in: [temple, cafe]).first?.name == "Café Kopi", "diacritics must fold")
         assert(search("mrt", near: line[0], leisureOnly: true, in: [station]).isEmpty, "stations aren't sights")
+        // Whole-word hits first: "park" puts a park 2 km away before bike parking next door; "parki" still finds it.
+        let rack = Sight(name: "Bike parking", category: "bikeParking", lat: 1.30, lon: 103.8001)
+        let farPark = Sight(name: "Telok Kurau Park", category: "park", lat: 1.31, lon: 103.81)
+        assert(search("park", near: line[0], in: [rack, farPark]).map(\.name) == ["Telok Kurau Park", "Bike parking"], "whole words first")
+        assert(search("parki", near: line[0], in: [rack, farPark]).map(\.name) == ["Bike parking"], "prefix typing still works")
         assert(icon(for: "MKPOICategoryPark").label == "Park", "old MapKit categories must still map")
         // Real data: the bundle knows Gardens by the Bay.
         assert(!search("gardens by the bay", near: line[0]).isEmpty, "Gardens by the Bay missing from places.json")
@@ -338,6 +351,13 @@ nonisolated enum Discovery {
         assert(facts.values.contains { $0.note?.dishes?.isEmpty == false }, "overlay missing or not joined")
         assert(facts.values.allSatisfy { $0.note == nil || $0.note?.sources?.isEmpty == false }, "every note must carry its sources")
         assert(!search("toilets", near: line[0]).isEmpty, "amenities must be searchable")
+        // A note's sourced hours beat OSM's: Masjid Sultan is closed Fridays; Gardens by the Bay's OSM
+        // 09:00-21:00 (the conservatories) must not hide the gardens at 06:00. 2026-11-27 is a Friday.
+        let fri15 = Closures.sg.date(from: DateComponents(year: 2026, month: 11, day: 27, hour: 15))!
+        let fri06 = Closures.sg.date(from: DateComponents(year: 2026, month: 11, day: 27, hour: 6))!
+        func real(_ name: String) -> [PlaceFacts] { places.filter { $0.name == name }.compactMap { $0.osmID.flatMap { facts[$0] } } }
+        assert(!real("Masjid Sultan").isEmpty && real("Masjid Sultan").allSatisfy { !$0.isOpen(at: fri15) }, "Masjid Sultan closed Fridays")
+        assert(!real("Gardens by the Bay").isEmpty && real("Gardens by the Bay").allSatisfy { $0.isOpen(at: fri06) }, "Gardens by the Bay hidden at 06:00")
 
         // Places a rider really passes. 10 km west→east line at lat 1.30.
         let long = [Coord(lat: 1.30, lon: 103.80), Coord(lat: 1.30, lon: 103.8899)]
@@ -369,6 +389,7 @@ nonisolated enum Discovery {
                             closed: [], walk: [], limit: 5)
         assert(spread.count == 5 && spread.last?.name == "end", "spread: \(spread.map(\.name))")
         assert(spread.map(\.offsetAlong) == spread.map(\.offsetAlong).sorted(), "spread must stay in route order")
+        assert(sights(along: long, in: bunch, facts: [:], closed: [], walk: [], limit: 0).isEmpty, "limit 0 means none")
         // An unnamed playground ("Playground", the label it was given at build) is not a sight; a named one is.
         let unnamed = sights(along: long, in: [p("Playground", 103.81, cat: "playground"), p("Kidztopia", 103.82, cat: "playground")],
                              facts: [:], closed: [], walk: [])
