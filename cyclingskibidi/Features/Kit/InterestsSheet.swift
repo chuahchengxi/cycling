@@ -70,7 +70,7 @@ struct InterestsSheet: View {
         VStack(alignment: .leading, spacing: 8) {
             Text(title).font(.headline)
             Text(subtitle).font(.footnote).foregroundStyle(.secondary)
-            FlowLayout(spacing: 8) { chips() }
+            FlowLayout(spacing: 4) { chips() }
         }
     }
 
@@ -78,10 +78,12 @@ struct InterestsSheet: View {
         Button(action: toggle) {
             Label(title, systemImage: symbol)
                 .font(.subheadline.weight(.medium))
-                .padding(.horizontal, 14)
-                .frame(minHeight: 52)
+                .padding(.horizontal, 12)
+                .frame(minHeight: 34)   // Figma's chip height
                 .foregroundStyle(on ? .white : .primary)
                 .background(on ? Color.accentColor : Color(.secondarySystemFill), in: .capsule)
+                .padding(.vertical, 5)  // 44 pt tap target without a taller pill
+                .contentShape(.rect)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(on ? .isSelected : [])

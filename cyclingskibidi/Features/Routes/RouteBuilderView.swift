@@ -255,7 +255,7 @@ struct RouteBuilderView: View {
                                 Button { selectedSight = sight } label: {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(sight.name).font(.footnote.weight(.semibold)).lineLimit(1)
-                                        Text(sight.note ?? "\(Discovery.icon(for: sight.category).label) · \(Fmt.km(sight.offsetAlong))")
+                                        Text("\(sight.note ?? Discovery.icon(for: sight.category).label) · \(Fmt.km(sight.offsetAlong))")
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
                                     }

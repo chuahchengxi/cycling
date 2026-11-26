@@ -71,7 +71,8 @@ nonisolated enum Kit {
             what = Discovery.icon(for: s.category).label
         }
         let late = hawker && lengthMeters > 0 && s.offsetAlong >= lengthMeters * 0.8
-        return what + (late ? " · good after the ride" : " · km " + String(format: "%.1f", s.offsetAlong / 1000))
+        // No "km n" here: every row that shows a note shows the distance beside it.
+        return what + (late ? " · good after the ride" : "")
     }
 
     /// Everything Kit needs for a line: the quick picks to show now, and the ranked
@@ -187,13 +188,13 @@ extension Kit {
         // Template notes.
         func at(_ km: Double, _ cat: String) -> Sight { var s = p("t", 103.80, cat: cat); s.offsetAlong = km * 1000; return s }
         var bib = PlaceNote(); bib.stalls = [.init(name: "Cheok Kee Duck Rice", bib: 2026, since: nil)]; bib.dishes = ["duck rice"]
-        assert(templateNote(at(1.2, "hawker"), facts: facts(note: bib), lengthMeters: length) == "Cheok Kee Duck Rice, Bib Gourmand 2026 · km 1.2", "bib note")
+        assert(templateNote(at(1.2, "hawker"), facts: facts(note: bib), lengthMeters: length) == "Cheok Kee Duck Rice, Bib Gourmand 2026", "bib note")
         var dishes = PlaceNote(); dishes.dishes = ["satay", "BBQ chicken wings", "carrot cake"]
-        assert(templateNote(at(1.2, "hawker"), facts: facts(note: dishes), lengthMeters: length) == "Try satay or BBQ chicken wings · km 1.2", "dishes note")
-        assert(templateNote(at(1.2, "hawker"), facts: nil, lengthMeters: length) == "Hawker centre, local dishes · km 1.2", "bare hawker note")
+        assert(templateNote(at(1.2, "hawker"), facts: facts(note: dishes), lengthMeters: length) == "Try satay or BBQ chicken wings", "dishes note")
+        assert(templateNote(at(1.2, "hawker"), facts: nil, lengthMeters: length) == "Hawker centre, local dishes", "bare hawker note")
         var otter = PlaceNote(); otter.note = "Resident otter family. Best at dawn."
-        assert(templateNote(at(3.4, "park"), facts: facts(note: otter), lengthMeters: length) == "Resident otter family · km 3.4", "note sentence")
-        assert(templateNote(at(5, "museum"), facts: nil, lengthMeters: length) == "Museum · km 5.0", "category label")
+        assert(templateNote(at(3.4, "park"), facts: facts(note: otter), lengthMeters: length) == "Resident otter family", "note sentence")
+        assert(templateNote(at(5, "museum"), facts: nil, lengthMeters: length) == "Museum", "category label")
         assert(templateNote(at(8.5, "hawker"), facts: facts(note: dishes), lengthMeters: length) == "Try satay or BBQ chicken wings · good after the ride", "late hawker")
 
         // Counts.
