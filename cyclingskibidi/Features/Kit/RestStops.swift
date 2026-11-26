@@ -55,6 +55,7 @@ nonisolated enum RestStops {
     /// Amenities in route order; one joins the current stop when within `radius`
     /// of its first member, so a hawker centre's taps, toilets and parking are
     /// one place to rest rather than four.
+    // ponytail: anchors on the group's first member in route order, so two amenities at one spot with interleaved offsets can split into two stops.
     static func cluster(_ amenities: [Sight], radius: Double = 60) -> [RestStop] {
         var groups: [[Sight]] = []
         for a in amenities.sorted(by: { $0.offsetAlong < $1.offsetAlong }) {
@@ -123,9 +124,12 @@ nonisolated enum RestStops {
             chosen.append(p)
             last = p.offsetAlong
         }
+        // Warn only when the stop after this one is dry: a water-to-water gap is
+        // already covered by the next stop, and the last chosen stop never warns.
         for i in chosen.indices where chosen[i].amenities.contains("drinkingWater") {
-            let next = chosen[(i + 1)...].first { $0.amenities.contains("drinkingWater") }
-            let gap = (next?.offsetAlong ?? length) - chosen[i].offsetAlong
+            guard i + 1 < chosen.count, !chosen[i + 1].amenities.contains("drinkingWater") else { continue }
+            let nextWater = chosen[(i + 1)...].first { $0.amenities.contains("drinkingWater") }
+            let gap = (nextWater?.offsetAlong ?? length) - chosen[i].offsetAlong
             if gap >= 5000 {
                 chosen[i].warning = "No water for \(Int((gap / 1000).rounded())) km — fill up here"
             }
@@ -193,6 +197,8 @@ extension RestStops {
                      stop(18, []), stop(26, ["drinkingWater"]), stop(33, ["shelter"]), stop(38, [])]
         let regular = choose(forty, length: 40_000, level: .regular)
         assert(regular.map(\.offsetAlong) == [13_000, 26_000], "regular 40 km: \(regular.map(\.offsetAlong))")
+        assert(regular.allSatisfy { $0.warning == nil },
+               "water-to-water gap must not warn: \(regular.map { $0.warning ?? "nil" })")
         // The last spacing.lowerBound / 2 of the ride is never a stop.
         let sixty = forty + [stop(57, ["drinkingWater"])]
         let longer = choose(sixty, length: 60_000, level: .regular)
@@ -211,12 +217,20 @@ extension RestStops {
         assert(warned[0].warning == "No water for 29 km — fill up here", "warning: \(warned[0].warning ?? "nil")")
         assert(warned[1].warning == nil, "no water, no warning")
 
+        // The last chosen stop never warns, even if the finish is a dry 14 km away.
+        let dryFinish = choose([stop(13, ["toilets"]), stop(26, ["drinkingWater"])],
+                               length: 40_000, level: .regular)
+        assert(dryFinish.map(\.offsetAlong) == [13_000, 26_000]
+               && dryFinish.allSatisfy { $0.warning == nil },
+               "last chosen stop warned: \(dryFinish.map { $0.warning ?? "nil" })")
+
         // Fast gets nothing.
         let line = [Coord(lat: 1.30, lon: 103.80), Coord(lat: 1.30, lon: 103.90)]
         assert(along(line, mode: .fast, level: .regular, places: [], facts: [:], closed: [], walk: []).isEmpty,
                "fast: no stops")
 
-        // A toilet inside a closure is never a stop.
+        // A toilet inside a closure is never a stop. The empty 10–15 km window
+        // falls through to the open toilet at ~16.7 km, so it is the one expected.
         let inside = Sight(name: "Shut toilet", category: "toilets", lat: 1.30, lon: 103.80)
         let open = Sight(name: "Open toilet", category: "toilets", lat: 1.30, lon: 103.85)
         let route = [Coord(lat: 1.30, lon: 103.70), Coord(lat: 1.30, lon: 103.9246)]
