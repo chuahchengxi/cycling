@@ -20,19 +20,19 @@ nonisolated extension PCNGraph {
         var g: [GridKey: Double] = [start: 0]
         var came: [GridKey: GridKey] = [:]
         var open = MinHeap()
-        open.push(Geo.distance(coord[start]!.cl, goalC.cl), start)
+        open.push(Geo.distance(coord[start]!.cl, goalC.cl) * heuristicScale, start)
 
         while let (f, current) = open.pop() {
             if current == goal { return rebuild(came, from: current) }
             let gc = g[current] ?? .infinity
             // Lazy deletion: skip entries pushed before a cheaper route to this node was found.
-            if f > gc + Geo.distance(coord[current]!.cl, goalC.cl) + 1e-9 { continue }
+            if f > gc + Geo.distance(coord[current]!.cl, goalC.cl) * heuristicScale + 1e-9 { continue }
             for (nb, w) in adj[current] ?? [] {
                 let tentative = gc + w
                 if tentative < (g[nb] ?? .infinity) {
                     came[nb] = current
                     g[nb] = tentative
-                    open.push(tentative + Geo.distance(coord[nb]!.cl, goalC.cl), nb)
+                    open.push(tentative + Geo.distance(coord[nb]!.cl, goalC.cl) * heuristicScale, nb)
                 }
             }
         }
@@ -111,5 +111,44 @@ extension PCNGraph {
         let ns = Geo.distance(at(0, 0).cl, at(1, 0).cl), ew = Geo.distance(at(0, 0).cl, at(0, 1).cl)
         let gp = grid.path(from: at(0, 0), to: at(29, 29)) ?? []
         assert(abs(grid.pathLength(gp) - 29 * (ns + ew)) < 1, "grid path length off: \(grid.pathLength(gp))")
+
+        // Scenic discount: two ways from A to B. The north way is 10% longer but its
+        // nodes are scenic, so a full-strength discount halves it (1.1 × 0.5 < 1).
+        let squareA = Coord(lat: 1.300, lon: 103.800), squareB = Coord(lat: 1.300, lon: 103.802)
+        let southWay = Coord(lat: 1.300, lon: 103.801)                            // on the straight line
+        let northWay = Coord(lat: 1.300 + 50.9 / metresPerDegree, lon: 103.801)   // 10% longer way
+        let square = PCNGraph(polylines: [[squareA, southWay, squareB], [squareA, northWay, squareB]])
+        let ak = key(squareA, cell: square.cell), bk = key(squareB, cell: square.cell)
+        let nk = key(northWay, cell: square.cell)
+        let northNodes: Set<GridKey> = [ak, nk, bk]
+
+        func via(_ g: PCNGraph) -> Coord? {
+            guard let r = g.path(from: ak, to: bk), r.count == 3 else { return nil }
+            return r[1]
+        }
+        assert(via(square) == southWay, "undiscounted route must take the shorter south way")
+        assert(via(square.scenic(northNodes, strength: 1)) == northWay,
+               "a full scenic discount must take the longer north way")
+        assert(via(square.scenic([], strength: 1)) == southWay, "no scenic nodes must take the south way")
+        assert(via(square.scenic(northNodes, strength: 0)) == southWay, "strength 0 must take the south way")
+        assert(square.scenic(northNodes, strength: 1).heuristicScale == 0.5, "strength 1 must halve the heuristic")
+        assert(square.scenic(northNodes, strength: 0).heuristicScale == 1, "strength 0 must leave the heuristic alone")
+        assert(square.scenic(northNodes, strength: 2).heuristicScale == 0.5, "strength must clamp to 1")
+
+        // Scenic nodes: a park 30 m from A marks A only; a river whose pin is far but
+        // whose outline passes 20 m from B marks B, not A. Cafés are never scenic.
+        let pair = PCNGraph(polylines: [[squareA, squareB]])
+        let park = Sight(name: "Toy Park", category: "park",
+                         lat: squareA.lat + 30 / metresPerDegree, lon: squareA.lon)
+        assert(pair.scenicNodes(near: [park], facts: [:]) == [ak], "park must mark only the near node")
+        var river = Sight(name: "Toy River", category: "waterway", lat: 1.31, lon: 103.800)
+        river.osmID = "river"
+        let riverShape = PlaceFacts(hours: nil, area: 0,
+                                    shape: [Coord(lat: squareB.lat + 20 / metresPerDegree, lon: squareB.lon)],
+                                    wiki: false, note: nil)
+        assert(pair.scenicNodes(near: [river], facts: ["river": riverShape]) == [bk],
+               "a river's outline must count, not just its pin")
+        let cafe = Sight(name: "Cafe", category: "cafe", lat: squareA.lat, lon: squareA.lon)
+        assert(pair.scenicNodes(near: [cafe], facts: [:]).isEmpty, "cafés are not scenic")
     }
 }
