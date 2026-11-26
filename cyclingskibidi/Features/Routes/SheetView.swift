@@ -38,7 +38,7 @@ struct SheetView: View {
                         summary
                         climb
                         elevationGraph
-                        if !route.noBikeCrossings.isEmpty || !walkStretches.isEmpty { noBikeList }
+                        if !route.noBikeCrossings.isEmpty || closures.active.contains(where: { $0.kind == .noCycling }) { noBikeList }
                         if closures.active.contains(where: { $0.kind == .closure }) || !closures.expired.isEmpty { closureList }
                         if !obstacles.isEmpty { obstacleList }
                         if !route.sights.isEmpty {
@@ -136,11 +136,11 @@ struct SheetView: View {
             Text("Closures on this route").font(.headline)
             ForEach(closures.active.filter { $0.kind == .closure }) { c in
                 HStack(spacing: 12) {
-                    Image(systemName: c.kind == .closure ? "nosign" : "figure.walk")
-                        .foregroundStyle(c.kind == .closure ? .red : .orange)
+                    Image(systemName: "nosign")
+                        .foregroundStyle(.red)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading) {
-                        Text(c.kind == .closure ? "\(c.name) is closed" : "No cycling: \(c.name)")
+                        Text("\(c.name) is closed")
                             .font(.subheadline.weight(.semibold))
                         Text(c.note).font(.caption).foregroundStyle(.secondary)
                     }
@@ -164,43 +164,42 @@ struct SheetView: View {
         }
     }
 
-    /// Walk-your-bike stretches on this line, from the no-cycling closures it touches.
-    private var walkStretches: [(name: String, along: Double, length: Double)] {
-        let walk = closures.active.filter { $0.kind == .noCycling }
-        return NoBike.walkStretches(on: route.polyline, walk: walk.flatMap(\.noGoCircles),
-                                    names: walk.flatMap { c in c.noGoCircles.map { _ in c.name } })
-    }
-
     /// No bike path and walk-your-bike rows (Figma v3 · 13): terracotta where a straight
-    /// leg crosses a no-bike way, gold where the rider must walk.
+    /// leg crosses a no-bike way, gold where the rider must walk. The line is decoded once.
+    @ViewBuilder
     private var noBikeList: some View {
-        let crossings = route.noBikeCrossings.map { NoBike.describe($0, on: route.polyline) }
-        return VStack(alignment: .leading, spacing: 10) {
-            if let first = crossings.first {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("KIT · NO BIKE PATH HERE").font(.caption.weight(.bold)).tracking(1)
-                    Text("No bike path for \(Int(first.legLength.rounded())) m near \(first.line.map { $0.name.isEmpty ? "an expressway" : $0.name } ?? "an expressway"), and the road beside it is an expressway. Walk the footpath, or move your end point.")
-                        .font(.subheadline)
+        let line = route.polyline.map(\.cl), cum = Geo.cumulative(line)
+        let crossings = route.noBikeCrossings.map { NoBike.describe($0, on: line, cumulative: cum) }
+        let walk = closures.active.filter { $0.kind == .noCycling }
+        let stretches = NoBike.walkStretches(on: route.polyline, walk: walk.flatMap(\.noGoCircles),
+                                             names: walk.flatMap { c in c.noGoCircles.map { _ in c.name } })
+        if !crossings.isEmpty || !stretches.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                if let first = crossings.first {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("KIT · NO BIKE PATH HERE").font(.caption.weight(.bold)).tracking(1)
+                        Text(NoBike.cardText(first)).font(.subheadline)
+                    }
+                    .foregroundStyle(KitColor.ink)
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(KitColor.terracotta)
+                    .overlay(Rectangle().stroke(KitColor.ink, lineWidth: 2))
+                    .accessibilityElement(children: .combine)
                 }
-                .foregroundStyle(KitColor.ink)
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(KitColor.terracotta)
-                .overlay(Rectangle().stroke(KitColor.ink, lineWidth: 2))
-                .accessibilityElement(children: .combine)
-            }
-            ForEach(Array(crossings.enumerated()), id: \.offset) { _, c in
-                HStack(spacing: 12) {
-                    RoadLabel(kind: .noBikes)
-                    Text("No bike path · \(Fmt.km(c.along))").font(.subheadline.weight(.semibold))
+                ForEach(Array(crossings.enumerated()), id: \.offset) { _, c in
+                    HStack(spacing: 12) {
+                        RoadLabel(kind: c.line?.kind == "expressway" || c.line == nil ? .expressway : .noBikes)
+                        Text("No bike path · \(Fmt.km(c.along))").font(.subheadline.weight(.semibold))
+                    }
                 }
-            }
-            ForEach(Array(walkStretches.enumerated()), id: \.offset) { _, w in
-                HStack(spacing: 12) {
-                    RoadLabel(kind: .walkYourBike)
-                    VStack(alignment: .leading) {
-                        Text("\(w.name) · \(Fmt.km(w.along))").font(.subheadline.weight(.semibold))
-                        Text("No cycling here: walk your bike \(Int(w.length.rounded())) m.").font(.caption).foregroundStyle(.secondary)
+                ForEach(Array(stretches.enumerated()), id: \.offset) { _, w in
+                    HStack(spacing: 12) {
+                        RoadLabel(kind: .walkYourBike)
+                        VStack(alignment: .leading) {
+                            Text("\(w.name) · \(Fmt.km(w.along))").font(.subheadline.weight(.semibold))
+                            Text("No cycling here: walk your bike \(Int(w.length.rounded())) m.").font(.caption).foregroundStyle(.secondary)
+                        }
                     }
                 }
             }

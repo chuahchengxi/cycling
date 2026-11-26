@@ -50,38 +50,56 @@ nonisolated enum NoBike {
     static var lines: [NoBikeLine] { bundle.lines }
     static var entrances: [NoBikeEntrance] { bundle.entrances }
 
-    /// Where a straight leg crosses any no-bike line (one point per crossed segment).
+    /// Where a straight leg crosses any no-bike line. Crossings within 30 m are one
+    /// (a shared vertex, or both carriageways of one expressway).
     static func crossings(of leg: [Coord], lines: [NoBikeLine] = NoBike.lines) -> [Coord] {
         var out: [Coord] = []
+        func add(_ x: Coord) { if !out.contains(where: { Geo.distance($0.cl, x.cl) < 30 }) { out.append(x) } }
         for (a, b) in zip(leg, leg.dropFirst()) {
             let lo = (min(a.lat, b.lat), max(a.lat, b.lat), min(a.lon, b.lon), max(a.lon, b.lon))
             for line in lines where line.box.0 <= lo.1 && line.box.1 >= lo.0 && line.box.2 <= lo.3 && line.box.3 >= lo.2 {
                 for (c, d) in zip(line.pts, line.pts.dropFirst()) {
-                    if let x = intersection(a, b, c, d) { out.append(x) }
+                    if let x = intersection(a, b, c, d) { add(x) }
                 }
             }
         }
         return out
     }
 
-    /// Crossings of the straight fallback legs only: the 2-point off-connector segments.
-    /// Real network legs cross expressways on bridges and in underpasses, which is fine.
+    /// Crossings of the straight pieces only: a 2-point segment is a straight fallback leg;
+    /// a longer one is a road leg whose first and last pieces are the straight connectors
+    /// from the pins to the network (RoadGraph snaps up to 500 m). Its middle is real network,
+    /// which crosses expressways on bridges and in underpasses, and is never tested.
     static func crossings(inOffSegments segments: [[Coord]], lines: [NoBikeLine] = NoBike.lines) -> [Coord] {
-        segments.filter { $0.count == 2 }.flatMap { crossings(of: $0, lines: lines) }
+        segments.flatMap { seg -> [Coord] in
+            guard seg.count > 2 else { return crossings(of: seg, lines: lines) }
+            return crossings(of: Array(seg.prefix(2)), lines: lines) + crossings(of: Array(seg.suffix(2)), lines: lines)
+        }
     }
 
     /// What a crossing on `polyline` is, for the route sheet: the no-bike line it crosses,
     /// how far along the route it is, and the length of the straight leg it's on.
-    static func describe(_ crossing: Coord, on polyline: [Coord], lines: [NoBikeLine] = NoBike.lines) -> (line: NoBikeLine?, along: Double, legLength: Double) {
+    static func describe(_ crossing: Coord, on line: [CLLocationCoordinate2D], cumulative cum: [Double],
+                         lines: [NoBikeLine] = NoBike.lines) -> (line: NoBikeLine?, along: Double, legLength: Double) {
         let pad = 0.0005
-        let line = lines.filter { $0.box.0 - pad <= crossing.lat && $0.box.1 + pad >= crossing.lat && $0.box.2 - pad <= crossing.lon && $0.box.3 + pad >= crossing.lon }
-            .min { a, b in
-                func d(_ l: NoBikeLine) -> Double { l.pts.map { Geo.distance($0.cl, crossing.cl) }.min() ?? .infinity }
-                return d(a) < d(b)
+        let hit = lines.lazy.filter { $0.box.0 - pad <= crossing.lat && $0.box.1 + pad >= crossing.lat && $0.box.2 - pad <= crossing.lon && $0.box.3 + pad >= crossing.lon }
+            .map { l -> (NoBikeLine, Double) in
+                let cl = l.pts.map(\.cl)
+                return (l, Geo.snap(crossing.cl, to: cl, cumulative: Geo.cumulative(cl))?.lateral ?? .infinity)
             }
-        let cl = polyline.map(\.cl), cum = Geo.cumulative(cl)
-        guard let s = Geo.snap(crossing.cl, to: cl, cumulative: cum), cl.indices.contains(s.index + 1) else { return (line, 0, 0) }
-        return (line, s.along, Geo.distance(cl[s.index], cl[s.index + 1]))
+            .min { $0.1 < $1.1 }?.0
+        guard let s = Geo.snap(crossing.cl, to: line, cumulative: cum), line.indices.contains(s.index + 1) else { return (hit, 0, 0) }
+        return (hit, s.along, Geo.distance(line[s.index], line[s.index + 1]))
+    }
+
+    /// The Kit card's line for a crossing (Figma v3 · 13), by what was crossed.
+    static func cardText(_ d: (line: NoBikeLine?, along: Double, legLength: Double)) -> String {
+        let n = Int(d.legLength.rounded()), name = d.line?.name ?? ""
+        switch d.line?.kind {
+        case "steps": return "No bike path for \(n) m, and there are steps on the way. Carry your bike, or move your end point."
+        case "nobike": return "No bike path for \(n) m near \(name.isEmpty ? "a way" : name) where bikes aren't allowed. Walk the footpath, or move your end point."
+        default: return "No bike path for \(n) m near \(name.isEmpty ? "an expressway" : name), and the road beside it is an expressway. Walk the footpath, or move your end point."
+        }
     }
 
     /// Segment intersection in a flat local frame (metres); nil if they don't touch.
@@ -129,6 +147,14 @@ nonisolated enum NoBike {
         // Only straight legs are tested: a 40-point network leg across the same line is a bridge.
         let road = (0..<40).map { Coord(lat: 1.306, lon: 103.798 + Double($0) * 0.0001) }
         assert(crossings(inOffSegments: [across, road], lines: toy).count == 1, "only the 2-point straight leg may be flagged")
+        // A road leg whose straight connector from the pin crosses: flagged.
+        let connector = [Coord(lat: 1.307, lon: 103.7995), Coord(lat: 1.307, lon: 103.8005)] + (1..<20).map { Coord(lat: 1.307 + Double($0) * 0.0001, lon: 103.8005) }
+        assert(crossings(inOffSegments: [connector], lines: toy).count == 1, "a pin-to-network connector across a no-bike way must be flagged")
+        // Through a shared vertex of two pieces: one crossing, not two.
+        let kinked = [NoBikeLine(kind: "expressway", name: "K", pts: [Coord(lat: 1.300, lon: 103.800), Coord(lat: 1.305, lon: 103.800), Coord(lat: 1.310, lon: 103.800)])]
+        assert(crossings(of: across, lines: kinked).count == 1, "a leg through a shared vertex is one crossing")
+        assert(cardText((toy[0], 0, 120)).contains("Toy Expressway") && cardText((NoBikeLine(kind: "steps", name: "", pts: toy[0].pts), 0, 80)).contains("steps"),
+               "the card names what was crossed")
         assert(crossings(inOffSegments: [], lines: toy).isEmpty)
 
         // Real data: the bundled lines know the Pan-Island Expressway, and a straight leg

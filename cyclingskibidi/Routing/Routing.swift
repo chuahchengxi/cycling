@@ -62,20 +62,23 @@ enum Routing {
         closed += Closures.marked.filter { $0.isActive(on: Closures.now) }.flatMap(\.noGoCircles) + closures
         let roads = await RoadNetwork.graph()
         var poly: [Coord]
+        var straight: [[Coord]]? = nil   // what to test for no-bike crossings; nil = the off segments
         switch mode {
         case .fast:
-            let (line, off) = await Task.detached { [closed, walk] in
-                var line: [Coord] = [], off: [[Coord]] = []
+            let (line, off, legs) = await Task.detached { [closed, walk] in
+                var line: [Coord] = [], off: [[Coord]] = [], legs: [[Coord]] = []
                 for (a, b) in zip(waypoints, waypoints.dropFirst()) {
                     var leg = roads?.route(a, b, profile: .fast, closed: closed, walk: walk) ?? []
                     if leg.count < 2 { leg = [a, b]; off.append(leg) }
+                    legs.append(leg)
                     if !line.isEmpty { leg.removeFirst() }
                     line += leg
                 }
-                return (line, off)
+                return (line, off, legs)
             }.value
             poly = line
             plan.offConnectorSegments = off
+            straight = legs   // every Fast leg starts and ends with a pin-to-road connector
             plan.offConnectorMeters = off.reduce(0) { $0 + (Geo.cumulative($1.coordinates).last ?? 0) }
         case .moderate, .leisure:
             let base = await PCNDataset.graph()
@@ -100,7 +103,7 @@ enum Routing {
             plan.offConnectorSegments = zip(poly, poly.dropFirst()).map { [$0, $1] }   // straight legs, tested below
             plan.offConnectorMeters = Geo.cumulative(poly.coordinates).last ?? 0
         }
-        plan.noBikeCrossings = NoBike.crossings(inOffSegments: plan.offConnectorSegments, lines: noBikeLines)
+        plan.noBikeCrossings = NoBike.crossings(inOffSegments: poly.count < 2 ? plan.offConnectorSegments : (straight ?? plan.offConnectorSegments), lines: noBikeLines)
 
         let cl = poly.coordinates
         plan.distance = Geo.cumulative(cl).last ?? 0
