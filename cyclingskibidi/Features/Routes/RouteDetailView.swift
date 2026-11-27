@@ -24,7 +24,12 @@ struct RouteDetailView: View {
 
     @State private var sheetShown = true
     @State private var startPending = false
-    @State private var detent: PresentationDetent = .fraction(0.28)
+    @State private var detent: PresentationDetent = {
+        #if DEBUG
+        if Demo.screen == "detail-full" { return .large }
+        #endif
+        return .fraction(0.28)
+    }()
     @State private var focus: MapFocus?
     /// Bundled closures and the rider's own closed marks this route rides — checked when opened.
     @State private var closureHits: (active: [Closure], expired: [Closure]) = ([], [])

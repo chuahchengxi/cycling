@@ -107,7 +107,7 @@ struct SheetView: View {
            let line = PresetLoops.returnLine(for: last, in: Discovery.places) {
             Label(line, systemImage: "parkingsign")
                 .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.green)
+                .foregroundStyle(KitColor.accentStrong)
         }
     }
 
@@ -145,63 +145,54 @@ struct SheetView: View {
         .foregroundStyle(.secondary)
     }
 
+    /// Kit/chart · elevation (Figma v3 · 03): board fill, 2 pt ink border, sage bars, ochre steepest climb.
     @ViewBuilder
     private var elevationGraph: some View {
         let profile = route.elevations
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Elevation").font(.headline)
-            if profile.count > 1 {
-                Chart(Array(profile.enumerated()), id: \.offset) { index, metres in
-                    AreaMark(
-                        x: .value("Distance", Double(index) / Double(profile.count - 1) * route.distanceKM),
-                        y: .value("Elevation", metres))
-                    .interpolationMethod(.monotone)
-                    .foregroundStyle(.linearGradient(colors: [.accentColor.opacity(0.6), .accentColor.opacity(0.05)],
-                                                     startPoint: .top, endPoint: .bottom))
-                    LineMark(
-                        x: .value("Distance", Double(index) / Double(profile.count - 1) * route.distanceKM),
-                        y: .value("Elevation", metres))
-                    .interpolationMethod(.monotone)
-                    .foregroundStyle(Color.accentColor)
+        if profile.count > 1 {
+            let bars = KitChart.buckets(profile), steepest = KitChart.steepestClimb(bars)
+            // Floor just under the lowest point, so a 30 m climb still reads as a climb.
+            let low = bars.min() ?? 0, high = max(bars.max() ?? 1, low + 1), floor = low - (high - low) * 0.25
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Elevation · climbs \(Int(route.ascentMeters)) m").font(.footnote.weight(.semibold))
+                    Spacer()
+                    Text(Fmt.km(route.distanceMeters)).font(.kitNumber(.headline))
                 }
-                .chartXAxisLabel("km")
-                .chartYAxisLabel("m")
-                .frame(height: 160)
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Elevation profile")
-                .accessibilityValue("Climbs \(Int(route.ascentMeters)) metres, from \(Int(profile.min() ?? 0)) up to \(Int(profile.max() ?? 0)) metres")
-            } else {
-                Text("No elevation data for this route.")
-                    .font(.footnote).foregroundStyle(.secondary)
-                    .frame(height: 60)
+                Chart(Array(bars.enumerated()), id: \.offset) { i, metres in
+                    let step = route.distanceKM / Double(bars.count)
+                    RectangleMark(xStart: .value("Distance", (Double(i) + 0.15) * step),
+                                  xEnd: .value("Distance", (Double(i) + 0.85) * step),
+                                  yStart: .value("Elevation", floor), yEnd: .value("Elevation", metres))
+                        .foregroundStyle(i == steepest ? KitColor.gold : KitColor.accentStrong)
+                }
+                .chartXScale(domain: 0...max(route.distanceKM, 0.1))
+                .chartYScale(domain: floor...high)
+                .chartYAxis(.hidden)
+                .chartXAxis { AxisMarks { AxisValueLabel().font(.kitNumber(.caption2)).foregroundStyle(KitColor.muted) } }
+                .frame(height: 120)
             }
+            .foregroundStyle(KitColor.ink)
+            .kitCard(KitColor.board)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Elevation profile")
+            .accessibilityValue("Climbs \(Int(route.ascentMeters)) metres, from \(Int(profile.min() ?? 0)) up to \(Int(profile.max() ?? 0)) metres")
+        } else {
+            Text("No elevation data for this route.").font(.footnote).foregroundStyle(.secondary)
         }
     }
 
+    /// Closures as Kit's heads-up (Figma v3 · 03 "Kit · closed on your line").
     private var closureList: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Closures on this route").font(.headline)
-            ForEach(closures.active.filter { $0.kind == .closure }) { c in
-                HStack(spacing: 12) {
-                    Image(systemName: "nosign")
-                        .foregroundStyle(.red)
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading) {
-                        Text("\(c.name) is closed")
-                            .font(.subheadline.weight(.semibold))
-                        Text(c.note).font(.caption).foregroundStyle(.secondary)
-                    }
-                }
+        let active = closures.active.filter { $0.kind == .closure }
+        return VStack(alignment: .leading, spacing: 12) {
+            ForEach(active) { c in
+                KitBubble(label: "Kit · closed on your line", text: "\(c.name) is closed. \(c.note)")
             }
-            if closures.active.contains(where: { $0.kind == .closure }) {
-                Button(action: onReplan) {
-                    if replanning { ProgressView("Re-planning") } else {
-                        Label(closures.active.filter { $0.kind == .closure }.count == 1 ? "Re-plan around it" : "Re-plan around them",
-                              systemImage: "arrow.triangle.branch")
-                    }
-                }
-                .buttonStyle(.bordered)
-                .disabled(replanning)
+            if !active.isEmpty {
+                KitButton(title: replanning ? "Re-planning…" : active.count == 1 ? "Re-plan around it" : "Re-plan around them",
+                          icon: "kit-icon-chevron", style: .tertiary, action: onReplan)
+                    .disabled(replanning)
             }
             ForEach(closures.expired) { c in
                 Label("\(c.name): was closed until \(c.untilText ?? "recently")", systemImage: "clock.arrow.circlepath")
@@ -281,7 +272,7 @@ struct SheetView: View {
                 Button { selectedSight = sight } label: {
                     HStack(spacing: 12) {
                         PixelIcon(rows: PixelArt.forCategory(sight.category), size: 24)
-                            .foregroundStyle(.green).frame(width: 30)
+                            .foregroundStyle(KitColor.accentStrong).frame(width: 30)
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(sight.name).font(.body.weight(.semibold))
@@ -322,7 +313,7 @@ struct SheetView: View {
             ForEach(route.restStops) { stop in
                 HStack(alignment: .top, spacing: 12) {
                     PixelIcon(rows: PixelArt.forCategory(stop.amenities.contains("drinkingWater") ? "drinkingWater" : stop.amenities.first ?? ""), size: 24)
-                        .frame(width: 30).foregroundStyle(.teal)
+                        .frame(width: 30).foregroundStyle(KitColor.accentStrong)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(stop.name).font(.subheadline.weight(.semibold))
@@ -359,16 +350,12 @@ struct SheetView: View {
         }
     }
 
+    /// Kit/button primary (Figma v3 · 03): the one sage button on the brief.
     private var startButton: some View {
-        Button(action: onStart) {
-            Text("Start Ride")
-                .font(.title2.bold())
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 16)
-        }
-        .buttonStyle(.borderedProminent)
-        .buttonBorderShape(.roundedRectangle(radius: 18))
-        .disabled(route.polyline.count < 2 || replanning)
+        let disabled = route.polyline.count < 2 || replanning
+        return KitButton(title: "Start ride", icon: "kit-icon-play", style: .primary, action: onStart)
+            .disabled(disabled)
+            .opacity(disabled ? 0.5 : 1)
     }
 }
 
@@ -382,7 +369,7 @@ struct StepRow: View {
             Image(systemName: step.maneuver.symbol)
                 .font(.title3)
                 .frame(width: 30)
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(KitColor.accentStrong)
             VStack(alignment: .leading, spacing: 2) {
                 Text(distanceLabel).font(.subheadline.weight(.semibold))
                 Text(step.instruction)

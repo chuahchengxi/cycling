@@ -91,7 +91,7 @@ struct ContentView: View {
     private func openDemoScreen() async {
         guard let screen = Demo.screen, let route = await Demo.seed(context) else { return }
         switch screen {
-        case "detail":   path.append(route)
+        case "detail", "detail-full":   path.append(route)
         case "navigate": trip.begin(route)
         case "navigate-kit":   // a pass-by in the banner (v3 · 04)
             trip.begin(route)

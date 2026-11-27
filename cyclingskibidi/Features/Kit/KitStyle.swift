@@ -229,3 +229,29 @@ struct KitHeader: View {
             .accessibilityAddTraits(.isHeader)
     }
 }
+
+/// Kit/chart · elevation helpers: a few wide bars instead of hundreds of samples, and the
+/// one bar (ochre) where the steepest climb ends.
+nonisolated enum KitChart {
+    /// Averages `values` into at most `count` buckets.
+    static func buckets(_ values: [Double], count: Int = 30) -> [Double] {
+        guard values.count > count, count > 0 else { return values }
+        return (0..<count).map { b in
+            let slice = values[(b * values.count / count)..<((b + 1) * values.count / count)]
+            return slice.reduce(0, +) / Double(slice.count)
+        }
+    }
+
+    /// Index at the top of the biggest rise between neighbours; nil on a flat or falling line.
+    static func steepestClimb(_ values: [Double]) -> Int? {
+        values.indices.dropFirst().filter { values[$0] > values[$0 - 1] }
+            .max { values[$0] - values[$0 - 1] < values[$1] - values[$1 - 1] }
+    }
+
+    static func selfCheck() {
+        assert(buckets([1, 2, 3], count: 30) == [1, 2, 3], "short lines are kept")
+        assert(buckets([0, 2, 4, 6], count: 2) == [1, 5], "buckets average")
+        assert(buckets(Array(repeating: 1, count: 1000)).count == 30, "long lines become 30 bars")
+        assert(steepestClimb([0, 1, 5, 6]) == 2 && steepestClimb([3, 2, 1]) == nil && steepestClimb([]) == nil, "steepest climb")
+    }
+}

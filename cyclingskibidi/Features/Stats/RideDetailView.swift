@@ -118,7 +118,7 @@ struct RideDetailView: View {
     /// Kit/chart · elevation: board fill, 2 pt ink border, sage bars, ochre steepest climb.
     private var elevationChart: some View {
         let samples = elevation
-        let steepest = Self.steepestClimb(in: samples)
+        let steepest = KitChart.steepestClimb(samples.map(\.alt))
         return Chart(Array(samples.enumerated()), id: \.offset) { i, p in
             BarMark(x: .value("km", p.km), y: .value("m", p.alt))
                 .foregroundStyle(i == steepest ? KitColor.gold : KitColor.sage)
@@ -134,16 +134,6 @@ struct RideDetailView: View {
         .accessibilityValue("Min \(Int(samples.map(\.alt).min() ?? 0)) m, max \(Int(samples.map(\.alt).max() ?? 0)) m, \(Int(ride.ascentMeters)) m climbed")
     }
 
-    /// Point at the top of the steepest climb, so only that bar is ochre.
-    private static func steepestClimb(in samples: [(km: Double, alt: Double)]) -> Int? {
-        var bestDelta = 0.0
-        var bestIndex: Int?
-        for i in samples.indices.dropFirst() {
-            let climb = samples[i].alt - samples[i - 1].alt
-            if climb > bestDelta { bestDelta = climb; bestIndex = i }
-        }
-        return bestIndex
-    }
 
     private var speedChart: some View {
         Chart(Array(speed.enumerated()), id: \.offset) { _, p in
