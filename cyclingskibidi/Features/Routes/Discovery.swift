@@ -409,6 +409,33 @@ nonisolated enum Discovery {
     }
 }
 
+extension Discovery {
+    /// One of Apple's landmarks as a Sight: our own place (with its notes) when one of the
+    /// same name is within 200 m, else a bare Sight with a matching category.
+    static func sight(feature name: String, at c: CLLocationCoordinate2D, category: MKPointOfInterestCategory?) -> Sight {
+        let here = CLLocation(latitude: c.latitude, longitude: c.longitude)
+        func metres(_ p: Sight) -> Double { here.distance(from: CLLocation(latitude: p.lat, longitude: p.lon)) }
+        if let ours = places.filter({ $0.name.localizedCaseInsensitiveCompare(name) == .orderedSame }).min(by: { metres($0) < metres($1) }),
+           metres(ours) < 200 {
+            return ours
+        }
+        let kind: String = switch category {
+        case .park?, .nationalPark?: "park"
+        case .beach?: "beach"
+        case .museum?: "museum"
+        case .library?: "library"
+        case .zoo?: "zoo"
+        case .aquarium?: "aquarium"
+        case .cafe?, .bakery?: "cafe"
+        case .restaurant?, .foodMarket?: "restaurant"
+        case .restroom?: "toilets"
+        case .marina?: "marina"
+        default: "attraction"
+        }
+        return Sight(name: name, category: kind, lat: c.latitude, lon: c.longitude)
+    }
+}
+
 struct DiscoveryPanel: View {
     let region: MKCoordinateRegion
     let onPick: (CLLocationCoordinate2D) -> Void
@@ -474,6 +501,8 @@ struct SightBadge: View {
 /// list sheet and the pass-by card.
 struct SightDetail: View {
     let sight: Sight
+    /// Off when the card above already names the kind of place.
+    var showsCategory = true
 
     private var facts: PlaceFacts? { sight.osmID.flatMap { Discovery.facts[$0] } }
 
@@ -484,7 +513,11 @@ struct SightDetail: View {
         if n?.status == "closed" {
             out.append(("xmark.octagon", "Closed" + (n?.valid_until.map { " until \($0)" } ?? "")))
         }
-        if let text = sight.note, !text.isEmpty { out.append(("pawprint", text)) }
+        // Kit's note, unless it only repeats the kind of place ("Hawker centre, local dishes").
+        let kind = Discovery.icon(for: sight.category).label
+        if let text = sight.note, !text.isEmpty, text != kind, !text.hasPrefix("Hawker centre, local dishes") {
+            out.append(("pawprint", text))
+        }
         if let text = n?.note, !text.isEmpty, text != sight.note { out.append(("text.quote", text)) }
         for stall in n?.stalls ?? [] {
             let tag = stall.bib.map { "Michelin Bib Gourmand \($0)" } ?? stall.since.map { "since \($0)" }
@@ -501,10 +534,12 @@ struct SightDetail: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            let icon = Discovery.icon(for: sight.category)
-            Label(icon.label, systemImage: icon.symbol)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
+            if showsCategory {
+                let icon = Discovery.icon(for: sight.category)
+                Label(icon.label, systemImage: icon.symbol)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            }
             ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
                 Label(line.text, systemImage: line.symbol).font(.body)
             }

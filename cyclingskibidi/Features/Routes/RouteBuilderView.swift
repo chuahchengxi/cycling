@@ -47,6 +47,8 @@ struct RouteBuilderView: View {
     @State private var sights: [Sight]?
     @State private var sightsLoading = false
     @State private var selectedSight: Sight?
+    /// A place tapped on the map: Kit's card over the map, Details opens the full sheet.
+    @State private var tapped: Sight?
     @State private var editingInterests = false
     /// The model's picks replaced the quick ones for the current line.
     @State private var kitByModel = false
@@ -66,7 +68,18 @@ struct RouteBuilderView: View {
             ZStack(alignment: .bottom) {
                 map
                 controls
+                if let s = tapped {
+                    VStack {
+                        PassBySightCard(sight: s, onClose: { tapped = nil }, onMore: { tapped = nil; selectedSight = s })
+                            .padding(.horizontal, 16).padding(.top, 8)
+                        Spacer()
+                    }
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
             }
+            .animation(.default, value: tapped?.id)
+            // The map runs under the bar; the title and buttons float over it.
+            .toolbarBackground(.hidden, for: .navigationBar)
             .navigationTitle("New route")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -104,9 +117,10 @@ struct RouteBuilderView: View {
 
     private var map: some View {
         OfflineMap(lines: mapLines, pins: mapPins, focus: focus, showsUser: true, showsUserButton: true,
-                   onTap: { coord in waypoints.append(Coord(coord)); replan() },
-                   onRegionChange: { mapRegion = $0 })
-            .ignoresSafeArea(edges: .bottom)
+                   onTap: { coord in tapped = nil; waypoints.append(Coord(coord)); replan() },
+                   onRegionChange: { mapRegion = $0 },
+                   onFeatureTap: { tapped = $0 })
+            .ignoresSafeArea()
     }
 
     private var mapLines: [MapLine] {
@@ -123,7 +137,7 @@ struct RouteBuilderView: View {
         }
         return pins + (sights ?? []).map { sight in
             MapPin(id: sight.id.uuidString, coordinate: sight.coordinate, title: sight.name,
-                   look: .view(AnyView(SightBadge(sight: sight))), onTap: { selectedSight = sight })
+                   look: .view(AnyView(SightBadge(sight: sight))), onTap: { tapped = sight })
         }
     }
 

@@ -87,12 +87,9 @@ struct SheetView: View {
             summaryDivider
             Text(Fmt.duration(route.currentExpectedSeconds))
             summaryDivider
-            Text(route.difficulty.rawValue).foregroundStyle(route.difficulty.color)
+            Text(route.difficulty.rawValue)
             Spacer(minLength: 0)
-            Label(route.mode.rawValue, systemImage: route.mode.symbol)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: true, vertical: false)   // keep the mode on one line
+            ModeTag(mode: route.mode).fixedSize()   // the ride mode is the emphasis; one line
         }
         .font(.title2.bold())
         .lineLimit(1)

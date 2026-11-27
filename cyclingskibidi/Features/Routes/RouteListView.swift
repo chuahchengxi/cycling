@@ -233,9 +233,8 @@ struct RouteCard: View {
             FlowLayout {
                 KitChip(text: Fmt.km(route.distanceMeters), caps: false)
                 KitChip(text: Fmt.duration(route.currentExpectedSeconds), caps: false)
-                KitChip(text: route.difficulty.rawValue, fill: kitFill(for: route.difficulty), caps: false)
-                    .kitSurface()
-                KitChip(text: route.mode.rawValue, icon: route.mode.kitIcon, caps: false)
+                KitChip(text: route.difficulty.rawValue, caps: false)
+                ModeTag(mode: route.mode)
             }
             .padding(.top, 10)
         }
@@ -245,22 +244,34 @@ struct RouteCard: View {
 }
 
 /// Kit's tag fills: light colours with dark ink in both themes.
-private func kitFill(for difficulty: Difficulty) -> Color {
-    switch difficulty {
-    case .easy: return KitColor.sage
-    case .medium: return KitColor.gold
-    case .hard: return KitColor.terracotta
+
+
+extension RideMode {
+    /// Each way to ride has its own colour; difficulty stays plain text.
+    var tint: Color {
+        switch self {
+        case .fast: KitColor.terracotta
+        case .moderate: KitColor.gold
+        case .leisure: KitColor.sage
+        }
     }
 }
 
-
-extension Difficulty {
-    var color: Color {
-        switch self {
-        case .easy: return .green
-        case .medium: return .orange
-        case .hard: return .red
+/// The ride mode as the emphasised tag: its pixel icon, bold, on the mode's colour.
+struct ModeTag: View {
+    let mode: RideMode
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(mode.kitIcon).renderingMode(.template).resizable().frame(width: 16, height: 16).accessibilityHidden(true)
+            Text(mode.rawValue).font(.footnote.weight(.bold))
         }
+        .foregroundStyle(KitColor.ink)
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .background(mode.tint)
+        .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
+        .environment(\.colorScheme, .light)   // light fills keep dark ink in both themes
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(mode.rawValue) ride")
     }
 }
 

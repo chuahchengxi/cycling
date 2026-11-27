@@ -72,6 +72,8 @@ struct OfflineMap: UIViewRepresentable {
     var interactive = true
     var onTap: ((CLLocationCoordinate2D) -> Void)?
     var onRegionChange: ((MKCoordinateRegion) -> Void)?
+    /// A tap on one of Apple's landmarks, as a Sight (our own place when it's the same one).
+    var onFeatureTap: ((Sight) -> Void)?
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -80,7 +82,11 @@ struct OfflineMap: UIViewRepresentable {
         map.delegate = context.coordinator
         // Apple's own map underneath (the bundled OSM tiles looked flat); our lines and pins on top.
         map.preferredConfiguration = MKStandardMapConfiguration(elevationStyle: .flat, emphasisStyle: .muted)
-        map.pointOfInterestFilter = .excludingAll
+        // Landmarks a rider cares about, tappable; shops, banks and the like stay hidden.
+        map.pointOfInterestFilter = MKPointOfInterestFilter(including: [
+            .park, .nationalPark, .beach, .marina, .museum, .library, .zoo, .aquarium, .amusementPark,
+            .stadium, .theater, .cafe, .restaurant, .bakery, .foodMarket, .publicTransport, .restroom])
+        map.selectableMapFeatures = onFeatureTap == nil ? [] : [.pointsOfInterest]
         map.showsCompass = false   // our own compass, placed under the locate button so they never overlap
         map.isRotateEnabled = true
         map.cameraBoundary = MKMapView.CameraBoundary(coordinateRegion: TilePack.coverage)
@@ -146,6 +152,7 @@ struct OfflineMap: UIViewRepresentable {
         let location = CLLocationManager()
         private var overlaySignature = ""
         private var annotations: [String: PinAnnotation] = [:]
+        var featureTappedAt = Date.distantPast
 
         func sync(lines: [MapLine], discs: [MapDisc], on map: MKMapView) {
             // Re-add overlays only when they really changed: a ride redraws on every fix.
@@ -195,7 +202,12 @@ struct OfflineMap: UIViewRepresentable {
             // A tap on a pin is the pin's, not the map's.
             if let hit = map.hitTest(pt, with: nil), hit is MKAnnotationView || hit.superview is MKAnnotationView
                 || hit.superview?.superview is MKAnnotationView { return }
-            onTap(map.convert(pt, toCoordinateFrom: map))
+            let coord = map.convert(pt, toCoordinateFrom: map)
+            // A landmark tap selects the feature a moment later; then it's the landmark's tap, not a dropped pin.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                guard let self, Date.now.timeIntervalSince(self.featureTappedAt) > 0.5 else { return }
+                onTap(coord)
+            }
         }
 
         func mapView(_ map: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
@@ -242,6 +254,12 @@ struct OfflineMap: UIViewRepresentable {
         }
 
         func mapView(_ map: MKMapView, didSelect annotation: MKAnnotation) {
+            if let f = annotation as? MKMapFeatureAnnotation {
+                featureTappedAt = .now
+                map.deselectAnnotation(f, animated: false)
+                parent?.onFeatureTap?(Discovery.sight(feature: f.title ?? "", at: f.coordinate, category: f.pointOfInterestCategory))
+                return
+            }
             guard let a = annotation as? PinAnnotation else { return }
             map.deselectAnnotation(a, animated: false)
             a.pin.onTap?()

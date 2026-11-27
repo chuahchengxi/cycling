@@ -289,9 +289,8 @@ private struct RoutePreview: View {
                 FlowLayout {
                     Pill(text: Fmt.km(plan.distance))
                     Pill(text: Fmt.duration(plan.expected))
-                    Pill(text: Difficulty.rated(distanceMeters: plan.distance, ascentMeters: plan.ascent).rawValue,
-                         tint: Difficulty.rated(distanceMeters: plan.distance, ascentMeters: plan.ascent).color)
-                    Pill(text: mode.rawValue, tint: KitColor.accentStrong)
+                    Pill(text: Difficulty.rated(distanceMeters: plan.distance, ascentMeters: plan.ascent).rawValue)
+                    ModeTag(mode: mode)
                 }
                 TextField("Route name", text: $editedName).textFieldStyle(.roundedBorder)
                 Spacer()
