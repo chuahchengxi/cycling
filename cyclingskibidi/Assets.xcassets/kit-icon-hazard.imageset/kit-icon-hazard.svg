@@ -1,5 +1,5 @@
-<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g id="icon/hazard" clip-path="url(#clip0_0_219)">
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="icon/hazard">
 <g id="hazard">
 <path d="M10 2H14V4H10V2Z" fill="#2B2A27"/>
 <path d="M10 4H14V6H10V4Z" fill="#2B2A27"/>
@@ -24,9 +24,4 @@
 <path d="M2 20H22V22H2V20Z" fill="#2B2A27"/>
 </g>
 </g>
-<defs>
-<clipPath id="clip0_0_219">
-<rect width="16" height="16" fill="white"/>
-</clipPath>
-</defs>
 </svg>

@@ -216,48 +216,6 @@ struct KitAlarmedFigure: View {
     }
 }
 
-/// Gold "Walk your bike" banner while the rider is in a no-cycling zone (v3 · 16).
-struct WalkBikeBanner: View {
-    let zone: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                RoadLabel(kind: .walkYourBike)
-                Text("\(zone) · moving time paused").font(.subheadline)
-            }
-            Spacer(minLength: 0)
-        }
-        .foregroundStyle(KitColor.ink)
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(KitColor.gold)
-        .overlay(Rectangle().stroke(KitColor.ink, lineWidth: 2))
-        .kitSurface()
-        .accessibilityElement(children: .combine)
-    }
-}
-
-/// A reroute that would have needed a no-bike way was refused (v3 · 14).
-struct RerouteBlockedBanner: View {
-    let reason: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            PixelIcon(rows: PixelArt.noBikes, size: 24)
-            Text(reason).font(.subheadline.weight(.semibold))
-            Spacer(minLength: 0)
-        }
-        .foregroundStyle(KitColor.ink)
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(KitColor.terracotta)
-        .overlay(Rectangle().stroke(KitColor.ink, lineWidth: 2))
-        .kitSurface()
-        .accessibilityElement(children: .combine)
-    }
-}
-
 #Preview("Expressway") {
     KitAlarmView(alarm: KitAlarm(key: "x", kind: .noBikes(expressway: true), title: "Expressway ahead: bikes not allowed",
                                  detail: "This is the way onto Ayer Rajah Expressway.", distance: 42, coordinate: Coord(lat: 1.29, lon: 103.78)),

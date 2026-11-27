@@ -91,6 +91,12 @@ struct ContentView: View {
         switch screen {
         case "detail":   path.append(route)
         case "navigate": trip.begin(route)
+        case "navigate-kit":   // a pass-by in the banner (v3 · 04)
+            trip.begin(route)
+            try? await Task.sleep(for: .seconds(3))
+            var s = Sight(name: "Lorong Halus red bridge", category: "bridge", lat: 1.30, lon: 103.79)
+            s.note = "Golden hour in 7 min, a good 2-minute photo stop"
+            trip.recorder.passingSight = s
         case "finished":
             trip.begin(route)
             let plan = RoutePlan(polyline: route.polyline, steps: route.steps,

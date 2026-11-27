@@ -14,11 +14,11 @@ extension KitColor {
     /// Chart and inset fill (Figma "board").
     static let board = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? hex(0x1E1C25) : hex(0xE8E5DD) })
     /// Secondary text (Figma "muted").
-    static let muted = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? hex(0xB4AFA3) : hex(0x5F6159) })
+    static let muted = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? hex(0xB3AD9F) : hex(0x5F6159) })
     /// Empty segments and hairlines (Figma "line").
-    static let line = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? hex(0x4A4756) : hex(0xD6D3C9) })
+    static let line = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? hex(0x3D3A46) : hex(0xD6D3C9) })
     /// Filled progress segments (Figma "accent-strong").
-    static let accentStrong = Color(.sRGB, red: 0x64 / 255.0, green: 0x7A / 255.0, blue: 0x5C / 255.0)
+    static let accentStrong = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? hex(0xA8C59A) : hex(0x647A5C) })
 
     fileprivate static func hex(_ h: UInt32) -> UIColor {
         UIColor(red: CGFloat((h >> 16) & 0xFF) / 255, green: CGFloat((h >> 8) & 0xFF) / 255, blue: CGFloat(h & 0xFF) / 255, alpha: 1)

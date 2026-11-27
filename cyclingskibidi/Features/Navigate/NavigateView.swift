@@ -24,11 +24,13 @@ struct NavigateView: View {
     @Query private var obstacles: [Obstacle]
 
     @State private var focus: MapFocus? = .user(heading: true)
-    @State private var detent: PresentationDetent = .height(150)
+    @State private var detent: PresentationDetent = .height(190)
     @State private var line: [CLLocationCoordinate2D] = []
     @State private var placing = false
     @State private var pending: PendingObstacle?
     @State private var showSheet = true
+    /// A sight the rider tapped on the map: its full brief in a Kit card. (Passing one goes in the banner.)
+    @State private var tappedSight: Sight?
 
     private var recorder: RideRecorder { trip.recorder }
 
@@ -50,40 +52,32 @@ struct NavigateView: View {
 
     /// Collapsed nav-sheet detent. The side buttons clear this plus the home-
     /// indicator inset the sheet sits on, so the bottom one isn't tucked under it.
-    private static let collapsedSheet: CGFloat = 150
+    private static let collapsedSheet: CGFloat = 190
 
     private var navigating: some View {
         GeometryReader { geo in
             ZStack(alignment: .top) {
                 map
-                VStack(spacing: 8) {
-                    GuidanceBanner(step: recorder.currentStep,
-                                   distance: recorder.distanceToManeuver,
-                                   offRoute: recorder.offRoute,
-                                   rerouting: recorder.rerouting)
-                    if let reason = recorder.rerouteBlockedReason {
-                        RerouteBlockedBanner(reason: reason)
-                    }
-                    if let zone = recorder.walkingThrough {
-                        WalkBikeBanner(zone: zone).transition(.move(edge: .top).combined(with: .opacity))
-                    }
-                    if let failure = recorder.rerouteFailure {
-                        RerouteFailureBanner(message: failure) { recorder.dismissRerouteFailure() }
-                    }
-                    if let hazard = recorder.nearHazard, recorder.alarm == nil {   // the takeover replaces the banner
-                        HazardBanner(alert: hazard).transition(.move(edge: .top).combined(with: .opacity))
-                    }
-                }
+                GuidanceBanner(step: recorder.currentStep,
+                               distance: recorder.distanceToManeuver,
+                               offRoute: recorder.offRoute,
+                               rerouting: recorder.rerouting,
+                               message: bannerMessage,
+                               onStop: { if let s = recorder.passingSight { recorder.kitVerdict(s, stopped: true) }; recorder.passingSight = nil },
+                               onSkip: { if let s = recorder.passingSight { recorder.kitVerdict(s, stopped: false) }; recorder.passingSight = nil },
+                               onDismiss: { recorder.dismissRerouteFailure() },
+                               onTimeout: { recorder.passingSight = nil })
                 .padding(.horizontal, 12)
             }
             .overlay(alignment: .bottomTrailing) {
                 sideButtons.padding(.bottom, geo.safeAreaInsets.bottom + Self.collapsedSheet + 12)
             }
-            .overlay { passBySight }
+            .overlay { tappedSightCard }
             .overlay { kitAlarm }
             .overlay { fallOverlay }
             .overlay(alignment: .bottom) { if placing { placementBar } }
             .animation(.default, value: recorder.passingSight?.id)
+            .animation(.default, value: tappedSight?.id)
             .animation(.default, value: placing)
             .animation(.default, value: recorder.nearHazard == nil)
             .animation(.default, value: recorder.alarm?.key)
@@ -109,10 +103,10 @@ struct NavigateView: View {
             get: { showSheet && recorder.alarm == nil && recorder.fallPhase == .none },
             set: { if recorder.alarm == nil && recorder.fallPhase == .none { showSheet = $0 } })) {
             navSheet
-                // The 150 pt detent can't grow, so its numbers stop at AX1 and shrink rather than truncate.
+                // The 190 pt detent can't grow, so its numbers stop at AX1 and shrink rather than truncate.
                 .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                 .minimumScaleFactor(0.6)
-                .presentationDetents([.height(150), .fraction(0.45), .large], selection: $detent)
+                .presentationDetents([.height(190), .fraction(0.5), .large], selection: $detent)
                 .presentationBackgroundInteraction(.enabled)
                 .presentationDragIndicator(.visible)
                 .interactiveDismissDisabled()
@@ -133,15 +127,22 @@ struct NavigateView: View {
         }
     }
 
-    /// The pass-by card: when the ride reaches a sight, its brief pops over the
-    /// map on a dim scrim — tap outside or the close button to dismiss.
+    /// The one Kit message in the guidance banner (Figma v3 · 04, 05, 14, 16).
+    private var bannerMessage: BannerMessage? {
+        BannerMessage.pick(failure: recorder.rerouteFailure, blocked: recorder.rerouteBlockedReason,
+                           walking: recorder.walkingThrough,
+                           hazard: recorder.alarm == nil ? recorder.nearHazard : nil,   // the takeover replaces it
+                           passing: recorder.passingSight)
+    }
+
+    /// A sight tapped on the map: its brief over a dim scrim; tap outside or close to dismiss.
     @ViewBuilder
-    private var passBySight: some View {
-        if let sight = recorder.passingSight {
+    private var tappedSightCard: some View {
+        if let sight = tappedSight {
             ZStack {
                 Color.black.opacity(0.25).ignoresSafeArea()
-                    .onTapGesture { recorder.passingSight = nil }
-                PassBySightCard(sight: sight, onVerdict: { recorder.kitVerdict(sight, stopped: $0) }) { recorder.passingSight = nil }
+                    .onTapGesture { tappedSight = nil }
+                PassBySightCard(sight: sight) { tappedSight = nil }
                     .padding(.horizontal, 20)
             }
             .transition(.opacity)
@@ -220,33 +221,34 @@ struct NavigateView: View {
         }
         pins += recorder.sights.map { sight in
             MapPin(id: sight.id.uuidString, coordinate: sight.coordinate, title: sight.name,
-                   look: .view(AnyView(SightBadge(sight: sight))), onTap: { recorder.passingSight = sight })
+                   look: .view(AnyView(SightBadge(sight: sight))), onTap: { tappedSight = sight })
         }
         return pins
     }
 
+    /// Map controls (Kit, Figma 217:340): square icon buttons; hazards are caution gold.
     private var sideButtons: some View {
-        VStack(spacing: 12) {
-            CircleButton(symbol: "exclamationmark.triangle.fill", tint: .orange) {
+        VStack(spacing: 10) {
+            KitIconButton(icon: "kit-icon-hazard", label: "Mark obstacle", caution: true, size: 52) {
                 placing = true
                 showSheet = false
             }
-            .accessibilityLabel("Mark obstacle")
-            CircleButton(symbol: recorder.voiceEnabled ? "speaker.wave.2.fill" : "speaker.slash.fill",
-                         tint: .secondary) { recorder.voiceEnabled.toggle() }
-            .accessibilityLabel(recorder.voiceEnabled ? "Mute guidance" : "Unmute guidance")
-            CircleButton(symbol: "location.north.fill", tint: .blue) {
+            KitIconButton(icon: "kit-icon-sound", label: recorder.voiceEnabled ? "Mute guidance" : "Unmute guidance", size: 52) {
+                recorder.voiceEnabled.toggle()
+            }
+            .overlay { if !recorder.voiceEnabled { Rectangle().fill(KitColor.ink).frame(width: 3, height: 34).rotationEffect(.degrees(45)).allowsHitTesting(false) } }
+            KitIconButton(icon: "kit-icon-locate", label: "Recenter map", size: 52) {
                 focus = .user(heading: true)
             }
-            .accessibilityLabel("Recenter map")
         }
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         .padding(.trailing, 12)
     }
 
     /// Compact placement prompt shown while the rider is choosing a hazard spot.
     private var placementBar: some View {
         HStack(spacing: 12) {
-            Image(systemName: "hand.tap.fill")
+            Image("kit-icon-hazard").renderingMode(.template).resizable().frame(width: 22, height: 22).accessibilityHidden(true)
             Text("Tap the blue route to place the obstacle")
                 .font(.subheadline.weight(.medium))
             Spacer(minLength: 8)
@@ -254,10 +256,8 @@ struct NavigateView: View {
                 Text("Cancel").font(.subheadline.bold()).frame(minHeight: 52)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(.regularMaterial, in: .capsule)
-        .shadow(radius: 8, y: 2)
+        .foregroundStyle(KitColor.ink)
+        .kitCard(shadow: true, padding: 12)
         .padding(.horizontal, 16)
         .padding(.bottom, 24)
     }
@@ -279,30 +279,13 @@ struct NavigateView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Next turn: \(step.instruction), in \(Fmt.km(recorder.distanceToManeuver))")
             }
-            HStack(alignment: .firstTextBaseline, spacing: 16) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(Fmt.km(recorder.remainingDistance)).font(.title.bold())
-                    Text("to go").font(.caption2).foregroundStyle(.secondary)
-                }
-                Divider().frame(height: 28)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(Fmt.clock(recorder.remainingSeconds)).font(.headline).monospacedDigit()
-                    Text("left").font(.caption2).foregroundStyle(.secondary)
-                }
-                Spacer()
-                VStack(alignment: .trailing, spacing: 0) {
-                    Text(Fmt.eta(recorder.remainingSeconds)).font(.headline)
-                    Text("arrival").font(.caption2).foregroundStyle(.secondary)
-                }
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, recorder.currentStep == nil ? 22 : 8)
+            KitTimer(elapsed: recorder.movingSeconds, toGo: Fmt.km(recorder.remainingDistance),
+                     left: Fmt.clock(recorder.remainingSeconds), arrival: Fmt.eta(recorder.remainingSeconds),
+                     progress: recorder.progress)
+                .padding(.horizontal, 16)
+                .padding(.top, recorder.currentStep == nil ? 18 : 8)
 
-            ProgressView(value: recorder.progress)
-                .padding(.horizontal, 20)
-                .padding(.top, 10)
-
-            if detent != .height(150) {
+            if detent != .height(190) {
                 controls.padding(.top, 18)
             }
             if detent == .large {
@@ -316,33 +299,21 @@ struct NavigateView: View {
     private var controls: some View {
         VStack(spacing: 12) {
             HStack(spacing: 24) {
-                Stat(title: "Distance", value: Fmt.km(recorder.distance))
-                Stat(title: "Moving", value: Fmt.clock(recorder.movingSeconds))
-                Stat(title: "Speed", value: Fmt.speed(recorder.speed))
+                KitStat(value: Fmt.km(recorder.distance), caption: "ridden", style: .title3).frame(maxWidth: .infinity)
+                KitStat(value: Fmt.speed(recorder.speed), caption: "speed", style: .title3).frame(maxWidth: .infinity)
             }
 
-            Button {
-                recorder.phase == .running ? recorder.pause() : recorder.resume()
-            } label: {
-                Label(recorder.phase == .running ? "Pause" : "Resume",
-                      systemImage: recorder.phase == .running ? "pause.fill" : "play.fill")
-                    .font(.title3.bold())
-                    .frame(maxWidth: .infinity, minHeight: 52)
+            HStack(spacing: 12) {
+                KitButton(title: recorder.phase == .running ? "Pause" : "Resume",
+                          icon: recorder.phase == .running ? "kit-icon-pause" : "kit-icon-play",
+                          style: recorder.phase == .running ? .secondary : .primary) {
+                    recorder.phase == .running ? recorder.pause() : recorder.resume()
+                }
+                // A hold, so a bump or a wet glove can't end the ride.
+                HoldButton(title: "Hold to end ride", icon: "kit-icon-stop", style: .destructive, seconds: 1.5, action: end)
             }
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.roundedRectangle(radius: 18))
-
-            // A hold, so a bump or a wet glove can't end the ride.
-            HoldButton(title: "End ride", seconds: 1.5, action: end)
             #if DEBUG
-            Button {
-                recorder.fallDetected()
-            } label: {
-                Label("Simulate fall", systemImage: "bolt.triangle.fill")
-                    .font(.title3.bold())
-                    .frame(maxWidth: .infinity, minHeight: 52)
-            }
-            .buttonStyle(.bordered)
+            KitButton(title: "Simulate fall", icon: "kit-icon-hazard", style: .tertiary) { recorder.fallDetected() }
             #endif
         }
         .padding(.horizontal, 20)
@@ -374,7 +345,11 @@ struct NavigateView: View {
         }
         recorder.start()
         UIApplication.shared.isIdleTimerDisabled = true
-        if (RiderProfile.decode(UserDefaults.standard.string(forKey: RiderProfile.storageKey) ?? "") ?? RiderProfile()).fallSensitivity != .off {
+        var askNotifications = (RiderProfile.decode(UserDefaults.standard.string(forKey: RiderProfile.storageKey) ?? "") ?? RiderProfile()).fallSensitivity != .off
+        #if DEBUG
+        if Demo.screen != nil { askNotifications = false }   // a permission alert would cover the screenshots
+        #endif
+        if askNotifications {
             UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         }
     }
@@ -407,172 +382,203 @@ struct NavigateView: View {
     }
 }
 
-// MARK: - Pass-by sight
+// MARK: - Sight card
 
-/// The sight brief that pops up as the rider passes it: a title row with a close
-/// button over the shared SightDetail. Wraps the same content the pre-ride list
-/// shows, styled as a floating card rather than a system sheet (the nav screen
-/// already owns a persistent sheet).
+/// A sight's brief, from a tap on its map pin, as a Kit card over the map.
 struct PassBySightCard: View {
     let sight: Sight
-    var onVerdict: ((_ stopped: Bool) -> Void)? = nil
     let onClose: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
+            HStack(alignment: .top) {
+                KitAvatar(mood: .happy, size: 36)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(sight.name).font(.title3.bold())
-                    if let note = sight.note { Text(note).font(.subheadline).foregroundStyle(.secondary) }
+                    if let note = sight.note { Text(note).font(.subheadline).foregroundStyle(KitColor.muted) }
                 }
                 Spacer(minLength: 8)
                 Button(action: onClose) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.title2).foregroundStyle(.secondary)
-                        .frame(minWidth: 52, minHeight: 52)
+                    Image("kit-icon-close").renderingMode(.template).resizable().frame(width: 20, height: 20)
+                        .frame(minWidth: 44, minHeight: 44)
                 }
                 .accessibilityLabel("Close")
             }
             SightDetail(sight: sight)
-            if let onVerdict {
-                // Kit learns from these (Figma v3 · 04).
-                HStack(spacing: 10) {
-                    Button { onVerdict(true) } label: {
-                        Label("Stop here", systemImage: "flag.checkered").frame(maxWidth: .infinity, minHeight: 52)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    Button { onVerdict(false) } label: {
-                        Label("Skip", systemImage: "xmark").frame(maxWidth: .infinity, minHeight: 52)
-                    }
-                    .buttonStyle(.bordered)
-                }
-            }
         }
-        .padding(18)
-        .background(.regularMaterial, in: .rect(cornerRadius: 22))
-        .shadow(radius: 8, y: 2)
+        .foregroundStyle(KitColor.ink)
+        .kitCard(shadow: true, padding: 16)
     }
 }
 
 // MARK: - Banner
 
+/// The Kit message that slides into the guidance banner. One at a time, most urgent first.
+nonisolated struct BannerMessage: Equatable {
+    enum Kind: Equatable { case failure, blocked, walking, hazard, passing }
+    let kind: Kind
+    let label: String
+    let text: String
+    /// Replaces the distance row ("Rerouting", "Walk your bike").
+    var headline: String? = nil
+    /// Replaces the instruction line.
+    var subtitle: String? = nil
+    var mood: KitAvatar.Mood { kind == .passing ? .happy : .alarmed }
+    /// Pass-bys hide on their own after this long (the pixel bar shows time left); warnings stay.
+    static let passingSeconds = 8.0
+
+    static func pick(failure: String?, blocked: String?, walking: String?, hazard: HazardAlert?, passing: Sight?) -> BannerMessage? {
+        if let failure { return .init(kind: .failure, label: "Kit · no way round", text: failure) }
+        if let blocked {
+            return .init(kind: .blocked, label: "Kit · keeping you off the expressway",
+                         text: "New routes only use roads and paths where bikes are allowed.",
+                         headline: "Rerouting", subtitle: blocked)
+        }
+        if let walking {
+            return .init(kind: .walking, label: "Kit · on foot",
+                         text: "No cycling here. Your moving time is paused; I'll buzz when you can ride again.",
+                         headline: "Walk your bike", subtitle: walking)
+        }
+        if let hazard {
+            let note = hazard.note.isEmpty ? "Slow down and go carefully." : hazard.note
+            return .init(kind: .hazard, label: "Kit · \(hazard.kind.rawValue) in \(Fmt.km(hazard.distance))", text: note)
+        }
+        if let passing {
+            return .init(kind: .passing, label: "Kit · coming up",
+                         text: [passing.name, passing.note].compactMap { $0 }.joined(separator: ". "))
+        }
+        return nil
+    }
+
+    static func selfCheck() {
+        let hazard = HazardAlert(kind: .pothole, distance: 120, note: "")
+        let sight = Sight(name: "Red bridge", category: "bridge", lat: 1.4, lon: 103.9)
+        assert(pick(failure: nil, blocked: nil, walking: nil, hazard: nil, passing: nil) == nil, "nothing to say, no box")
+        assert(pick(failure: "x", blocked: "y", walking: "z", hazard: hazard, passing: sight)?.kind == .failure, "a failed reroute wins")
+        assert(pick(failure: nil, blocked: "y", walking: "z", hazard: hazard, passing: sight)?.kind == .blocked, "then the blocked reroute")
+        assert(pick(failure: nil, blocked: nil, walking: "Henderson Waves", hazard: hazard, passing: sight)?.headline == "Walk your bike")
+        assert(pick(failure: nil, blocked: nil, walking: nil, hazard: hazard, passing: sight)?.kind == .hazard, "a hazard beats a pass-by")
+        assert(pick(failure: nil, blocked: nil, walking: nil, hazard: hazard, passing: nil)?.text == "Slow down and go carefully.")
+        let p = pick(failure: nil, blocked: nil, walking: nil, hazard: nil, passing: sight)
+        assert(p?.kind == .passing && p?.mood == .happy && p?.text == "Red bridge", "pass-by: happy Kit, the place's name")
+    }
+}
+
+/// Kit/guidance banner (Figma 229:2405): native material with the turn, the instruction
+/// and, when Kit has something to say, Kit's message in the same card.
 struct GuidanceBanner: View {
     let step: StoredStep?
     let distance: Double
     let offRoute: Bool
     let rerouting: Bool
+    var message: BannerMessage? = nil
+    var onStop: () -> Void = {}
+    var onSkip: () -> Void = {}
+    var onDismiss: () -> Void = {}
+    var onTimeout: () -> Void = {}
+
+    private var headline: String {
+        if let h = message?.headline { return h }
+        if rerouting { return "Recalculating…" }
+        if offRoute { return "Off route" }
+        return Fmt.km(distance)
+    }
 
     var body: some View {
-        // Arrow and distance are always the big top row; the instruction sits under it.
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 12) {
-                Image(systemName: rerouting ? "arrow.triangle.2.circlepath" : (offRoute ? "exclamationmark.triangle.fill" : (step?.maneuver.symbol ?? "arrow.up")))
-                    .font(.system(.largeTitle, weight: .semibold))
-                    .accessibilityHidden(true)
-                // Rerouting always wins the headline, whether it was triggered by
-                // drifting off the line or by marking a closure on it.
-                if rerouting || offRoute {
-                    Text(rerouting ? "Recalculating…" : "Off route")
-                        .lineLimit(1).minimumScaleFactor(0.5)
-                } else {
-                    Text(Fmt.km(distance)).lineLimit(1).fixedSize()   // "600 m" never wraps
-                }
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                turnIcon.accessibilityHidden(true)
+                Text(headline).font(.system(.largeTitle, weight: .medium))
+                    .lineLimit(1).minimumScaleFactor(0.5)
                 Spacer(minLength: 0)
             }
-            .font(.system(.largeTitle, design: .rounded, weight: .bold))
-            Text(step?.instruction ?? "Follow the route")
-                .font(.body)
-                .foregroundStyle(.secondary)
-        }
-        .foregroundStyle((rerouting || offRoute) ? Color.orange : Color.primary)
-        .accessibilityElement(children: .combine)
-        .padding(18)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial, in: .rect(cornerRadius: 22))
-        .shadow(radius: 8, y: 2)
-    }
-}
-
-/// A reroute that couldn't find a way around a closure: shown inline until the
-/// rider explicitly dismisses it, never auto-dismissed and never a modal alert
-/// so it doesn't block the map.
-struct RerouteFailureBanner: View {
-    let message: String
-    let onDismiss: () -> Void
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "exclamationmark.triangle.fill")
-            Text(message)
-                .font(.subheadline.weight(.medium))
-            Spacer(minLength: 8)
-            Button(action: onDismiss) { Text("Dismiss").font(.subheadline.bold()).frame(minHeight: 52) }
-        }
-        .foregroundStyle(Color.orange)
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial, in: .rect(cornerRadius: 18))
-        .shadow(radius: 8, y: 2)
-    }
-}
-
-/// A marked hazard close by: what it is, how far, and the rider's note.
-struct HazardBanner: View {
-    let alert: HazardAlert
-
-    var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: alert.kind.symbol).font(.title2)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("\(alert.kind.rawValue) · \(Fmt.km(alert.distance))").font(.headline)
-                if !alert.note.isEmpty {
-                    Text(alert.note).font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+            .foregroundStyle((rerouting || offRoute) && message?.headline == nil ? Color.orange : Color.primary)
+            Text(message?.subtitle ?? step?.instruction ?? "Follow the route")
+                .font(.body.weight(.medium))
+            if let message {
+                KitBubble(label: message.label, text: message.text, mood: message.mood) {
+                    switch message.kind {
+                    case .passing:
+                        HStack(spacing: 8) {
+                            KitButton(title: "Stop here", icon: "kit-icon-flag", style: .primary, action: onStop)
+                            KitButton(title: "Skip", icon: "kit-icon-close", style: .secondary, action: onSkip)
+                        }
+                    case .failure:
+                        KitButton(title: "OK", icon: "kit-icon-check", style: .tertiary, action: onDismiss)
+                    default: EmptyView()
+                    }
+                }
+                if message.kind == .passing {
+                    PassByCountdown(onTimeout: onTimeout).id(message.text)   // a new place restarts the clock
                 }
             }
-            Spacer(minLength: 0)
         }
-        .foregroundStyle(Color.orange)
-        .padding(14)
+        .accessibilityElement(children: .contain)
+        .padding(.horizontal, 18).padding(.vertical, 14)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(.regularMaterial, in: .rect(cornerRadius: 18))
-        .shadow(radius: 8, y: 2)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Caution: \(alert.kind.rawValue), \(Fmt.km(alert.distance)) away. \(alert.note)")
+        .background(.regularMaterial, in: .rect(cornerRadius: 28))
+        .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+    }
+
+    /// The pixel turn arrow for right and left turns (mirrored); SF Symbols for the rest.
+    @ViewBuilder private var turnIcon: some View {
+        let m = step?.maneuver
+        if message?.kind == .walking || message?.kind == .blocked || rerouting || offRoute {
+            Image("kit-icon-turn-right").renderingMode(.template).resizable().frame(width: 32, height: 32)
+                .scaleEffect(x: message?.kind == .walking ? 1 : -1)
+        } else if m == .right || m == .slightRight || m == .sharpRight {
+            Image("kit-icon-turn-right").renderingMode(.template).resizable().frame(width: 32, height: 32)
+        } else if m == .left || m == .slightLeft || m == .sharpLeft {
+            Image("kit-icon-turn-right").renderingMode(.template).resizable().frame(width: 32, height: 32).scaleEffect(x: -1)
+        } else {
+            Image(systemName: m?.symbol ?? "arrow.up").font(.system(size: 28, weight: .semibold)).frame(width: 32, height: 32)
+        }
+    }
+}
+
+/// The gold pixel bar under a pass-by: drains over `BannerMessage.passingSeconds`, then hides it.
+private struct PassByCountdown: View {
+    let onTimeout: () -> Void
+    @State private var shownAt = Date.now
+
+    var body: some View {
+        TimelineView(.periodic(from: shownAt, by: 0.25)) { context in
+            KitSegmentBar(progress: 1 - context.date.timeIntervalSince(shownAt) / BannerMessage.passingSeconds,
+                          segments: 24, on: KitColor.gold, off: .gray.opacity(0.3), height: 4)
+        }
+        .accessibilityHidden(true)
+        .task {
+            try? await Task.sleep(for: .seconds(BannerMessage.passingSeconds))
+            onTimeout()
+        }
+    }
+}
+
+/// Kit/timer (Figma 214:59): ride time, the three numbers and pixel progress, in a Kit card.
+struct KitTimer: View {
+    let elapsed: Double
+    let toGo: String
+    let left: String
+    let arrival: String
+    let progress: Double
+
+    var body: some View {
+        VStack(spacing: 10) {
+            Text(Fmt.clock(elapsed)).font(.kitNumber(.title)).monospacedDigit()
+                .accessibilityLabel("Riding for \(Fmt.clock(elapsed))")
+            HStack(spacing: 0) {
+                KitStat(value: toGo, caption: "to go").frame(maxWidth: .infinity)
+                KitStat(value: left, caption: "left").frame(maxWidth: .infinity)
+                KitStat(value: arrival, caption: "arrival").frame(maxWidth: .infinity)
+            }
+            KitSegmentBar(progress: progress, segments: 24)
+        }
+        .foregroundStyle(KitColor.ink)
+        .kitCard(padding: 14)
     }
 }
 
 // MARK: - Bits
-
-struct CircleButton: View {
-    let symbol: String
-    var tint: Color = .accentColor
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Image(systemName: symbol)
-                .font(.headline)
-                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)   // the glyph stays inside its 52 pt disc
-                .frame(width: 52, height: 52)
-                .background(.regularMaterial, in: .circle)
-                .foregroundStyle(tint)
-        }
-        .shadow(radius: 3)
-    }
-}
-
-struct Stat: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        VStack(spacing: 2) {
-            Text(value).font(.title3.bold()).monospacedDigit()
-            Text(title).font(.caption2).foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-    }
-}
 
 // MARK: - Marking an obstacle
 
