@@ -29,6 +29,9 @@ nonisolated final class FallMonitor {
                                       accelG: (a.x * a.x + a.y * a.y + a.z * a.z).squareRoot(),
                                       rotation: (r.x * r.x + r.y * r.y + r.z * r.z).squareRoot())
             if self.detector.feed(sample) {
+                // Re-arm at once: after "I'm OK" the ride goes on and a second fall must count.
+                // (A fall while the prompt is up is ignored by fallDetected().)
+                self.detector.reset()
                 Task { @MainActor in onFall() }
             }
         }

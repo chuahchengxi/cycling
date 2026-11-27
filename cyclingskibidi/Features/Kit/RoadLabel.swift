@@ -39,6 +39,7 @@ nonisolated enum KitColor {
         assert(contrast(0x2B2A27, 0xB78773) >= 4.5, "ink on terracotta fails WCAG AA")
         assert(contrast(0x2B2A27, 0xC5AF76) >= 4.5, "ink on gold fails WCAG AA")
         assert(contrast(0xF4F1EA, 0x2B2A27) >= 4.5, "paper on ink fails WCAG AA")
+        assert(contrast(0xFFFFFF, 0xB80A0A) >= 4.5, "white on the HELP red fails WCAG AA")
         // Why kitSurface exists: the Figma dark values fail with either ink.
         assert(contrast(0xEFE8D8, 0xA8604B) < 4.5 && contrast(0x2B2A27, 0xA8604B) < 4.5)
     }

@@ -176,15 +176,15 @@ struct NavigateView: View {
         }
     }
 
-    /// The place named on the HELP screen: the closest sight within 300 m, or a
-    /// generic connector. The rider's snapped fix is the fallback coordinate.
+    /// The place named on the HELP screen: the closest sight within 300 m, or a generic
+    /// connector. The coordinates are always the rider's own raw fix: that's where help goes.
     private var helpSpot: (place: String, coordinate: CLLocationCoordinate2D?) {
-        guard let rider = recorder.snapped ?? recorder.location else { return ("Park connector", nil) }
+        guard let rider = recorder.location ?? recorder.snapped else { return ("Park connector", nil) }
         let nearest = recorder.sights
             .map { ($0, Geo.distance(rider, $0.coordinate)) }
             .filter { $0.1 <= 300 }
             .min { $0.1 < $1.1 }?.0
-        return (nearest?.name ?? "Park connector", nearest?.coordinate ?? rider)
+        return (nearest?.name ?? "Park connector", rider)
     }
 
     private var map: some View {

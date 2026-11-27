@@ -19,7 +19,7 @@ struct AreYouOKView: View {
     let onRingNow: () -> Void
 
     var body: some View {
-        TimelineView(.animation) { context in
+        TimelineView(.periodic(from: .now, by: 0.5)) { context in
             let seconds = max(0, Int((deadline.timeIntervalSince(context.date)).rounded(.up)))
             VStack(spacing: 24) {
                 Text("Are you OK?")
@@ -67,7 +67,6 @@ struct AreYouOKView: View {
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isModal)
         .onAppear {
-            if !AlarmSound.shared.isPlaying { AlarmSound.shared.start(.rising) }
             UIAccessibility.post(notification: .screenChanged, argument: "Are you OK?")
         }
     }
@@ -85,6 +84,8 @@ struct HelpAlarmView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private let ink = Color(.sRGB, red: 0.07, green: 0.07, blue: 0.09)
+    /// Deep red: white text on it passes WCAG AA (system red doesn't).
+    private let red = Color(.sRGB, red: 0.72, green: 0.04, blue: 0.04)
 
     var body: some View {
         TimelineView(.periodic(from: since, by: 0.25)) { context in
@@ -130,13 +131,12 @@ struct HelpAlarmView: View {
                 .foregroundStyle(.white)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(reduceMotion || flashing ? Color.red : ink)
+            .background(reduceMotion || flashing ? red : ink)
             .ignoresSafeArea()
         }
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isModal)
         .onAppear {
-            if !AlarmSound.shared.isPlaying { AlarmSound.shared.start(.help) }
             UIAccessibility.post(notification: .screenChanged, argument: "HELP alarm. Call 995. Don't move them.")
             AudioServicesPlayAlertSound(SystemSoundID(1005))
         }
