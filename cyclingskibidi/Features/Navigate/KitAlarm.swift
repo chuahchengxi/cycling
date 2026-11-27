@@ -45,6 +45,10 @@ nonisolated struct AlarmZone: Sendable {
     let circles: [NoGoCircle]
 }
 
+/// The full-screen Kit alarm (Figma v3 · 07, 08, 11, 12): hazard tape top and bottom,
+/// the label chip, distance and what it is first, Kit alarmed in rippling rings, then
+/// Kit's buttons. Dark mode fills the screen with the alarm colour; light mode puts it
+/// on a card over paper (v3 · 11).
 struct KitAlarmView: View {
     let alarm: KitAlarm
     let onPrimary: () -> Void
@@ -52,51 +56,50 @@ struct KitAlarmView: View {
     let onNotThere: () -> Void
 
     @AppStorage(AlertScheme.storageKey) private var scheme: AlertScheme = .kit
+    @Environment(\.colorScheme) private var colorScheme
+    private var light: Bool { colorScheme == .light }
     private var fill: UInt32 { alarm.tone == .obstacle ? scheme.fills.obstacle : scheme.fills.noAccess }
     private var text: Color { Color(hex: AlertScheme.text(on: fill)) }
-
     private var metres: Int { Int(alarm.distance.rounded()) }
-    private var label: RoadLabelKind? {
+
+    private var label: (icon: String, text: String) {
         switch alarm.kind {
-        case .noBikes(let expressway): return expressway ? .expressway : .noBikes
-        case .closure: return .closed
-        case .walk: return .walkYourBike
-        case .hazard: return nil
+        case .hazard: ("kit-icon-hazard", "KIT · OBSTACLE AHEAD")
+        case .noBikes: ("kit-icon-expressway", "KIT · NO BIKES")
+        case .closure: ("kit-icon-closed", "KIT · PATH CLOSED")
+        case .walk: ("kit-icon-closed", "KIT · NO CYCLING")
+        }
+    }
+    private var icons: (primary: String, secondary: String) {
+        switch alarm.kind {
+        case .hazard, .closure: ("kit-icon-chevron", "kit-icon-check")
+        case .walk, .noBikes: ("kit-icon-flag", "kit-icon-chevron")
         }
     }
 
     var body: some View {
-        ScrollView {   // large accessibility text on a small phone must still reach the buttons
-            VStack(alignment: .leading, spacing: 20) {
-                if let label { RoadLabel(kind: label) }
-                // Distance and what it is first (spec section 7), Kit smaller.
-                Text(alarm.tone == .noAccess ? "STOP IN \(metres) m" : "\(metres) m")
-                    .font(.system(size: 56, weight: .black, design: .monospaced))
-                    .minimumScaleFactor(0.6).lineLimit(1)
-                    .contentTransition(.numericText())
-                    .accessibilityLabel(alarm.tone == .noAccess ? "Stop in \(metres) metres" : "\(metres) metres ahead")
-                Text(alarm.title).font(.title2.bold())
-                Label {
-                    Text(alarm.detail).font(.body)
-                } icon: {
-                    Image(systemName: "cat.fill").accessibilityLabel("Kit")
+        VStack(spacing: 0) {
+            KitHazardTape()
+            GeometryReader { geo in
+                ScrollView {   // large accessibility text on a small phone must still reach the buttons
+                    VStack(spacing: 0) {
+                        message
+                        Spacer(minLength: 16)
+                        KitAlarmedFigure(ring: light ? KitColor.ink : KitColor.paper)
+                        Spacer(minLength: 16)
+                        actions.padding(.horizontal, 24)
+                    }
+                    .padding(.top, 14)
+                    .padding(.bottom, 28)
+                    .frame(minHeight: geo.size.height)
                 }
-                VStack(spacing: 12) {
-                    button(alarm.buttons.primary, filled: true, action: onPrimary)
-                    button(alarm.buttons.secondary, filled: false, action: onSecondary)
-                    button("It's not there", filled: false, action: onNotThere)
-                }
+                .scrollBounceBehavior(.basedOnSize)
             }
-            .padding(24)
-            .padding(.top, 40)
+            KitHazardTape()
         }
-        .foregroundStyle(text)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .background(Color(hex: fill).ignoresSafeArea())
-        .overlay(alignment: .top) {   // walk stretches carry a band of the hazard colour on the no-access fill
-            if alarm.kind == .walk { Color(hex: scheme.fills.obstacle).frame(height: 10).ignoresSafeArea() }
-        }
-        .kitSurface()
+        // Kit's ink, paper and sage are the same in both themes here; `light` only picks the layout.
+        .environment(\.colorScheme, .light)
+        .background((light ? KitColor.paper : Color(hex: fill)).ignoresSafeArea())
         .accessibilityElement(children: .contain)
         .accessibilityAddTraits(.isModal)
         .onAppear {
@@ -106,15 +109,135 @@ struct KitAlarmView: View {
         }
     }
 
-    private func button(_ title: String, filled: Bool, action: @escaping () -> Void) -> some View {
+    /// Label chip, distance, what it is, Kit's line (v3 · 07 "Message").
+    private var message: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Image(label.icon).renderingMode(.template).resizable().frame(width: 16, height: 16).accessibilityHidden(true)
+                Text(label.text).font(.caption.bold()).tracking(0.96)
+            }
+            .foregroundStyle(KitColor.ink)
+            .padding(.horizontal, 10).padding(.vertical, 6)
+            .background(light ? Color(hex: fill) : KitColor.paper)
+            .overlay(Rectangle().stroke(KitColor.ink, lineWidth: 2))
+
+            Text(alarm.tone == .noAccess ? "STOP IN \(metres) m" : "\(metres) m")
+                .font(.system(size: alarm.tone == .noAccess ? 72 : 104, weight: .black, design: .monospaced))
+                .minimumScaleFactor(0.4).lineLimit(1)
+                .contentTransition(.numericText())
+                .accessibilityLabel(alarm.tone == .noAccess ? "Stop in \(metres) metres" : "\(metres) metres ahead")
+            Text(alarm.title).font(.title.bold())
+            Text(alarm.detail).font(.body)
+        }
+        .foregroundStyle(text)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(light ? 14 : 0)
+        .background(light ? Color(hex: fill) : .clear)
+        .overlay { if light { Rectangle().stroke(KitColor.ink, lineWidth: 2) } }
+        .padding(.horizontal, light ? 16 : 24)
+    }
+
+    private var actions: some View {
+        VStack(spacing: 12) {
+            KitButton(title: alarm.buttons.primary, icon: icons.primary, style: .primary, action: onPrimary)
+            KitButton(title: alarm.buttons.secondary, icon: icons.secondary, style: .secondary, action: onSecondary)
+            KitButton(title: "It's not there", icon: "kit-icon-close", style: .tertiary, action: onNotThere)
+        }
+    }
+}
+
+/// Kit/button (Figma 220:695): square, 2 pt ink border, ink text, a 20 pt pixel icon.
+/// Primary is sage with a hard 3 pt shadow, one per screen; secondary paper; tertiary a
+/// shorter paper button with smaller text.
+struct KitButton: View {
+    enum Style { case primary, secondary, tertiary }
+    let title: String
+    let icon: String
+    var style: Style = .secondary
+    let action: () -> Void
+
+    var body: some View {
         Button(action: action) {
-            Text(title).font(.headline)
-                .frame(maxWidth: .infinity, minHeight: 52)   // 52 pt touch targets (spec 7)
-                .foregroundStyle(filled ? KitColor.paper : KitColor.ink)
-                .background(filled ? KitColor.ink : KitColor.paper)
-                .overlay(Rectangle().stroke(text, lineWidth: 2))   // the outline reads on every scheme
+            HStack(spacing: 8) {
+                Image(icon).renderingMode(.template).resizable().frame(width: 20, height: 20).accessibilityHidden(true)
+                Text(title).font(style == .tertiary ? .subheadline.weight(.semibold) : .headline)
+            }
+            .foregroundStyle(KitColor.ink)
+            .padding(.horizontal, 20)
+            .frame(maxWidth: .infinity, minHeight: style == .tertiary ? 52 : 56)
+            .background(style == .primary ? KitColor.sage : KitColor.paper)
+            .overlay(Rectangle().stroke(KitColor.ink, lineWidth: 2))
+            .background(alignment: .topLeading) {
+                if style == .primary { KitColor.shadow.offset(x: 3, y: 3) }
+            }
         }
         .buttonStyle(.plain)
+    }
+}
+
+/// Kit/hazard-tape (225:2110): ochre and ink tape scrolling sideways; still with Reduce Motion.
+struct KitHazardTape: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        // Stripes in an overlay so their 1380 pt width never widens the layout.
+        KitColor.gold
+            .frame(height: 28)
+            .overlay(alignment: .leading) {
+                TimelineView(.animation(paused: reduceMotion)) { context in
+                    // One stripe period (28 pt) every 0.5 s, so the loop is seamless.
+                    let shift = reduceMotion ? 0 : -28 * context.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 0.5) / 0.5
+                    HStack(spacing: 0) {
+                        ForEach(0..<3, id: \.self) { _ in Image("kit-hazard-stripes").resizable().frame(width: 460, height: 28) }
+                    }
+                    .offset(x: shift)
+                }
+            }
+            .clipped()
+            .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 3))
+        .accessibilityHidden(true)
+    }
+}
+
+/// Kit/alarm-pulse behind Kit/alarmed (225:2063, 225:2135): square rings ripple out while
+/// Kit wobbles with a pixel "!". Still with Reduce Motion.
+struct KitAlarmedFigure: View {
+    let ring: Color
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        TimelineView(.animation(paused: reduceMotion)) { context in
+            let t = reduceMotion ? 0.45 : context.date.timeIntervalSinceReferenceDate
+            ZStack(alignment: .topLeading) {
+                // Four rings a quarter-cycle apart, 1.8 s per ripple (0.45 s per Figma step).
+                ForEach(0..<4, id: \.self) { i in
+                    let p = (t / 1.8 + Double(i) / 4).truncatingRemainder(dividingBy: 1)
+                    let side = 33.3 + (200 - 33.3) * p
+                    Rectangle().stroke(ring, lineWidth: 5)
+                        .frame(width: side, height: side)
+                        .opacity(p < 1.0 / 3 ? p * 3 : (1 - p) * 1.5)
+                        .position(x: 100, y: 100)
+                }
+                // Kit: a sage tile with a 4.65 pt ink border, tilted 7° (wobbling ±4°).
+                let wobble = reduceMotion ? 7 : 7 + 4 * (Int(t / 0.16) % 2 == 0 ? 1.0 : -1.0)
+                ZStack(alignment: .topLeading) {
+                    KitColor.sage
+                    Image("kit-alarmed").resizable().frame(width: 83.7, height: 83.7).offset(y: 2.32)
+                }
+                .frame(width: 93, height: 93)
+                .clipped()
+                .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 4.65))
+                .rotationEffect(.degrees(wobble))
+                .position(x: 38 + 62, y: 44 + 77.5)
+                Image("kit-alarm-bang").renderingMode(.template).resizable()
+                    .foregroundStyle(ring)
+                    .frame(width: 12.4, height: 31)
+                    .position(x: 38 + 102.3 + 6.2, y: 44 + 15.5)
+            }
+            .frame(width: 200, height: 200)
+        }
+        .frame(width: 200, height: 200)
+        .accessibilityHidden(true)
     }
 }
 

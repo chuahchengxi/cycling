@@ -24,6 +24,20 @@ enum Demo {
             .replacingOccurrences(of: "-demo:", with: "")
     }
 
+    /// -demo:alarm-hazard | -demo:alarm-expressway | -demo:alarm-walk: one Kit alarm over everything.
+    static var alarm: KitAlarm? {
+        let at = Coord(lat: 1.29, lon: 103.78)
+        switch screen {
+        case "alarm-hazard": return KitAlarm(key: "h", kind: .hazard(.glass), title: "Fallen tree across the path",
+                                             detail: "Slow down now. Kit found a way round, +300 m.", distance: 80, coordinate: at)
+        case "alarm-expressway": return KitAlarm(key: "x", kind: .noBikes(expressway: true), title: "Expressway ahead: bikes not allowed",
+                                                 detail: "This slip road joins the Ayer Rajah Expressway. Stop and turn back.", distance: 60, coordinate: at)
+        case "alarm-walk": return KitAlarm(key: "w", kind: .walk, title: "Henderson Waves: walk your bike",
+                                           detail: "Cycling isn't allowed on the bridge. Push across.", distance: 40, coordinate: at)
+        default: return nil
+        }
+    }
+
     private static let waypoints = [
         Coord(lat: 1.29926, lon: 103.78776),
         Coord(lat: 1.30180, lon: 103.79180),

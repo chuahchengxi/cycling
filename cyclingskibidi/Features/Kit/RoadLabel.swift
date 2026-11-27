@@ -18,6 +18,9 @@ nonisolated enum KitColor {
     static let terracotta = Color(uiColor: UIColor { traits in
         rgb(traits.userInterfaceStyle == .dark ? 0xA8604B : 0xB78773)
     })
+    /// Kit's one primary colour (Kit/button primary) and its hard shadow.
+    static let sage = Color(.sRGB, red: 0xA8 / 255.0, green: 0xB6 / 255.0, blue: 0x9A / 255.0)
+    static let shadow = Color(.sRGB, red: 0x3B / 255.0, green: 0x33 / 255.0, blue: 0x55 / 255.0)
     static let gold = Color(uiColor: UIColor { traits in
         rgb(traits.userInterfaceStyle == .dark ? 0xA88A40 : 0xC5AF76)
     })

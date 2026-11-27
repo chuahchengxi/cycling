@@ -43,6 +43,8 @@ final class RideRecorder {
     var startSound: (AlarmSound.Style) -> Void = { AlarmSound.shared.start($0) }
     var stopSound: () -> Void = { AlarmSound.shared.stop() }
     private let fallMonitor = FallMonitor()
+    /// DEBUG checks replace the fall monitor and GPS start with this, so start() and resume() are testable.
+    var startSensors: ((FallSensitivity) -> Void)?
     private var fallTimer: Task<Void, Never>?
 
     // Navigation state
@@ -227,8 +229,11 @@ final class RideRecorder {
         }
         phase = .running
         lastFixAt = nil
-        fallMonitor.start(sensitivity: loadProfile().fallSensitivity) { [weak self] in self?.fallDetected() }
-        listen()
+        let sensitivity = loadProfile().fallSensitivity
+        if let startSensors { startSensors(sensitivity) } else {
+            fallMonitor.start(sensitivity: sensitivity) { [weak self] in self?.fallDetected() }
+            listen()
+        }
         // Only the departure direction, and only on a real start — the tiered
         // guidance handles every turn after, and resume shouldn't re-announce.
         if fresh { announce(steps.first?.instruction ?? "Follow the route.") }
@@ -555,7 +560,7 @@ final class RideRecorder {
         guard let fix = location else { rerouteFailure = "No GPS fix yet, so I can't find a way round."; return }
         guard !rerouting else { return }   // one is already on its way; the banner says "Recalculating"
         offRoute = false
-        markOffRoute(from: fix)
+        markOffRoute(from: fix, manual: true)
     }
 
     /// Walk-your-bike mode (Figma v3 · 16), with hysteresis: on at the circle's edge,
@@ -681,7 +686,8 @@ final class RideRecorder {
 
     private static func key(_ h: Obstacle) -> String { "\(h.latitude),\(h.longitude),\(h.reportedAt.timeIntervalSince1970)" }
 
-    private func markOffRoute(from fix: CLLocationCoordinate2D) {
+    /// `manual`: the rider asked for a way round, so a failed plan must say so (automatic ones stay quiet).
+    private func markOffRoute(from fix: CLLocationCoordinate2D, manual: Bool = false) {
         offRoute = true
         announce("Off route. Recalculating.")
         guard !pinsAhead.isEmpty, !rerouting else { return }
@@ -692,7 +698,10 @@ final class RideRecorder {
             // Routing.plan always avoids every "Path closed" the rider has marked.
             guard let plan = try? await Routing.plan(through: [Coord(fix)] + ahead, mode: self?.mode ?? .moderate,
                                                       context: self?.loadProfile().today ?? [], scenic: self?.scenic ?? 0),
-                  !plan.polyline.isEmpty, let self else { return }
+                  !plan.polyline.isEmpty, let self else {
+                if manual { self?.rerouteFailed("Couldn't find a way round from here. Keep to your route and go carefully.") }
+                return
+            }
             if !self.applyReroute(plan) { self.announce(self.rerouteBlockedReason ?? "") }
         }
     }
@@ -731,6 +740,7 @@ final class RideRecorder {
     }
 
     func dismissRerouteFailure() { rerouteFailure = nil }
+    private func rerouteFailed(_ why: String) { rerouteFailure = why; announce(why, safety: true) }
 
     /// Swap in a freshly planned route, resetting the navigation state that
     /// tracked the old line. Shared by every reroute path so they never drift
@@ -1044,6 +1054,20 @@ final class RideRecorder {
         assert(r.fallPhase == .none && silences == 5, "finish clears the countdown")
         r.reset()
         assert(r.fallPhase == .none, "reset clears the countdown")
+
+        // start() and resume() (re)start the fall monitor with the rider's sensitivity.
+        var starts: [FallSensitivity] = []
+        r.startSensors = { starts.append($0) }
+        profile.fallSensitivity = .high
+        r.start()
+        assert(starts == [.high], "start() starts the fall monitor: \(starts)")
+        r.pause()
+        r.resume()
+        assert(starts == [.high, .high] && r.phase == .running, "resume() restarts the fall monitor")
+        r.fallDetected()
+        assert(deadline(r.fallPhase) != nil, "a resumed ride detects falls again")
+        _ = r.finish()
+        r.reset()
 
         // Old profiles stored before this field existed still use Normal.
         let json = "{\"likes\":[],\"today\":[],\"level\":\"regular\",\"weights\":{}}"

@@ -73,6 +73,7 @@ struct ContentView: View {
         .onChange(of: obstacles, initial: true) { Closures.marked = obstacles.compactMap(\.asClosure) }
         #if DEBUG
         .task { await openDemoScreen() }
+        .overlay { if let a = Demo.alarm { KitAlarmView(alarm: a, onPrimary: {}, onSecondary: {}, onNotThere: {}) } }
         #endif
     }
 
