@@ -213,10 +213,11 @@ struct PlacePin: View {
         // rest stops paper, everything else sage. Light scheme so the ink stays dark on the map.
         PixelIcon(rows: PixelArt.forCategory(category), size: 16)
             .foregroundStyle(KitColor.ink)
-            .padding(5)
+            .padding(6)
             .background(["hawker", "restaurant", "cafe"].contains(category) ? KitColor.terracotta
-                        : RestStops.amenityCategories.contains(category) ? KitColor.paper : KitColor.sage)
-            .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
+                        : RestStops.amenityCategories.contains(category) ? KitColor.paper : KitColor.sage, in: .circle)
+            .overlay(Circle().strokeBorder(.white, lineWidth: 2))
+            .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
             .environment(\.colorScheme, .light)
             .accessibilityElement()
             .accessibilityLabel("\(Discovery.icon(for: category).label): \(name)")

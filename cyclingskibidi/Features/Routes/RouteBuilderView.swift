@@ -73,8 +73,11 @@ struct RouteBuilderView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { naming = true }.disabled(!canSave)
+                }
             }
-            .searchable(text: $query, prompt: "Search for a place")
+            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search for a place")
             .onSubmit(of: .search, runSearch)
             .onChange(of: query) { if query.isEmpty { results = [] } }
             .overlay(alignment: .top) { searchResults }
@@ -89,6 +92,9 @@ struct RouteBuilderView: View {
             .sheet(item: $selectedSight) { SightSheet(sight: $0) }
             .sheet(isPresented: $editingInterests) { InterestsSheet() }
             .onChange(of: mode) { _, _ in replan() }
+            #if DEBUG
+            .task { if Demo.screen == "builder-route", waypoints.isEmpty, let loop = PresetLoops.all.dropFirst().first { use(loop) } }
+            #endif
             .onChange(of: profileRaw) { _, _ in direct = nil }   // today's context changes the direct line too
             .onChange(of: profileRaw) { _, _ in replan() }   // "For you" edits re-pick
         }
@@ -150,7 +156,19 @@ struct RouteBuilderView: View {
 
     // MARK: Bottom bar
 
+    /// Native glass panel, capped so the map and route stay visible; it scrolls when full.
     private var controls: some View {
+        ViewThatFits(in: .vertical) {
+            panel
+            ScrollView { panel }.scrollBounceBehavior(.basedOnSize)
+        }
+        .frame(maxHeight: 380)
+        .frame(maxWidth: .infinity)
+        .background(.regularMaterial, in: .rect(cornerRadius: 22))
+        .padding(12)
+    }
+
+    private var panel: some View {
         VStack(spacing: 12) {
             if waypoints.count >= 2 {
                 HStack {
@@ -211,30 +229,36 @@ struct RouteBuilderView: View {
                     .multilineTextAlignment(.center)
             } else {
                 // Figma v3 · 02: three big figures, then the extras as Kit tags.
-                HStack(alignment: .top) {
-                    KitStat(value: Fmt.km(plan.distance), caption: "distance")
-                    Spacer()
-                    KitStat(value: Fmt.duration(plan.expected), caption: "at \(mode.rawValue.lowercased()) pace")
-                    Spacer()
-                    KitStat(value: difficulty.rawValue, caption: "difficulty")
+                HStack(alignment: .firstTextBaseline) {
+                    figure(Fmt.km(plan.distance), "Distance")
+                    figure(Fmt.duration(plan.expected), "At \(mode.rawValue.lowercased()) pace")
+                    figure(difficulty.rawValue, "Difficulty")
                 }
-                if plan.ascent > 0 || plan.offConnectorMeters > 0 {
-                    FlowLayout {
-                        if plan.ascent > 0 { KitChip(text: "↗ \(Int(plan.ascent)) m", caps: false) }
-                        if plan.offConnectorMeters > 0 {
-                            KitChip(text: "\(Fmt.km(plan.offConnectorMeters)) off-connector", icon: "kit-icon-hazard", fill: KitColor.gold, caps: false)
-                                .kitSurface()
-                        }
-                    }
+                if plan.ascent > 0 {
+                    Label("\(Int(plan.ascent)) m of climbing", systemImage: "arrow.up.right")
+                        .font(.footnote).foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if plan.offConnectorMeters > 0 {
+                    Label("\(Fmt.km(plan.offConnectorMeters)) is off the park connectors", systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote).foregroundStyle(.orange)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
 
-            if mode != .fast, let sights, !sights.isEmpty, !sightsLoading { KitCard(count: sights.count, byModel: kitByModel) }
+            if mode != .fast, let sights, !sights.isEmpty, !sightsLoading {
+                // One quiet line here; the full Kit bubble lives on the route brief.
+                Label {
+                    Text(kitByModel ? "Kit picked \(sights.count) places for what you like" : "Kit's quick picks: \(sights.count) places for what you like")
+                } icon: { KitAvatar(size: 22) }
+                .font(.footnote).foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
             if mode != .fast { placesSection }
             if waypoints.isEmpty { loopsSection }   // never wipes pins the rider placed
 
             HStack {
-                Button(role: .destructive) {
+                Button {
                     waypoints.removeLast()
                     replan()
                 } label: {
@@ -244,7 +268,7 @@ struct RouteBuilderView: View {
 
                 Spacer()
 
-                Button {
+                Button(role: .destructive) {
                     waypoints = []
                     plan = RoutePlan()
                     generation += 1
@@ -257,17 +281,18 @@ struct RouteBuilderView: View {
             }
             .font(.subheadline)
             .buttonStyle(.bordered)
-
-            if !plan.polyline.isEmpty {
-                KitButton(title: "Save route", icon: "kit-icon-check", style: .primary) { naming = true }
-                    .disabled(!canSave)
-                    .opacity(canSave ? 1 : 0.5)
-            }
+            .buttonBorderShape(.capsule)
         }
         .padding(16)
+    }
+
+    private func figure(_ value: String, _ caption: String) -> some View {
+        VStack(spacing: 2) {
+            Text(value).font(.title3.weight(.semibold)).monospacedDigit().lineLimit(1).minimumScaleFactor(0.7)
+            Text(caption).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+        }
         .frame(maxWidth: .infinity)
-        .background(.regularMaterial, in: .rect(cornerRadius: 22))
-        .padding(12)
+        .accessibilityElement(children: .combine)
     }
 
     private var canSave: Bool { !plan.polyline.isEmpty && !planning && !(mode != .fast && sightsLoading) }
@@ -307,10 +332,9 @@ struct RouteBuilderView: View {
                                             .font(.caption2)
                                             .foregroundStyle(.secondary)
                                     }
-                                    .padding(.horizontal, 12)
+                                    .padding(.horizontal, 12).padding(.vertical, 8)
                                     .frame(minHeight: 44, alignment: .leading)
-                                    .background(KitColor.paper)
-                                    .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
+                                    .background(.fill.tertiary, in: .rect(cornerRadius: 12))
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityLabel("\(sight.name), \(Discovery.icon(for: sight.category).label), \(Fmt.km(sight.offsetAlong)) along the route")
@@ -336,10 +360,9 @@ struct RouteBuilderView: View {
                                 Text(loop.blurb).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
                             }
                             .frame(width: 240, alignment: .leading)
-                            .padding(.horizontal, 12)
+                            .padding(.horizontal, 12).padding(.vertical, 10)
                             .frame(minHeight: 44, alignment: .leading)
-                            .background(KitColor.paper)
-                            .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
+                            .background(.fill.tertiary, in: .rect(cornerRadius: 12))
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("\(loop.name). \(loop.blurb)")
@@ -363,8 +386,13 @@ struct RouteBuilderView: View {
 
     private func use(_ loop: PresetLoop) {
         waypoints = loop.waypoints
-        if let first = waypoints.first {
-            focus = .region(.init(center: first.cl, latitudinalMeters: 12_000, longitudinalMeters: 12_000))
+        // Whole loop in view; extra padding since the panel covers the lower part of the map.
+        // The panel covers the lower half of the map: centre the loop in the half above it.
+        let lats = loop.waypoints.map(\.lat), lons = loop.waypoints.map(\.lon)
+        if let la0 = lats.min(), let la1 = lats.max(), let lo0 = lons.min(), let lo1 = lons.max() {
+            let span = max(la1 - la0, lo1 - lo0, 0.01) * 1.6
+            focus = .region(.init(center: .init(latitude: (la0 + la1) / 2 - span * 0.9, longitude: (lo0 + lo1) / 2),
+                                  span: .init(latitudeDelta: span * 2.6, longitudeDelta: span)))
         }
         sights = nil
         sightsLoading = false
@@ -463,13 +491,12 @@ private struct WaypointPin: View {
     let last: Bool
 
     var body: some View {
-        // Kit squares: start sage, end ink, the rest paper (as RouteSketch draws them).
-        Text("\(index + 1)").font(.caption2.bold())
-            .foregroundStyle(last ? KitColor.paper : KitColor.ink)
+        // Round with a white ring, as Maps draws its own markers: start green, end red.
+        Text("\(index + 1)").font(.caption2.bold()).foregroundStyle(.white)
             .frame(width: 26, height: 26)
-            .background(last ? KitColor.ink : index == 0 ? KitColor.sage : KitColor.paper)
-            .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
-            .environment(\.colorScheme, .light)
+            .background(last ? Color.red : index == 0 ? Color.green : Color.blue, in: .circle)
+            .overlay(Circle().strokeBorder(.white, lineWidth: 2))
+            .shadow(color: .black.opacity(0.25), radius: 2, y: 1)
     }
 }
 

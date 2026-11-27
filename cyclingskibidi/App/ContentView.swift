@@ -78,7 +78,9 @@ struct ContentView: View {
             switch Demo.screen {
             case "onboarding": OnboardingView()
             case "newroute": CreateRouteFlow()
-            case "builder": RouteBuilderView(mode: .leisure)
+            case "sight": SightSheet(sight: Discovery.places.first { Discovery.facts[$0.osmID ?? ""]?.note?.stalls?.isEmpty == false } ?? Discovery.places[0])
+            case "sight-plain": SightSheet(sight: Discovery.places.first { $0.name == "Neighbourhood Park" } ?? Discovery.places[0])
+            case "builder", "builder-route": RouteBuilderView(mode: .leisure)
             case "interests": InterestsSheet()
             case "mark": ObstacleReportView(coordinate: nil)
             case "stats": NavigationStack { StatsView() }

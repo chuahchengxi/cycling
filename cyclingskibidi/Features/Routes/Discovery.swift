@@ -439,10 +439,9 @@ struct DiscoveryPanel: View {
                                     Text(place.name).font(.footnote.weight(.medium)).lineLimit(1)
                                 }
                                 .foregroundStyle(KitColor.ink)
-                                .padding(.horizontal, 10)
+                                .padding(.horizontal, 12).padding(.vertical, 8)
                                 .frame(minHeight: 44)
-                                .background(KitColor.paper)
-                                .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
+                                .background(.fill.tertiary, in: .capsule)
                             }
                             .buttonStyle(.plain)
                         }
@@ -476,20 +475,90 @@ struct SightBadge: View {
 struct SightDetail: View {
     let sight: Sight
 
+    private var facts: PlaceFacts? { sight.osmID.flatMap { Discovery.facts[$0] } }
+
+    /// Everything we know, sourced from places.json and our research notes. Nothing invented.
+    var lines: [(symbol: String, text: String)] {
+        var out: [(String, String)] = []
+        let n = facts?.note
+        if n?.status == "closed" {
+            out.append(("xmark.octagon", "Closed" + (n?.valid_until.map { " until \($0)" } ?? "")))
+        }
+        if let text = sight.note, !text.isEmpty { out.append(("pawprint", text)) }
+        if let text = n?.note, !text.isEmpty, text != sight.note { out.append(("text.quote", text)) }
+        for stall in n?.stalls ?? [] {
+            let tag = stall.bib.map { "Michelin Bib Gourmand \($0)" } ?? stall.since.map { "since \($0)" }
+            out.append(("fork.knife", tag.map { "\(stall.name), \($0)" } ?? stall.name))
+        }
+        if let dishes = n?.dishes, !dishes.isEmpty { out.append(("takeoutbag.and.cup.and.straw", "Try " + dishes.joined(separator: ", "))) }
+        if let best = n?.best_time, !best.isEmpty { out.append(("clock", "Best time: \(best)")) }
+        if let f = facts, f.hours != nil, n?.status != "closed" {
+            out.append(("clock.badge.checkmark", f.isOpen(at: .now) ? "Open now" : "Closed right now"))
+        }
+        if facts?.wiki == true { out.append(("book", "Has a Wikipedia article")) }
+        return out
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             let icon = Discovery.icon(for: sight.category)
             Label(icon.label, systemImage: icon.symbol)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(.secondary)
-            if !sight.address.isEmpty {
-                Text(sight.address).font(.body)
+            ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                Label(line.text, systemImage: line.symbol).font(.body)
             }
-            if let tel = telURL {
-                Link(destination: tel) { Label("Call", systemImage: "phone") }
-                    .font(.subheadline)
-                    .buttonStyle(.bordered)
+            if !sight.address.isEmpty { Label(sight.address, systemImage: "mappin.and.ellipse").font(.body) }
+        }
+    }
+}
+
+/// The pre-ride presentation: a native grouped sheet with where the place is, what we
+/// know about it, and Apple Maps' own place card (photos, hours, reviews) when online.
+struct SightSheet: View {
+    let sight: Sight
+    @Environment(\.dismiss) private var dismiss
+    @State private var appleItem: MKMapItem?
+    @State private var showingCard = false
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Map(initialPosition: .region(.init(center: sight.coordinate, latitudinalMeters: 600, longitudinalMeters: 600)),
+                        interactionModes: []) {
+                        Marker(sight.name, systemImage: Discovery.icon(for: sight.category).symbol, coordinate: sight.coordinate)
+                    }
+                    .frame(height: 180)
+                    .listRowInsets(EdgeInsets())
+                }
+                let detail = SightDetail(sight: sight)
+                Section("About") {
+                    Label(Discovery.icon(for: sight.category).label, systemImage: Discovery.icon(for: sight.category).symbol)
+                    ForEach(Array(detail.lines.enumerated()), id: \.offset) { _, line in
+                        Label(line.text, systemImage: line.symbol)
+                    }
+                    if detail.lines.isEmpty {
+                        Label("Kit has no notes on this place yet.", systemImage: "pawprint").foregroundStyle(.secondary)
+                    }
+                    if sight.offsetAlong > 0 { Label("\(Fmt.km(sight.offsetAlong)) along your route", systemImage: "point.topleft.down.to.point.bottomright.curvepath") }
+                }
+                Section {
+                    if appleItem != nil {
+                        Button { showingCard = true } label: { Label("Photos, hours and reviews", systemImage: "info.circle") }
+                    }
+                    if !sight.address.isEmpty { Label(sight.address, systemImage: "mappin.and.ellipse") }
+                    if let tel = telURL { Link(destination: tel) { Label("Call", systemImage: "phone") } }
+                    Button {
+                        (appleItem ?? MKMapItem(placemark: MKPlacemark(coordinate: sight.coordinate))).openInMaps()
+                    } label: { Label("Open in Maps", systemImage: "map") }
+                }
             }
+            .navigationTitle(sight.name)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .mapItemDetailSheet(isPresented: $showingCard, item: appleItem)
+            .task { appleItem = await Self.lookUp(sight) }
         }
     }
 
@@ -497,21 +566,18 @@ struct SightDetail: View {
         let digits = sight.phone.filter { $0.isNumber || $0 == "+" }
         return digits.isEmpty ? nil : URL(string: "tel://\(digits)")
     }
-}
 
-/// The pre-ride presentation: SightDetail as its own sheet with a title.
-struct SightSheet: View {
-    let sight: Sight
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        NavigationStack {
-            ScrollView {
-                SightDetail(sight: sight).padding(20)
-            }
-            .navigationTitle(sight.name)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+    /// Apple Maps' entry for this place: same name nearby, within 250 m. Nil offline or when
+    /// Apple doesn't know it, so we never show another place's card.
+    static func lookUp(_ sight: Sight) async -> MKMapItem? {
+        let request = MKLocalSearch.Request()
+        request.naturalLanguageQuery = sight.name
+        request.region = MKCoordinateRegion(center: sight.coordinate, latitudinalMeters: 1000, longitudinalMeters: 1000)
+        request.resultTypes = .pointOfInterest
+        guard let items = try? await MKLocalSearch(request: request).start().mapItems else { return nil }
+        let here = CLLocation(latitude: sight.lat, longitude: sight.lon)
+        return items.first { item in
+            item.placemark.location.map { $0.distance(from: here) < 250 } ?? false
         }
     }
 }

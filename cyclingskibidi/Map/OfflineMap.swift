@@ -78,9 +78,10 @@ struct OfflineMap: UIViewRepresentable {
     func makeUIView(context: Context) -> MKMapView {
         let map = MKMapView()
         map.delegate = context.coordinator
-        map.addOverlay(OfflineTileOverlay.shared, level: .aboveLabels)
+        // Apple's own map underneath (the bundled OSM tiles looked flat); our lines and pins on top.
+        map.preferredConfiguration = MKStandardMapConfiguration(elevationStyle: .flat, emphasisStyle: .muted)
         map.pointOfInterestFilter = .excludingAll
-        map.showsCompass = true
+        map.showsCompass = false   // our own compass, placed under the locate button so they never overlap
         map.isRotateEnabled = true
         map.cameraBoundary = MKMapView.CameraBoundary(coordinateRegion: TilePack.coverage)
         map.cameraZoomRange = MKMapView.CameraZoomRange(minCenterCoordinateDistance: 150, maxCenterCoordinateDistance: 90_000)
@@ -88,32 +89,27 @@ struct OfflineMap: UIViewRepresentable {
         map.isUserInteractionEnabled = interactive
         map.addGestureRecognizer(UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tapped(_:))))
 
-        // ODbL: the map data is OpenStreetMap's, and it says so on the map.
-        let credit = UILabel()
-        credit.text = " © OpenStreetMap contributors "
-        credit.font = .preferredFont(forTextStyle: .caption2)
-        credit.adjustsFontForContentSizeCategory = true
-        credit.textColor = .label
-        credit.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.7)
-        credit.layer.cornerRadius = 4
-        credit.clipsToBounds = true
-        credit.translatesAutoresizingMaskIntoConstraints = false
-        map.addSubview(credit)
-        NSLayoutConstraint.activate([
-            credit.trailingAnchor.constraint(equalTo: map.safeAreaLayoutGuide.trailingAnchor, constant: -6),
-            credit.bottomAnchor.constraint(equalTo: map.safeAreaLayoutGuide.bottomAnchor, constant: -4),
-        ])
+        // Native controls, left as iOS draws them (restyling the tracking button made it
+        // flip between pill and square). The compass sits under the locate button.
+        let compass = MKCompassButton(mapView: map)
+        compass.compassVisibility = .adaptive
+        compass.translatesAutoresizingMaskIntoConstraints = false
+        map.addSubview(compass)
+        var compassTop = compass.topAnchor.constraint(equalTo: map.safeAreaLayoutGuide.topAnchor, constant: 10)
         if showsUserButton {
             let button = MKUserTrackingButton(mapView: map)
-            button.backgroundColor = .systemBackground.withAlphaComponent(0.85)
-            button.layer.cornerRadius = 8
             button.translatesAutoresizingMaskIntoConstraints = false
             map.addSubview(button)
             NSLayoutConstraint.activate([
                 button.trailingAnchor.constraint(equalTo: map.safeAreaLayoutGuide.trailingAnchor, constant: -10),
                 button.topAnchor.constraint(equalTo: map.safeAreaLayoutGuide.topAnchor, constant: 10),
             ])
+            compassTop = compass.topAnchor.constraint(equalTo: button.bottomAnchor, constant: 10)
+            NSLayoutConstraint.activate([compass.centerXAnchor.constraint(equalTo: button.centerXAnchor)])
+        } else {
+            NSLayoutConstraint.activate([compass.trailingAnchor.constraint(equalTo: map.safeAreaLayoutGuide.trailingAnchor, constant: -10)])
         }
+        compassTop.isActive = true
         return map
     }
 
