@@ -12,10 +12,10 @@ import SwiftData
 struct cyclingskibidiApp: App {
     let container: ModelContainer = {
         do {
-            return try ModelContainer(for: Route.self, Obstacle.self, Ride.self)
+        return try ModelContainer(for: Route.self, Obstacle.self, Ride.self)
         } catch {
-            // A schema the store cannot open is a bug, not a runtime condition.
-            fatalError("Could not open the local store: \(error)")
+        // A schema the store cannot open is a bug, not a runtime condition.
+        fatalError("Could not open the local store: \(error)")
         }
     }()
 
@@ -23,6 +23,29 @@ struct cyclingskibidiApp: App {
         // 1.7 MB of no-bike ways: decode it off the main actor before the first plan needs it.
         Task.detached { _ = NoBike.lines }
         #if DEBUG
+        // Only on request (the test script passes -selfcheck): on a phone they hold up launch.
+        if ProcessInfo.processInfo.arguments.contains("-selfcheck") { Self.runSelfChecks() }
+        Self.watchMainThread()
+        #endif
+    }
+
+    #if DEBUG
+    /// Prints whenever the main thread stalls for over half a second, so a freeze on a phone shows in Xcode's console.
+    private static func watchMainThread() {
+        Thread.detachNewThread {
+            while true {
+                let pinged = Date.now, done = DispatchSemaphore(value: 0)
+                DispatchQueue.main.async { done.signal() }
+                if done.wait(timeout: .now() + 0.5) == .timedOut {
+                    done.wait()
+                    print("MAIN THREAD BLOCKED \(Int(Date.now.timeIntervalSince(pinged) * 1000)) ms")
+                }
+                Thread.sleep(forTimeInterval: 0.25)
+            }
+        }
+    }
+
+    private static func runSelfChecks() {
         Geo.selfCheck()
         GeoJSON.selfCheck()
         PCNGraph.selfCheck()
@@ -63,12 +86,13 @@ struct cyclingskibidiApp: App {
         Task { await RestStops.selfCheckReal() }
         Task { await Routing.selfCheckScenic() }
         Task { await PresetLoops.selfCheck() }
-        #endif
+        print("SELFCHECK sync done")
     }
+    #endif
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+        ContentView()
         }
         .modelContainer(container)
     }
