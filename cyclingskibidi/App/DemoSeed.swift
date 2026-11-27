@@ -38,7 +38,7 @@ enum Demo {
         }
     }
 
-    private static let waypoints = [
+    static let waypoints = [
         Coord(lat: 1.29926, lon: 103.78776),
         Coord(lat: 1.30180, lon: 103.79180),
         Coord(lat: 1.29760, lon: 103.79420),

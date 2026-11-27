@@ -31,16 +31,16 @@ struct NavigateView: View {
     @State private var showSheet = true
     /// A sight the rider tapped on the map: its full brief in a Kit card. (Passing one goes in the banner.)
     @State private var tappedSight: Sight?
+    @State private var confirmEnd = false
 
     private var recorder: RideRecorder { trip.recorder }
 
     var body: some View {
         Group {
             if let ride = trip.finished {
-                FinishedView(ride: ride, kitNote: recorder.kitSummary) {
-                    trip.clear()
-                    dismiss()
-                }
+                // Only dismiss here: clearing the trip now would show the ride screen again for a
+                // frame, which started a new ride and spoke the first direction. ContentView clears it.
+                FinishedView(ride: ride, kitNote: recorder.kitSummary) { dismiss() }
             } else {
                 navigating
             }
@@ -200,7 +200,8 @@ struct NavigateView: View {
         // Only taps while placing do anything; pan/zoom are untouched.
         OfflineMap(lines: [MapLine(coords: line, color: .systemBlue, width: 7)],
                    pins: mapPins, focus: focus, showsUser: true,
-                   onTap: { coord in if placing { place(at: coord) } })
+                   onTap: { coord in if placing { place(at: coord) } },
+                   onFeatureTap: { tappedSight = $0 })
     }
 
     private var mapPins: [MapPin] {
@@ -280,7 +281,7 @@ struct NavigateView: View {
                 .accessibilityLabel("Next turn: \(step.instruction), in \(Fmt.km(recorder.distanceToManeuver))")
             }
             KitTimer(elapsed: recorder.movingSeconds, toGo: Fmt.km(recorder.remainingDistance),
-                     left: Fmt.clock(recorder.remainingSeconds), arrival: Fmt.eta(recorder.remainingSeconds),
+                     left: Fmt.duration(recorder.remainingSeconds), arrival: Fmt.eta(recorder.remainingSeconds),
                      progress: recorder.progress)
                 .padding(.horizontal, 16)
                 .padding(.top, recorder.currentStep == nil ? 18 : 8)
@@ -310,7 +311,11 @@ struct NavigateView: View {
                     recorder.phase == .running ? recorder.pause() : recorder.resume()
                 }
                 // A hold, so a bump or a wet glove can't end the ride.
-                HoldButton(title: "Hold to end ride", icon: "kit-icon-stop", style: .destructive, seconds: 1.5, action: end)
+                KitButton(title: "End ride", icon: "kit-icon-stop", style: .destructive) { confirmEnd = true }
+                    .confirmationDialog("End this ride?", isPresented: $confirmEnd, titleVisibility: .visible) {
+                        Button("End ride", role: .destructive, action: end)
+                        Button("Keep riding", role: .cancel) {}
+                    } message: { Text("Your ride is saved to your stats.") }
             }
             #if DEBUG
             KitButton(title: "Simulate fall", icon: "kit-icon-hazard", style: .tertiary) { recorder.fallDetected() }
@@ -335,6 +340,7 @@ struct NavigateView: View {
     // MARK: Actions
 
     private func begin() {
+        guard trip.finished == nil, recorder.phase == .idle else { return }   // never restart a ride that's over
         line = route.polyline.coordinates
         recorder.onReroute = { plan in line = plan.polyline.coordinates }
         recorder.voiceEnabled = AppSettings.flag(AppSettings.voice)
@@ -388,6 +394,8 @@ struct NavigateView: View {
 struct PassBySightCard: View {
     let sight: Sight
     let onClose: () -> Void
+    /// Opens the full place sheet (map, Apple's place card); nil hides the button.
+    var onMore: (() -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -395,7 +403,7 @@ struct PassBySightCard: View {
                 KitAvatar(mood: .happy, size: 36)
                 VStack(alignment: .leading, spacing: 2) {
                     Text(sight.name).font(.title3.bold())
-                    if let note = sight.note { Text(note).font(.subheadline).foregroundStyle(KitColor.muted) }
+                    Text(Discovery.icon(for: sight.category).label).font(.subheadline).foregroundStyle(KitColor.muted)
                 }
                 Spacer(minLength: 8)
                 Button(action: onClose) {
@@ -404,7 +412,8 @@ struct PassBySightCard: View {
                 }
                 .accessibilityLabel("Close")
             }
-            SightDetail(sight: sight)
+            SightDetail(sight: sight, showsCategory: false)
+            if let onMore { KitButton(title: "Details", icon: "kit-icon-chevron", style: .tertiary, action: onMore) }
         }
         .foregroundStyle(KitColor.ink)
         .kitCard(shadow: true, padding: 16)

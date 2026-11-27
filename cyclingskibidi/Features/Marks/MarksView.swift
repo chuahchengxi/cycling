@@ -93,7 +93,7 @@ struct CreditsView: View {
                 VStack(alignment: .leading, spacing: 20) {
                     creditGroup("Map, roads and places") {
                         Text("© OpenStreetMap contributors. Map data is available under the Open Database Licence (ODbL); see openstreetmap.org/copyright.")
-                        Text("Map tiles are drawn by this app from that data and ship inside it, so the map works offline.")
+                        Text("Routes, roads and places come from that data and ship inside the app, so planning and directions work offline. The map itself is Apple Maps.")
                     }
                     creditGroup("Place notes") {
                         Text("Place notes, dishes and timings are this app's own research from public sources, each cited in the app's data. Named stalls are on the Michelin Bib Gourmand Singapore 2026 list, or have a cited founding year.")

@@ -339,9 +339,8 @@ enum Fmt {
 
     /// "1:05 H" for long rides, "15:00" for short ones — matches the board.
     static func duration(_ seconds: Double) -> String {
-        let s = Int(seconds.rounded())
-        let h = s / 3600, m = (s % 3600) / 60
-        return h > 0 ? String(format: "%d:%02d H", h, m) : String(format: "%d:%02d", m, s % 60)
+        let m = max(1, Int((seconds / 60).rounded()))
+        return m >= 60 ? String(format: "%d h %02d", m / 60, m % 60) : "\(m) min"
     }
 
     static func clock(_ seconds: Double) -> String {

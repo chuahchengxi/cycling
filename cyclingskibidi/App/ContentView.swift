@@ -54,7 +54,7 @@ struct ContentView: View {
         .fullScreenCover(isPresented: Binding(get: { showWelcome }, set: { _ in }),
                          onDismiss: { if firstRun { askInterests = true; firstRun = false } }) { OnboardingView() }
         .environment(trip)
-        .fullScreenCover(item: $trip.route) { route in
+        .fullScreenCover(item: $trip.route, onDismiss: { trip.clear(); path = NavigationPath() }) { route in   // ride over: back to Routes
             NavigateView(route: route)
                 .environment(trip)
         }
@@ -78,7 +78,9 @@ struct ContentView: View {
             switch Demo.screen {
             case "onboarding": OnboardingView()
             case "newroute": CreateRouteFlow()
-            case "builder": RouteBuilderView(mode: .leisure)
+            case "sight": SightSheet(sight: Discovery.places.first { Discovery.facts[$0.osmID ?? ""]?.note?.stalls?.isEmpty == false } ?? Discovery.places[0])
+            case "sight-plain": SightSheet(sight: Discovery.places.first { $0.name == "Neighbourhood Park" } ?? Discovery.places[0])
+            case "builder", "builder-route": RouteBuilderView(mode: .leisure)
             case "interests": InterestsSheet()
             case "mark": ObstacleReportView(coordinate: nil)
             case "stats": NavigationStack { StatsView() }
@@ -96,7 +98,7 @@ struct ContentView: View {
     private func openDemoScreen() async {
         guard let screen = Demo.screen, let route = await Demo.seed(context) else { return }
         switch screen {
-        case "detail", "detail-full":   path.append(route)
+        case "detail", "detail-full", "detail-tap":   path.append(route)
         case "navigate": trip.begin(route)
         case "navigate-kit":   // a pass-by in the banner (v3 · 04)
             trip.begin(route)

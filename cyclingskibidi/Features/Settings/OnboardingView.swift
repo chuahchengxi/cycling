@@ -46,7 +46,7 @@ struct OnboardingView: View {
 
     private var welcome: some View {
         pageView(avatar: .happy, title: "Hi, I'm Kit",
-                 text: "I plan bike rides on Singapore's park connectors and pick stops you'll like along the way: hawker centres, views, heritage, cafés.\n\nEverything works with no signal. The maps, routes and places are all on your phone.")
+                 text: "I plan bike rides on Singapore's park connectors and pick stops you'll like along the way: hawker centres, views, heritage, cafés.\n\nRoutes, directions and places work with no signal: they're all on your phone. The map picture needs a connection the first time you look at an area.")
     }
 
     private var safety: some View {

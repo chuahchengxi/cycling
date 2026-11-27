@@ -22,13 +22,13 @@ struct RouteDetailView: View {
     @AppStorage(RiderProfile.storageKey) private var profileRaw = ""
     private var profile: RiderProfile { RiderProfile.decode(profileRaw) ?? RiderProfile() }
 
-    @State private var sheetShown = true
-    @State private var startPending = false
+    /// A place tapped on the map, shown as Kit's card over the map.
+    @State private var tapped: Sight?
     @State private var detent: PresentationDetent = {
         #if DEBUG
         if Demo.screen == "detail-full" { return .large }
         #endif
-        return .fraction(0.28)
+        return SheetView.collapsedDetent
     }()
     @State private var focus: MapFocus?
     /// Bundled closures and the rider's own closed marks this route rides — checked when opened.
@@ -58,8 +58,21 @@ struct RouteDetailView: View {
                        c.circles.map { MapDisc(center: .init(latitude: $0.lat, longitude: $0.lon), radius: $0.radiusM,
                                                color: .systemRed.withAlphaComponent(c.kind == .closure ? 0.3 : 0.15)) }
                    },
-                   pins: mapPins, focus: focus, showsUser: true)
-        .ignoresSafeArea(edges: .bottom)
+                   pins: mapPins, focus: focus, showsUser: true, onFeatureTap: { tapped = $0 })
+        .ignoresSafeArea()
+        // The map runs under the bar; the back button and title float over it.
+        .toolbarBackground(.hidden, for: .navigationBar)
+        .overlay(alignment: .top) {
+            if let s = tapped {
+                PassBySightCard(sight: s) { tapped = nil }
+                    .padding(.horizontal, 16).padding(.top, 8)
+                    .transition(.move(edge: .top).combined(with: .opacity))
+            }
+        }
+        .animation(.default, value: tapped?.id)
+        #if DEBUG
+        .task { if Demo.screen == "detail-tap" { try? await Task.sleep(for: .seconds(2)); tapped = route.sights.first } }
+        #endif
         // Keep the title inline so the large title bar doesn't cover the map.
         .navigationTitle(route.name)
         .navigationBarTitleDisplayMode(.inline)
@@ -74,29 +87,10 @@ struct RouteDetailView: View {
             guard route.mode != .fast, route.polyline.count > 1 else { return }
             await pick()
         }
-        .sheet(isPresented: $sheetShown, onDismiss: {
-            // Begin navigation only once the brief sheet is fully dismissed.
-            // Presenting the navigate cover while this sheet is still up is the
-            // "the current sheet is blocking the next one" failure.
-            if startPending { startPending = false; trip.begin(route) }
-        }) {
-            SheetView(route: route, obstacles: nearby, closures: closureHits, replanning: replanning, kitByModel: kitByModel, restLevel: restLevel ?? RiderLevel.effective(profile: profile, rides: rides),
-                      currentDetent: $detent, onStart: {
-                // Saved routes are rechecked at ride start too: a closure may have begun since opening.
-                checkClosures()
-                replanFailed = false
-                if blockingClosures.isEmpty { start() } else { confirmClosedStart = true }
-            }, onReplan: { replan() }, onAddStop: addStop, onRemoveStop: removeStop)
-            .confirmationDialog(closedStartTitle, isPresented: $confirmClosedStart, titleVisibility: .visible) {
-                if !replanFailed { Button(blockingClosures.count == 1 ? "Re-plan around it" : "Re-plan around them") { replan(thenStart: true) } }
-                Button("Ride anyway") { start() }
-                Button("Cancel", role: .cancel) {}
-            }
-            .presentationDetents([.fraction(0.28), .large], selection: $detent)
-            .presentationBackgroundInteraction(.enabled)
-            .presentationDragIndicator(.visible)
-            .interactiveDismissDisabled()
-        }
+        // The brief is part of this screen, not a system sheet: a sheet is its own layer and
+        // only slid away after the pop to Routes had finished. As an overlay it leaves with
+        // the screen, swipe-back included. Drag or tap the grabber to expand / collapse.
+        .overlay(alignment: .bottom) { briefPanel }
     }
 
     private var mapPins: [MapPin] {
@@ -115,7 +109,7 @@ struct RouteDetailView: View {
                    look: .marker(symbol: r.amenities.contains("drinkingWater") ? "drop.fill" : Discovery.icon(for: r.amenities.first ?? "").symbol, tint: .systemTeal))
         }
         pins += route.sights.map { s in
-            MapPin(id: s.id.uuidString, coordinate: s.coordinate, title: s.name, look: .view(AnyView(SightBadge(sight: s))))
+            MapPin(id: s.id.uuidString, coordinate: s.coordinate, title: s.name, look: .view(AnyView(SightBadge(sight: s))), onTap: { tapped = s })
         }
         return pins
     }
@@ -125,9 +119,47 @@ struct RouteDetailView: View {
         return replanFailed ? "Couldn't find a way round \(what)" : "\(what) \(blockingClosures.count == 1 ? "is" : "are") closed on this route"
     }
 
-    private func start() {
-        startPending = true
-        sheetShown = false
+    private func start() { trip.begin(route) }
+
+    private var expanded: Bool { detent == .large }
+
+    private var briefPanel: some View {
+        GeometryReader { geo in
+            VStack(spacing: 0) {
+                Capsule().fill(.secondary).frame(width: 36, height: 5).padding(.top, 8).padding(.bottom, 4)
+                    .frame(maxWidth: .infinity, minHeight: 22)
+                    .contentShape(.rect)
+                    .onTapGesture { withAnimation(.snappy) { detent = expanded ? SheetView.collapsedDetent : .large } }
+                    .accessibilityElement()
+                    .accessibilityLabel(expanded ? "Collapse route brief" : "Expand route brief")
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityAction { detent = expanded ? SheetView.collapsedDetent : .large }
+                SheetView(route: route, obstacles: nearby, closures: closureHits, replanning: replanning, kitByModel: kitByModel, restLevel: restLevel ?? RiderLevel.effective(profile: profile, rides: rides),
+                          currentDetent: $detent, onStart: {
+                    // Saved routes are rechecked at ride start too: a closure may have begun since opening.
+                    checkClosures()
+                    replanFailed = false
+                    if blockingClosures.isEmpty { start() } else { confirmClosedStart = true }
+                }, onReplan: { replan() }, onAddStop: addStop, onRemoveStop: removeStop)
+                .padding(.top, -24)   // SheetView's own top inset was for the system grabber
+            }
+            .frame(height: expanded ? geo.size.height * 0.92 : 170, alignment: .top)
+            .frame(maxWidth: .infinity)
+            .background(.regularMaterial, in: UnevenRoundedRectangle(topLeadingRadius: 34, topTrailingRadius: 34))
+            .shadow(color: .black.opacity(0.15), radius: 12, y: -2)
+            .gesture(DragGesture(minimumDistance: 20).onEnded { g in
+                withAnimation(.snappy) {
+                    if g.translation.height < -40 { detent = .large } else if g.translation.height > 40 { detent = SheetView.collapsedDetent }
+                }
+            })
+            .frame(maxHeight: .infinity, alignment: .bottom)
+            .confirmationDialog(closedStartTitle, isPresented: $confirmClosedStart, titleVisibility: .visible) {
+                if !replanFailed { Button(blockingClosures.count == 1 ? "Re-plan around it" : "Re-plan around them") { replan(thenStart: true) } }
+                Button("Ride anyway") { start() }
+                Button("Cancel", role: .cancel) {}
+            }
+        }
+        .ignoresSafeArea(edges: .bottom)
     }
 
     private func checkClosures() {

@@ -62,6 +62,7 @@ struct RouteListView: View {
 
     @State private var creating = false
     @State private var showingStats = false
+    @AppStorage("statsSeenCount") private var statsSeen = 0
     @State private var showingMarks = false
     @State private var showingCredits = false
     @State private var showingInterests = false
@@ -144,10 +145,12 @@ struct RouteListView: View {
     @ToolbarContentBuilder
     private var toolbarItems: some ToolbarContent {
         ToolbarItem(placement: .topBarLeading) {
-            Button { showingStats = true } label: {
+            Button { showingStats = true; statsSeen = rides.count } label: {
                 Label("Statistics", systemImage: "chart.bar.xaxis")
             }
-            .badge(rides.count)
+            // New rides since the stats were last opened; gone once looked at.
+            .badge(max(0, rides.count - statsSeen))
+            .onChange(of: rides.count) { _, n in if n < statsSeen { statsSeen = n } }   // a deleted ride never hides the next one
         }
         ToolbarItem(placement: .topBarTrailing) {
             Menu {
@@ -218,7 +221,7 @@ struct RouteCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            RouteSketch(coords: route.polyline)
+            RouteMapPreview(coords: route.polyline)
                 .frame(height: 100)
                 .frame(maxWidth: .infinity)
                 .padding(.bottom, 12)
@@ -230,9 +233,8 @@ struct RouteCard: View {
             FlowLayout {
                 KitChip(text: Fmt.km(route.distanceMeters), caps: false)
                 KitChip(text: Fmt.duration(route.currentExpectedSeconds), caps: false)
-                KitChip(text: route.difficulty.rawValue, fill: kitFill(for: route.difficulty), caps: false)
-                    .kitSurface()
-                KitChip(text: route.mode.rawValue, icon: route.mode.kitIcon, caps: false)
+                KitChip(text: route.difficulty.rawValue, caps: false)
+                ModeTag(mode: route.mode)
             }
             .padding(.top, 10)
         }
@@ -242,22 +244,34 @@ struct RouteCard: View {
 }
 
 /// Kit's tag fills: light colours with dark ink in both themes.
-private func kitFill(for difficulty: Difficulty) -> Color {
-    switch difficulty {
-    case .easy: return KitColor.sage
-    case .medium: return KitColor.gold
-    case .hard: return KitColor.terracotta
+
+
+extension RideMode {
+    /// Each way to ride has its own colour; difficulty stays plain text.
+    var tint: Color {
+        switch self {
+        case .fast: KitColor.terracotta
+        case .moderate: KitColor.gold
+        case .leisure: KitColor.sage
+        }
     }
 }
 
-
-extension Difficulty {
-    var color: Color {
-        switch self {
-        case .easy: return .green
-        case .medium: return .orange
-        case .hard: return .red
+/// The ride mode as the emphasised tag: its pixel icon, bold, on the mode's colour.
+struct ModeTag: View {
+    let mode: RideMode
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(mode.kitIcon).renderingMode(.template).resizable().frame(width: 16, height: 16).accessibilityHidden(true)
+            Text(mode.rawValue).font(.footnote.weight(.bold))
         }
+        .foregroundStyle(KitColor.ink)
+        .padding(.horizontal, 10).padding(.vertical, 6)
+        .background(mode.tint)
+        .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
+        .environment(\.colorScheme, .light)   // light fills keep dark ink in both themes
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(mode.rawValue) ride")
     }
 }
 
@@ -307,5 +321,62 @@ struct RouteSketch: View {
             }
         }
         .background(KitColor.board)
+    }
+}
+
+/// The route on a real Apple Maps picture of its surroundings (a snapshot, so a list of
+/// cards stays cheap), with the line and start / end markers drawn on top. Cached per
+/// route, size and theme; the plain sketch shows while it loads or with no signal.
+struct RouteMapPreview: View {
+    let coords: [Coord]
+    @Environment(\.colorScheme) private var scheme
+    @State private var image: UIImage?
+
+    private static let cache = NSCache<NSString, UIImage>()
+
+    var body: some View {
+        GeometryReader { geo in
+            Group {
+                if let image { Image(uiImage: image).resizable() } else { RouteSketch(coords: coords) }
+            }
+            .task(id: key(geo.size)) { image = await snapshot(geo.size) }
+        }
+        .clipShape(.rect(cornerRadius: 12))
+        .accessibilityHidden(true)
+    }
+
+    private func key(_ size: CGSize) -> String {
+        "\(coords.count)-\(coords.first.map { "\($0.lat),\($0.lon)" } ?? "")-\(coords.last.map { "\($0.lat),\($0.lon)" } ?? "")-\(Int(size.width))x\(Int(size.height))-\(scheme == .dark)"
+    }
+
+    private func snapshot(_ size: CGSize) async -> UIImage? {
+        guard coords.count > 1, size.width > 0, size.height > 0 else { return nil }
+        let k = key(size) as NSString
+        if let hit = Self.cache.object(forKey: k) { return hit }
+        let lats = coords.map(\.lat), lons = coords.map(\.lon)
+        let options = MKMapSnapshotter.Options()
+        options.size = size
+        options.traitCollection = UITraitCollection(userInterfaceStyle: scheme == .dark ? .dark : .light)
+        options.preferredConfiguration = MKStandardMapConfiguration(emphasisStyle: .muted)
+        options.region = MKCoordinateRegion(
+            center: .init(latitude: (lats.min()! + lats.max()!) / 2, longitude: (lons.min()! + lons.max()!) / 2),
+            span: .init(latitudeDelta: max((lats.max()! - lats.min()!) * 1.5, 0.004),
+                        longitudeDelta: max((lons.max()! - lons.min()!) * 1.5, 0.004)))
+        guard let shot = try? await MKMapSnapshotter(options: options).start() else { return nil }
+        let points = coords.map { shot.point(for: $0.cl) }
+        let image = UIGraphicsImageRenderer(size: size).image { r in
+            shot.image.draw(at: .zero)
+            let c = r.cgContext
+            c.setLineWidth(4); c.setLineCap(.round); c.setLineJoin(.round)
+            c.setStrokeColor(UIColor.systemBlue.cgColor)
+            c.addLines(between: points); c.strokePath()
+            for (p, color) in [(points.first!, UIColor.systemGreen), (points.last!, UIColor.systemRed)] {
+                let dot = CGRect(x: p.x - 6, y: p.y - 6, width: 12, height: 12)
+                c.setFillColor(color.cgColor); c.fillEllipse(in: dot)
+                c.setStrokeColor(UIColor.white.cgColor); c.setLineWidth(2); c.strokeEllipse(in: dot)
+            }
+        }
+        Self.cache.setObject(image, forKey: k)
+        return image
     }
 }

@@ -72,15 +72,22 @@ struct OfflineMap: UIViewRepresentable {
     var interactive = true
     var onTap: ((CLLocationCoordinate2D) -> Void)?
     var onRegionChange: ((MKCoordinateRegion) -> Void)?
+    /// A tap on one of Apple's landmarks, as a Sight (our own place when it's the same one).
+    var onFeatureTap: ((Sight) -> Void)?
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> MKMapView {
         let map = MKMapView()
         map.delegate = context.coordinator
-        map.addOverlay(OfflineTileOverlay.shared, level: .aboveLabels)
-        map.pointOfInterestFilter = .excludingAll
-        map.showsCompass = true
+        // Apple's own map underneath (the bundled OSM tiles looked flat); our lines and pins on top.
+        map.preferredConfiguration = MKStandardMapConfiguration(elevationStyle: .flat, emphasisStyle: .muted)
+        // Landmarks a rider cares about, tappable; shops, banks and the like stay hidden.
+        map.pointOfInterestFilter = MKPointOfInterestFilter(including: [
+            .park, .nationalPark, .beach, .marina, .museum, .library, .zoo, .aquarium, .amusementPark,
+            .stadium, .theater, .cafe, .restaurant, .bakery, .foodMarket, .publicTransport, .restroom])
+        map.selectableMapFeatures = onFeatureTap == nil ? [] : [.pointsOfInterest]
+        map.showsCompass = false   // our own compass, placed under the locate button so they never overlap
         map.isRotateEnabled = true
         map.cameraBoundary = MKMapView.CameraBoundary(coordinateRegion: TilePack.coverage)
         map.cameraZoomRange = MKMapView.CameraZoomRange(minCenterCoordinateDistance: 150, maxCenterCoordinateDistance: 90_000)
@@ -88,32 +95,27 @@ struct OfflineMap: UIViewRepresentable {
         map.isUserInteractionEnabled = interactive
         map.addGestureRecognizer(UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.tapped(_:))))
 
-        // ODbL: the map data is OpenStreetMap's, and it says so on the map.
-        let credit = UILabel()
-        credit.text = " © OpenStreetMap contributors "
-        credit.font = .preferredFont(forTextStyle: .caption2)
-        credit.adjustsFontForContentSizeCategory = true
-        credit.textColor = .label
-        credit.backgroundColor = UIColor.systemBackground.withAlphaComponent(0.7)
-        credit.layer.cornerRadius = 4
-        credit.clipsToBounds = true
-        credit.translatesAutoresizingMaskIntoConstraints = false
-        map.addSubview(credit)
-        NSLayoutConstraint.activate([
-            credit.trailingAnchor.constraint(equalTo: map.safeAreaLayoutGuide.trailingAnchor, constant: -6),
-            credit.bottomAnchor.constraint(equalTo: map.safeAreaLayoutGuide.bottomAnchor, constant: -4),
-        ])
+        // Native controls, left as iOS draws them (restyling the tracking button made it
+        // flip between pill and square). The compass sits under the locate button.
+        let compass = MKCompassButton(mapView: map)
+        compass.compassVisibility = .adaptive
+        compass.translatesAutoresizingMaskIntoConstraints = false
+        map.addSubview(compass)
+        var compassTop = compass.topAnchor.constraint(equalTo: map.safeAreaLayoutGuide.topAnchor, constant: 10)
         if showsUserButton {
             let button = MKUserTrackingButton(mapView: map)
-            button.backgroundColor = .systemBackground.withAlphaComponent(0.85)
-            button.layer.cornerRadius = 8
             button.translatesAutoresizingMaskIntoConstraints = false
             map.addSubview(button)
             NSLayoutConstraint.activate([
                 button.trailingAnchor.constraint(equalTo: map.safeAreaLayoutGuide.trailingAnchor, constant: -10),
                 button.topAnchor.constraint(equalTo: map.safeAreaLayoutGuide.topAnchor, constant: 10),
             ])
+            compassTop = compass.topAnchor.constraint(equalTo: button.bottomAnchor, constant: 10)
+            NSLayoutConstraint.activate([compass.centerXAnchor.constraint(equalTo: button.centerXAnchor)])
+        } else {
+            NSLayoutConstraint.activate([compass.trailingAnchor.constraint(equalTo: map.safeAreaLayoutGuide.trailingAnchor, constant: -10)])
         }
+        compassTop.isActive = true
         return map
     }
 
@@ -150,6 +152,7 @@ struct OfflineMap: UIViewRepresentable {
         let location = CLLocationManager()
         private var overlaySignature = ""
         private var annotations: [String: PinAnnotation] = [:]
+        var featureTappedAt = Date.distantPast
 
         func sync(lines: [MapLine], discs: [MapDisc], on map: MKMapView) {
             // Re-add overlays only when they really changed: a ride redraws on every fix.
@@ -199,7 +202,12 @@ struct OfflineMap: UIViewRepresentable {
             // A tap on a pin is the pin's, not the map's.
             if let hit = map.hitTest(pt, with: nil), hit is MKAnnotationView || hit.superview is MKAnnotationView
                 || hit.superview?.superview is MKAnnotationView { return }
-            onTap(map.convert(pt, toCoordinateFrom: map))
+            let coord = map.convert(pt, toCoordinateFrom: map)
+            // A landmark tap selects the feature a moment later; then it's the landmark's tap, not a dropped pin.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
+                guard let self, Date.now.timeIntervalSince(self.featureTappedAt) > 0.5 else { return }
+                onTap(coord)
+            }
         }
 
         func mapView(_ map: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
@@ -246,6 +254,12 @@ struct OfflineMap: UIViewRepresentable {
         }
 
         func mapView(_ map: MKMapView, didSelect annotation: MKAnnotation) {
+            if let f = annotation as? MKMapFeatureAnnotation {
+                featureTappedAt = .now
+                map.deselectAnnotation(f, animated: false)
+                parent?.onFeatureTap?(Discovery.sight(feature: f.title ?? "", at: f.coordinate, category: f.pointOfInterestCategory))
+                return
+            }
             guard let a = annotation as? PinAnnotation else { return }
             map.deselectAnnotation(a, animated: false)
             a.pin.onTap?()
