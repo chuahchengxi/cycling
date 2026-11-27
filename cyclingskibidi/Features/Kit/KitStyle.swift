@@ -44,8 +44,9 @@ extension View {
     }
 
     /// Paper behind a whole screen, Kit's ink as the text colour, Kit's accent on native controls.
-    func kitScreen() -> some View {
-        self.foregroundStyle(KitColor.ink)
+    /// `ink: false` for Forms, so their buttons keep the tint (and destructive red).
+    func kitScreen(ink: Bool = true) -> some View {
+        self.foregroundStyle(ink ? AnyShapeStyle(KitColor.ink) : AnyShapeStyle(.primary))
             .tint(KitColor.accentStrong)
             .scrollContentBackground(.hidden)
             .background(KitColor.paper.ignoresSafeArea())

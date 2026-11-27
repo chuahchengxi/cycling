@@ -126,6 +126,7 @@ struct RideDetailView: View {
         .chartXAxisLabel("km")
         .chartYAxisLabel("m")
         .foregroundStyle(KitColor.muted)
+        .padding(12)
         .background(KitColor.board)
         .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
         .accessibilityElement(children: .ignore)
@@ -137,7 +138,7 @@ struct RideDetailView: View {
     private static func steepestClimb(in samples: [(km: Double, alt: Double)]) -> Int? {
         var bestDelta = 0.0
         var bestIndex: Int?
-        for i in 1..<samples.count {
+        for i in samples.indices.dropFirst() {
             let climb = samples[i].alt - samples[i - 1].alt
             if climb > bestDelta { bestDelta = climb; bestIndex = i }
         }
@@ -148,11 +149,12 @@ struct RideDetailView: View {
         Chart(Array(speed.enumerated()), id: \.offset) { _, p in
             LineMark(x: .value("min", p.min), y: .value("km/h", p.kmh))
                 .interpolationMethod(.monotone)
-                .foregroundStyle(KitColor.sage)
+                .foregroundStyle(KitColor.accentStrong)
         }
         .chartXAxisLabel("min")
         .chartYAxisLabel("km/h")
         .foregroundStyle(KitColor.muted)
+        .padding(12)
         .background(KitColor.board)
         .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
         .accessibilityElement(children: .ignore)
