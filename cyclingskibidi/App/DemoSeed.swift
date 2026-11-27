@@ -5,7 +5,7 @@
 //  Debug-only. You cannot ride a bike from behind Xcode, so this seeds a real
 //  route and a finished ride and can jump straight to any screen:
 //
-//      -demo:list | -demo:detail | -demo:navigate | -demo:finished
+//      -demo:list | -demo:detail | -demo:navigate | -demo:finished | -demo:fall | -demo:help
 //
 //  Pair it with `xcrun simctl location <udid> start --speed 6 ride.gpx` to feed
 //  the navigation engine a moving rider.
@@ -22,6 +22,20 @@ enum Demo {
         ProcessInfo.processInfo.arguments
             .first { $0.hasPrefix("-demo:") }?
             .replacingOccurrences(of: "-demo:", with: "")
+    }
+
+    /// -demo:alarm-hazard | -demo:alarm-expressway | -demo:alarm-walk: one Kit alarm over everything.
+    static var alarm: KitAlarm? {
+        let at = Coord(lat: 1.29, lon: 103.78)
+        switch screen {
+        case "alarm-hazard": return KitAlarm(key: "h", kind: .hazard(.glass), title: "Fallen tree across the path",
+                                             detail: "Slow down now. Kit found a way round, +300 m.", distance: 80, coordinate: at)
+        case "alarm-expressway": return KitAlarm(key: "x", kind: .noBikes(expressway: true), title: "Expressway ahead: bikes not allowed",
+                                                 detail: "This slip road joins the Ayer Rajah Expressway. Stop and turn back.", distance: 60, coordinate: at)
+        case "alarm-walk": return KitAlarm(key: "w", kind: .walk, title: "Henderson Waves: walk your bike",
+                                           detail: "Cycling isn't allowed on the bridge. Push across.", distance: 40, coordinate: at)
+        default: return nil
+        }
     }
 
     private static let waypoints = [

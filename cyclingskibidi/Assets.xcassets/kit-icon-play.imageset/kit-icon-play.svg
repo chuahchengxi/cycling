@@ -1,0 +1,16 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="icon/play">
+<g id="play">
+<path d="M6 2H8V4H6V2Z" fill="#2B2A27"/>
+<path d="M6 4H10V6H6V4Z" fill="#2B2A27"/>
+<path d="M6 6L12 6V8H6V6Z" fill="#2B2A27"/>
+<path d="M6 8H14V10H6V8Z" fill="#2B2A27"/>
+<path d="M6 10H16V12H6V10Z" fill="#2B2A27"/>
+<path d="M6 12H16V14H6V12Z" fill="#2B2A27"/>
+<path d="M6 14H14V16H6V14Z" fill="#2B2A27"/>
+<path d="M6 16L12 16V18H6V16Z" fill="#2B2A27"/>
+<path d="M6 18H10V20H6V18Z" fill="#2B2A27"/>
+<path d="M6 20H8V22H6V20Z" fill="#2B2A27"/>
+</g>
+</g>
+</svg>

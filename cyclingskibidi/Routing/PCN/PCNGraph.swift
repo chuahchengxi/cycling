@@ -33,6 +33,9 @@ nonisolated struct PCNGraph: Sendable {
     /// Spoken connector name per node, first feature to reach it wins.
     /// ponytail: per node, not per edge; at a junction the name comes from the node after it.
     private(set) var name: [GridKey: String] = [:]
+    /// A*'s straight-line heuristic is scaled by this so it stays admissible once
+    /// `scenic(_:strength:)` has discounted every edge (default: no discount).
+    var heuristicScale: Double = 1
 
     init(polylines: [[Coord]], snapTolerance: Double = PCNGraph.defaultSnapTolerance) {
         self.init(named: polylines.map { (nil, $0) }, snapTolerance: snapTolerance)
@@ -140,6 +143,66 @@ nonisolated struct PCNGraph: Sendable {
                 (b, w * (avoids.contains(a) || avoids.contains(b) ? Self.avoidCostFactor : 1) + max(extras[a] ?? 0, extras[b] ?? 0))
             }
         }
+        return g
+    }
+
+    // MARK: - Scenic
+
+    /// Place categories that make a connector scenic to ride.
+    static let scenicCategories: Set<String> = [
+        "waterway", "reservoir", "park", "nationalPark", "beach", "viewpoint", "bridge",
+    ]
+    /// A node is scenic when it lies within this many metres of a scenic place.
+    static let scenicRadius: Double = 50
+    /// A fully scenic edge costs at most half its length.
+    static let maxScenicDiscount: Double = 0.5
+
+    /// Nodes within `scenicRadius` of a scenic place's pin or any point of its
+    /// outline. Points are bucketed in a ~50 m grid so this is one pass over nodes.
+    func scenicNodes(near places: [Sight], facts: [String: PlaceFacts]) -> Set<GridKey> {
+        Self.nearScenery(coord.lazy.map { ($0.key, $0.value) }, places: places, facts: facts)
+    }
+
+    /// The keys of `nodes` near a scenic place; shared by the connector and road graphs.
+    static func nearScenery<K: Hashable>(_ nodes: some Sequence<(K, Coord)>, places: [Sight], facts: [String: PlaceFacts]) -> Set<K> {
+        let bucket = scenicRadius / metresPerDegree
+        func key(_ la: Double, _ lo: Double) -> GridKey { GridKey(la: Int((la / bucket).rounded(.down)), lo: Int((lo / bucket).rounded(.down))) }
+        var points: [GridKey: [CLLocationCoordinate2D]] = [:]
+        for p in places where scenicCategories.contains(p.category) {
+            for q in [p.coordinate] + (p.osmID.flatMap { facts[$0]?.shape } ?? []).map(\.cl) {
+                points[key(q.latitude, q.longitude), default: []].append(q)
+            }
+        }
+        guard !points.isEmpty else { return [] }
+        var out: Set<K> = []
+        for (k, c) in nodes {
+            let centre = key(c.lat, c.lon)
+            scan: for dla in -1...1 {
+                for dlo in -1...1 {
+                    for q in points[GridKey(la: centre.la + dla, lo: centre.lo + dlo)] ?? [] where Geo.distance(c.cl, q) <= scenicRadius {
+                        out.insert(k)
+                        break scan
+                    }
+                }
+            }
+        }
+        return out
+    }
+
+    /// A copy where every edge with both ends in `nodes` costs less: `strength`
+    /// (clamped 0…1) scales the discount up to `maxScenicDiscount`. The heuristic
+    /// is scaled to match, so A* still returns the true shortest discounted path.
+    func scenic(_ nodes: Set<GridKey>, strength: Double) -> PCNGraph {
+        let s = min(max(strength, 0), 1)
+        guard s > 0, !nodes.isEmpty else { return self }
+        let factor = 1 - Self.maxScenicDiscount * s
+        var g = self
+        for (a, list) in adj {
+            g.adj[a] = list.map { (b, w) in
+                (b, nodes.contains(a) && nodes.contains(b) ? w * factor : w)
+            }
+        }
+        g.heuristicScale = heuristicScale * factor   // discounts compound; keep A* admissible
         return g
     }
 

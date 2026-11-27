@@ -135,7 +135,8 @@ nonisolated enum Discovery {
     /// `closed`/`walk` nil = the bundled closures active at `start`.
     static func sights(along polyline: [Coord], mode: RideMode = .leisure, start: Date = .now,
                        in places: [Sight] = Discovery.places, facts: [String: PlaceFacts] = Discovery.facts,
-                       closed: [NoGoCircle]? = nil, walk: [NoGoCircle]? = nil, limit: Int? = 20) -> [Sight] {
+                       closed: [NoGoCircle]? = nil, walk: [NoGoCircle]? = nil, limit: Int? = 20,
+                       categories: Set<String> = leisureCategories, mergeByName: Bool = true) -> [Sight] {
         // A thinned line is plenty for a 100-300 m corridor and keeps the snap cheap.
         let coords = Geo.sample(polyline.map(\.cl), count: 400)
         guard coords.count >= 2, let inBox = box(coords, pad: largeCorridor) else { return [] }
@@ -144,7 +145,7 @@ nonisolated enum Discovery {
         let candidates = places.filter { p in
             // An unnamed playground is named "Playground" at build: fine to search, too vague to visit.
             // (It's the only leisure category that gets a made-up name; see scripts/places/build.py NAMELESS.)
-            leisureCategories.contains(p.category) && !(p.category == "playground" && p.name == "Playground")
+            categories.contains(p.category) && !(p.category == "playground" && p.name == "Playground")
                 && (inBox(p.coordinate) || (p.osmID.flatMap { facts[$0] }?.shape.contains { inBox($0.cl) } ?? false))
         }
         let cumulative = Geo.cumulative(coords)
@@ -159,7 +160,9 @@ nonisolated enum Discovery {
             if inside(s.coordinate, walk), f?.note?.reasons?.contains("park_and_walk") != true { return false }
             return true
         }
-        let one = onePerPlace(kept, polyline: coords, cumulative: cumulative, facts: facts)
+        // One per place merges a park's zones by name; amenities are all called "Toilets" or
+        // "Drinking water", so for them it would keep one tap for the whole route.
+        let one = mergeByName ? onePerPlace(kept, polyline: coords, cumulative: cumulative, facts: facts) : kept
         guard let limit else { return one }
         return spread(one, polyline: coords, cumulative: cumulative, limit: limit) { Double(notability($0, facts)) }
     }
@@ -416,11 +419,12 @@ struct DiscoveryPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Image(systemName: "leaf.fill").foregroundStyle(.green)
+                Image("kit-icon-leaf").renderingMode(.template).resizable().frame(width: 20, height: 20)
+                    .foregroundStyle(KitColor.accentStrong).accessibilityHidden(true)
                 TextField("What do you feel like? (hawker, temples…)", text: $tastes)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit(search)
-                Button(action: search) { Image(systemName: "magnifyingglass") }
+                Button(action: search) { Image(systemName: "magnifyingglass").foregroundStyle(KitColor.accentStrong) }
                     .accessibilityLabel("Search places")
             }
             if !results.isEmpty {
@@ -430,11 +434,15 @@ struct DiscoveryPanel: View {
                             Button {
                                 onPick(place.coordinate)
                             } label: {
-                                Text(place.name)
-                                    .font(.footnote.weight(.medium))
-                                    .lineLimit(1)
-                                    .padding(.horizontal, 12).padding(.vertical, 8)
-                                    .background(.quaternary, in: .capsule)
+                                HStack(spacing: 6) {
+                                    PixelIcon(rows: PixelArt.forCategory(place.category), size: 14).accessibilityHidden(true)
+                                    Text(place.name).font(.footnote.weight(.medium)).lineLimit(1)
+                                }
+                                .foregroundStyle(KitColor.ink)
+                                .padding(.horizontal, 10)
+                                .frame(minHeight: 44)
+                                .background(KitColor.paper)
+                                .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
                             }
                             .buttonStyle(.plain)
                         }
@@ -448,7 +456,10 @@ struct DiscoveryPanel: View {
     /// Leisure places on screen, matching the tastes typed (all of them when blank).
     private func search() {
         let radius = max(region.span.latitudeDelta, region.span.longitudeDelta) * PCNGraph.metresPerDegree / 2
+        // Many parks share a name ("Playground"): one chip each, the first (nearest) kept.
+        var seen = Set<String>()
         results = Discovery.search(tastes, near: region.center, within: max(radius, 1000), leisureOnly: true)
+            .filter { seen.insert($0.name).inserted }
     }
 }
 
@@ -456,15 +467,7 @@ struct DiscoveryPanel: View {
 struct SightBadge: View {
     let sight: Sight
 
-    var body: some View {
-        Image(systemName: Discovery.icon(for: sight.category).symbol)
-            .font(.caption.bold())
-            .foregroundStyle(.white)
-            .padding(6)
-            .background(.green, in: .circle)
-            .overlay(Circle().strokeBorder(.white, lineWidth: 2))
-            .shadow(radius: 2)
-    }
+    var body: some View { PlacePin(category: sight.category, name: sight.name) }
 }
 
 /// The "what it's about" content, all from the bundled data: the category, the

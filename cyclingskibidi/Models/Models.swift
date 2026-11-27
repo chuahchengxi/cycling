@@ -186,6 +186,17 @@ final class Route {
     /// Leisure sights within a corridor of the line, as [Sight]. Filled once on
     /// the route brief and reused by the ride; nil until then.
     var sightData: Data?
+    /// Where a straight leg crosses a no-bike way, as [Coord]; nil = none (and on older saves).
+    var noBikeData: Data?
+    /// Rest stops along the line, as [RestStop]; nil until the route brief finds them (and on older saves).
+    var restStopData: Data?
+    /// Direct (0) ↔ Scenic (1) for Leisure; nil on older saves, read as the midway default.
+    var scenicRaw: Double?
+    static let defaultScenic = 0.5
+    var scenic: Double {
+        get { scenicRaw ?? Self.defaultScenic }
+        set { scenicRaw = newValue }
+    }
 
     init(name: String = "Untitled route") {
         self.name = name
@@ -204,6 +215,8 @@ final class Route {
     var steps: [StoredStep] { Blob.decode([StoredStep].self, stepData) ?? [] }
     var elevations: [Double] { Blob.decode([Double].self, elevationData) ?? [] }
     var sights: [Sight] { Blob.decode([Sight].self, sightData) ?? [] }
+    var noBikeCrossings: [Coord] { Blob.decode([Coord].self, noBikeData) ?? [] }
+    var restStops: [RestStop] { Blob.decode([RestStop].self, restStopData) ?? [] }
 
     var distanceKM: Double { distanceMeters / 1000 }
 }
@@ -217,6 +230,8 @@ final class Obstacle {
     var note: String = ""
     var reportedAt: Date = Date.now
     var confirmations: Int = 0
+    /// "It's not there" taps on its alarm: a mark that keeps being wrong is worth clearing.
+    var falseAlarms: Int = 0
     /// Last day the mark applies, Singapore time; nil = until the rider removes it.
     var expiresAt: Date? = nil
 

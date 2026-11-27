@@ -36,11 +36,23 @@ struct ContentView: View {
     @Query private var obstacles: [Obstacle]
     @AppStorage(RiderProfile.storageKey) private var profileRaw = ""
     @State private var askInterests = false
+    /// No profile at launch: after the welcome (which saves the fall setting), ask for interests.
+    @State private var firstRun = false
+    @AppStorage(AppSettings.onboarded) private var onboarded = false
+    private var showWelcome: Bool {
+        #if DEBUG
+        if Demo.screen != nil { return false }   // demo screenshots skip onboarding
+        #endif
+        return !onboarded
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
             RouteListView()
         }
+        // The welcome, then (first run only) the interests sheet.
+        .fullScreenCover(isPresented: Binding(get: { showWelcome }, set: { _ in }),
+                         onDismiss: { if firstRun { askInterests = true; firstRun = false } }) { OnboardingView() }
         .environment(trip)
         .fullScreenCover(item: $trip.route) { route in
             NavigateView(route: route)
@@ -49,7 +61,8 @@ struct ContentView: View {
         // First launch: ask once. Continue always writes the profile, so it never shows again.
         .sheet(isPresented: $askInterests) { InterestsSheet() }
         .onAppear {
-            askInterests = profileRaw.isEmpty
+            firstRun = profileRaw.isEmpty
+            askInterests = profileRaw.isEmpty && onboarded
             #if DEBUG
             if Demo.screen != nil { askInterests = false }   // demo screenshots skip onboarding
             #endif
@@ -60,6 +73,22 @@ struct ContentView: View {
         .onChange(of: obstacles, initial: true) { Closures.marked = obstacles.compactMap(\.asClosure) }
         #if DEBUG
         .task { await openDemoScreen() }
+        .overlay { if let a = Demo.alarm { KitAlarmView(alarm: a, onPrimary: {}, onSecondary: {}, onNotThere: {}) } }
+        .overlay {
+            switch Demo.screen {
+            case "onboarding": OnboardingView()
+            case "newroute": CreateRouteFlow()
+            case "builder": RouteBuilderView(mode: .leisure)
+            case "interests": InterestsSheet()
+            case "mark": ObstacleReportView(coordinate: nil)
+            case "stats": NavigationStack { StatsView() }
+            case "settings": SettingsView()
+            case "fall": AreYouOKView(deadline: .now.addingTimeInterval(24), onOK: {}, onRingNow: {})
+            case "help": HelpAlarmView(since: .now, place: "Punggol Promenade", kmAlong: 14.2,
+                                       coordinate: .init(latitude: 1.41235, longitude: 103.91012), onStop: {})
+            default: EmptyView()
+            }
+        }
         #endif
     }
 
@@ -67,8 +96,14 @@ struct ContentView: View {
     private func openDemoScreen() async {
         guard let screen = Demo.screen, let route = await Demo.seed(context) else { return }
         switch screen {
-        case "detail":   path.append(route)
+        case "detail", "detail-full":   path.append(route)
         case "navigate": trip.begin(route)
+        case "navigate-kit":   // a pass-by in the banner (v3 · 04)
+            trip.begin(route)
+            try? await Task.sleep(for: .seconds(3))
+            var s = Sight(name: "Lorong Halus red bridge", category: "bridge", lat: 1.30, lon: 103.79)
+            s.note = "Golden hour in 7 min, a good 2-minute photo stop"
+            trip.recorder.passingSight = s
         case "finished":
             trip.begin(route)
             let plan = RoutePlan(polyline: route.polyline, steps: route.steps,

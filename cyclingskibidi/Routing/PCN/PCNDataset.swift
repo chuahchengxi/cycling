@@ -13,6 +13,9 @@ enum PCNDataset {
     private static var cachedGraph: PCNGraph?
     /// In-flight build, so concurrent first-callers share one off-main build.
     private static var building: Task<PCNGraph, Never>?
+    private static var cachedScenicNodes: Set<GridKey>?
+    /// In-flight scenic scan, shared by concurrent first-callers and built off-main.
+    private static var buildingScenicNodes: Task<Set<GridKey>, Never>?
 
     // MARK: Graph
 
@@ -31,6 +34,25 @@ enum PCNDataset {
         cachedGraph = g
         building = nil
         return g
+    }
+
+    // MARK: Scenic
+
+    /// The connector nodes near a scenic place, computed once from the bundled
+    /// places and memoised. Lazy: nothing runs at launch, only on the first plan
+    /// that asks for a scenic strength.
+    static func scenicNodes() async -> Set<GridKey> {
+        if let s = cachedScenicNodes { return s }
+        if let buildingScenicNodes { return await buildingScenicNodes.value }
+        // Single flight: the task is registered before any suspension, so a second caller waits on it.
+        let task = Task.detached(priority: .userInitiated) { () -> Set<GridKey> in
+            await graph().scenicNodes(near: Discovery.places, facts: Discovery.facts)
+        }
+        buildingScenicNodes = task
+        let s = await task.value
+        cachedScenicNodes = s
+        buildingScenicNodes = nil
+        return s
     }
 
     nonisolated private static func seedData() -> Data? {

@@ -19,17 +19,21 @@ struct MarksView: View {
             List {
                 ForEach(marks) { mark in
                     HStack(spacing: 12) {
-                        ObstacleBadge(kind: mark.kind)
+                        markIcon(for: mark.kind)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(mark.kind.rawValue).font(.body.weight(.semibold))
-                            if !mark.note.isEmpty { Text(mark.note).font(.subheadline).foregroundStyle(.secondary) }
+                            Text(mark.kind.rawValue).font(.body.weight(.semibold)).foregroundStyle(KitColor.ink)
+                            if !mark.note.isEmpty { Text(mark.note).font(.subheadline).foregroundStyle(KitColor.muted) }
                             Text("\(mark.expiryText) · marked \(mark.reportedAt.formatted(.relative(presentation: .named)))")
                                 .font(.caption)
-                                .foregroundStyle(mark.isActive ? Color.secondary : Color.orange)
+                                .foregroundStyle(mark.isActive ? KitColor.muted : KitColor.terracotta)
                         }
                     }
                     .opacity(mark.isActive ? 1 : 0.6)
                     .accessibilityElement(children: .combine)
+                    .kitCard()
+                    .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
                     .swipeActions {
                         Button(role: .destructive) { remove(mark) } label: { Label("Remove", systemImage: "trash") }
                     }
@@ -38,10 +42,18 @@ struct MarksView: View {
             }
             .overlay {
                 if marks.isEmpty {
-                    ContentUnavailableView("No marks", systemImage: "exclamationmark.triangle",
-                                           description: Text("Hazards you mark on a ride show up here."))
+                    ContentUnavailableView {
+                        VStack(spacing: 8) {
+                            Image("kit-icon-hazard").renderingMode(.template).resizable()
+                                .frame(width: 32, height: 32).foregroundStyle(KitColor.ink)
+                            Text("No marks")
+                        }
+                    } description: {
+                        Text("Hazards you mark on a ride show up here.")
+                    }
                 }
             }
+            .kitScreen()
             .navigationTitle("Your marks")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -49,6 +61,20 @@ struct MarksView: View {
                 ToolbarItem(placement: .topBarLeading) { EditButton().disabled(marks.isEmpty) }
             }
         }
+    }
+
+    /// Kit's pixel hazard icon for marks; closures get the closed-path pixel instead.
+    private func markIcon(for kind: ObstacleKind) -> some View {
+        Image(kind == .closed ? "kit-icon-closed" : "kit-icon-hazard")
+            .renderingMode(.template)
+            .resizable()
+            .frame(width: 22, height: 22)
+            .foregroundStyle(KitColor.ink)
+            .frame(width: 44, height: 44)
+            .background(kind == .closed ? KitColor.terracotta : KitColor.gold)
+            .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
+            .kitSurface()
+            .accessibilityHidden(true)
     }
 
     private func remove(_ mark: Obstacle) {
@@ -63,24 +89,38 @@ struct CreditsView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section("Map, roads and places") {
-                    Text("© OpenStreetMap contributors. Map data is available under the Open Database Licence (ODbL); see openstreetmap.org/copyright.")
-                    Text("Map tiles are drawn by this app from that data and ship inside it, so the map works offline.")
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    creditGroup("Map, roads and places") {
+                        Text("© OpenStreetMap contributors. Map data is available under the Open Database Licence (ODbL); see openstreetmap.org/copyright.")
+                        Text("Map tiles are drawn by this app from that data and ship inside it, so the map works offline.")
+                    }
+                    creditGroup("Place notes") {
+                        Text("Place notes, dishes and timings are this app's own research from public sources, each cited in the app's data. Named stalls are on the Michelin Bib Gourmand Singapore 2026 list, or have a cited founding year.")
+                    }
+                    creditGroup("Elevation") {
+                        Text("Terrain Tiles (Mapzen, hosted by AWS Open Data), from SRTM and other public sources.")
+                    }
+                    creditGroup("Park connectors and closures") {
+                        Text("Park connector routes and closure notices from NParks, matched to OpenStreetMap paths.")
+                    }
                 }
-                Section("Place notes") {
-                    Text("Place notes, dishes and timings are this app's own research from public sources, each cited in the app's data. Named stalls are on the Michelin Bib Gourmand Singapore 2026 list, or have a cited founding year.")
-                }
-                Section("Elevation") {
-                    Text("Terrain Tiles (Mapzen, hosted by AWS Open Data), from SRTM and other public sources.")
-                }
-                Section("Park connectors and closures") {
-                    Text("Park connector routes and closure notices from NParks, matched to OpenStreetMap paths.")
-                }
+                .padding(20)
             }
+            .kitScreen()
             .navigationTitle("Credits")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+        }
+    }
+
+    private func creditGroup<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            KitHeader(title)
+            VStack(alignment: .leading, spacing: 8) { content() }
+                .font(.body)
+                .foregroundStyle(KitColor.ink)
+                .kitCard()
         }
     }
 }

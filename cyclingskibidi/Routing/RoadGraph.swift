@@ -128,10 +128,14 @@ nonisolated struct RoadGraph: Sendable {
     /// A* from the node nearest `a` to the node nearest `b`; the line runs from
     /// `a` itself to `b` itself. nil when either end is off the network or the
     /// two aren't connected.
-    func route(_ a: Coord, _ b: Coord, profile: Profile, closed: [NoGoCircle] = [], walk: [NoGoCircle] = []) -> [Coord]? {
+    /// `scenic` nodes (with `scenicStrength` 0…1) make edges between two of them cheaper,
+    /// as `PCNGraph.scenic` does; the heuristic is scaled to match.
+    func route(_ a: Coord, _ b: Coord, profile: Profile, closed: [NoGoCircle] = [], walk: [NoGoCircle] = [],
+               scenic: Set<Int32> = [], scenicStrength: Double = 0) -> [Coord]? {
         guard let s = nearest(a), let t = nearest(b) else { return nil }
         if s == t { return [a, coord(s), b] }
-        let factors = profile.factors, minFactor = factors.min() ?? 1
+        let pretty = scenic.isEmpty ? Float(1) : Float(1 - PCNGraph.maxScenicDiscount * min(max(scenicStrength, 0), 1))
+        let factors = profile.factors, minFactor = (factors.min() ?? 1) * pretty
         let extra = penalties(closed: closed, walk: walk)
         let tl = Float(lat[t]) / 1e6, to0 = Float(lon[t]) / 1e6
         let kx = Float(cos(Double(tl) * .pi / 180) * PCNGraph.metresPerDegree), ky = Float(PCNGraph.metresPerDegree)
@@ -150,7 +154,9 @@ nonisolated struct RoadGraph: Sendable {
             if f - h(u) > g[u] + 0.01 { continue }   // stale entry
             for e in Int(first[u])..<Int(first[u + 1]) {
                 let v = Int(to[e])
-                let w = Float(len[e]) / 2 * factors[Int(cls[e])] + (extra[Int32(v)] ?? 0)
+                var w = Float(len[e]) / 2 * factors[Int(cls[e])]
+                if pretty < 1, scenic.contains(u32), scenic.contains(Int32(v)) { w *= pretty }
+                w += extra[Int32(v)] ?? 0
                 if g[u] + w < g[v] {
                     g[v] = g[u] + w
                     prev[v] = u32
@@ -198,6 +204,18 @@ nonisolated struct RoadGraph: Sendable {
 /// a bucket index), shared by every plan.
 enum RoadNetwork {
     private static var cached: RoadGraph?
+    private static var scenicCache: Task<Set<Int32>, Never>?
+
+    /// Road nodes near scenery, for Leisure's scenic legs. Lazy and single-flight, like the graph.
+    static func scenicNodes() async -> Set<Int32> {
+        if let scenicCache { return await scenicCache.value }
+        let task = Task.detached(priority: .userInitiated) { () -> Set<Int32> in
+            guard let g = await graph() else { return [] }
+            return PCNGraph.nearScenery((0..<g.nodeCount).lazy.map { (Int32($0), g.coord($0)) }, places: Discovery.places, facts: Discovery.facts)
+        }
+        scenicCache = task
+        return await task.value
+    }
     private static var building: Task<RoadGraph?, Never>?
 
     static func graph() async -> RoadGraph? {

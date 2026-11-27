@@ -22,6 +22,7 @@ struct CreateRouteFlow: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var path: [RideMode] = []
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -38,29 +39,40 @@ struct CreateRouteFlow: View {
     }
 
     private var modeStep: some View {
-        VStack(spacing: 14) {
-            Text("How do you want to ride?").font(.title3.bold()).frame(maxWidth: .infinity, alignment: .leading)
-            ForEach(RideMode.allCases) { m in
-                Button {
-                    path.append(m)
-                } label: {
-                    HStack(spacing: 14) {
-                        Image(systemName: m.symbol).font(.title2).frame(width: 34)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(m.rawValue).font(.headline)
-                            Text(m.subtitle).font(.footnote).foregroundStyle(.secondary)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Text("How do you want to ride?")
+                    .font(.title2.bold())
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                ForEach(RideMode.allCases) { m in
+                    Button {
+                        path.append(m)
+                    } label: {
+                        HStack(spacing: 14) {
+                            Image(m.kitIcon).renderingMode(.template).resizable()
+                                .frame(width: 22, height: 22)
+                                .frame(width: 40, height: 40)
+                                .background(m == .moderate ? KitColor.sage : KitColor.paper)
+                                .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
+                                .environment(\.colorScheme, m == .moderate ? .light : colorScheme)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(m.rawValue).font(.headline)
+                                Text(m.subtitle).font(.subheadline).foregroundStyle(KitColor.muted)
+                            }
+                            Spacer(minLength: 4)
+                            Image("kit-icon-chevron").renderingMode(.template).resizable()
+                                .frame(width: 16, height: 16)
                         }
-                        Spacer()
-                        Image(systemName: "chevron.right").foregroundStyle(.tertiary)
+                        .foregroundStyle(KitColor.ink)
+                        .frame(minHeight: 72)
+                        .kitCard(m == .moderate ? KitColor.board : KitColor.paper, padding: 14)
                     }
-                    .padding(16)
-                    .background(.background.secondary, in: .rect(cornerRadius: 16))
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
-            Spacer()
+            .padding(20)
         }
-        .padding(20)
+        .kitScreen()
     }
 
     static func selfCheck() {
@@ -68,6 +80,17 @@ struct CreateRouteFlow: View {
         // Hashable and round-trip, or the wizard cannot advance.
         assert(RideMode.allCases.allSatisfy { RideMode(rawValue: $0.rawValue) != nil })
         assert(Set(RideMode.allCases).count == RideMode.allCases.count)
+    }
+}
+
+extension RideMode {
+    /// Kit's pixel mark for the mode (Figma v2 · 02).
+    var kitIcon: String {
+        switch self {
+        case .fast: "kit-icon-bolt"
+        case .moderate: "kit-icon-bike"
+        case .leisure: "kit-icon-leaf"
+        }
     }
 }
 
@@ -100,12 +123,24 @@ private struct SourceStep: View {
     @State private var pendingBox: PreviewBox?
 
     var body: some View {
-        List {
-            Button { showingMap = true } label: { Label("Create from map", systemImage: "map") }
-            Button { importingFile = true } label: { Label("Import a GPX file", systemImage: "doc.badge.plus") }
-            Button { activeSheet = .workouts } label: { Label("Import from Garmin / COROS", systemImage: "applewatch.side.right") }
-            Button { importingFile = true } label: { Label("Import from Strava (GPX export)", systemImage: "arrow.down.doc") }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                KitHeader("Where does it come from?")
+                VStack(spacing: 0) {
+                    sourceRow(icon: "map", title: "Create from map") { showingMap = true }
+                    rowDivider
+                    sourceRow(icon: "doc.badge.plus", title: "Import a GPX file") { importingFile = true }
+                    rowDivider
+                    sourceRow(icon: "applewatch.side.right", title: "Import from Garmin / COROS") { activeSheet = .workouts }
+                    rowDivider
+                    sourceRow(icon: "arrow.down.doc", title: "Import from Strava (GPX export)") { importingFile = true }
+                }
+                .background(KitColor.paper)
+                .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
+            }
+            .padding(20)
         }
+        .kitScreen()
         .fullScreenCover(isPresented: $showingMap) {
             // Builder owns its NavigationStack; Save closes the cover and the flow.
             RouteBuilderView(mode: mode) { showingMap = false; onFinish() }
@@ -125,6 +160,30 @@ private struct SourceStep: View {
                 RoutePreview(name: box.name, waypoints: box.waypoints, plan: box.plan, mode: mode) { onFinish() }
             }
         }
+    }
+
+    private var rowDivider: some View {
+        Rectangle().fill(KitColor.line).frame(height: 1)
+    }
+
+    private func sourceRow(icon: String, title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.body)
+                    .frame(width: 24)
+                    .foregroundStyle(KitColor.ink)
+                Text(title).font(.body)
+                Spacer(minLength: 4)
+                Image("kit-icon-chevron").renderingMode(.template).resizable()
+                    .frame(width: 16, height: 16)
+            }
+            .foregroundStyle(KitColor.ink)
+            .padding(.horizontal, 14)
+            .frame(minHeight: 56)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func handleFile(_ result: Result<[URL], Error>) async {
@@ -232,7 +291,7 @@ private struct RoutePreview: View {
                     Pill(text: Fmt.duration(plan.expected))
                     Pill(text: Difficulty.rated(distanceMeters: plan.distance, ascentMeters: plan.ascent).rawValue,
                          tint: Difficulty.rated(distanceMeters: plan.distance, ascentMeters: plan.ascent).color)
-                    Pill(text: mode.rawValue, tint: .accentColor)
+                    Pill(text: mode.rawValue, tint: KitColor.accentStrong)
                 }
                 TextField("Route name", text: $editedName).textFieldStyle(.roundedBorder)
                 Spacer()
@@ -251,6 +310,7 @@ private struct RoutePreview: View {
     private func save() {
         let route = Route.make(name: editedName.isEmpty ? name : editedName,
                                mode: mode, waypoints: waypoints, plan: plan)
+        route.scenicRaw = 0   // an imported ride is kept as ridden; re-plans don't bend it
         context.insert(route)
         try? context.save()
         dismiss()

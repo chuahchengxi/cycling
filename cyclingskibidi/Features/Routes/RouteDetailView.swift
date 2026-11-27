@@ -18,12 +18,18 @@ struct RouteDetailView: View {
     @Environment(Trip.self) private var trip
     @Environment(\.modelContext) private var context
     @Query private var obstacles: [Obstacle]
+    @Query(sort: \Ride.startedAt, order: .reverse) private var rides: [Ride]
     @AppStorage(RiderProfile.storageKey) private var profileRaw = ""
     private var profile: RiderProfile { RiderProfile.decode(profileRaw) ?? RiderProfile() }
 
     @State private var sheetShown = true
     @State private var startPending = false
-    @State private var detent: PresentationDetent = .fraction(0.28)
+    @State private var detent: PresentationDetent = {
+        #if DEBUG
+        if Demo.screen == "detail-full" { return .large }
+        #endif
+        return .fraction(0.28)
+    }()
     @State private var focus: MapFocus?
     /// Bundled closures and the rider's own closed marks this route rides — checked when opened.
     @State private var closureHits: (active: [Closure], expired: [Closure]) = ([], [])
@@ -32,6 +38,7 @@ struct RouteDetailView: View {
     /// The last re-plan still crossed a closure (no way round).
     @State private var replanFailed = false
     @State private var kitByModel = false
+    @State private var restLevel: RiderLevel?
 
     private var blockingClosures: [Closure] { closureHits.active.filter { $0.kind == .closure } }
 
@@ -73,13 +80,13 @@ struct RouteDetailView: View {
             // "the current sheet is blocking the next one" failure.
             if startPending { startPending = false; trip.begin(route) }
         }) {
-            SheetView(route: route, obstacles: nearby, closures: closureHits, replanning: replanning, kitByModel: kitByModel,
+            SheetView(route: route, obstacles: nearby, closures: closureHits, replanning: replanning, kitByModel: kitByModel, restLevel: restLevel ?? RiderLevel.effective(profile: profile, rides: rides),
                       currentDetent: $detent, onStart: {
                 // Saved routes are rechecked at ride start too: a closure may have begun since opening.
                 checkClosures()
                 replanFailed = false
                 if blockingClosures.isEmpty { start() } else { confirmClosedStart = true }
-            }, onReplan: { replan() })
+            }, onReplan: { replan() }, onAddStop: addStop, onRemoveStop: removeStop)
             .confirmationDialog(closedStartTitle, isPresented: $confirmClosedStart, titleVisibility: .visible) {
                 if !replanFailed { Button(blockingClosures.count == 1 ? "Re-plan around it" : "Re-plan around them") { replan(thenStart: true) } }
                 Button("Ride anyway") { start() }
@@ -102,6 +109,10 @@ struct RouteDetailView: View {
         }
         pins += nearby.map { o in
             MapPin(id: o.pinID, coordinate: o.coordinate, title: o.kind.rawValue, look: .view(AnyView(ObstacleBadge(kind: o.kind))))
+        }
+        pins += route.restStops.map { r in
+            MapPin(id: "rest-\(r.id.uuidString)", coordinate: r.coordinate, title: "Rest stop, \(r.name)",
+                   look: .marker(symbol: r.amenities.contains("drinkingWater") ? "drop.fill" : Discovery.icon(for: r.amenities.first ?? "").symbol, tint: .systemTeal))
         }
         pins += route.sights.map { s in
             MapPin(id: s.id.uuidString, coordinate: s.coordinate, title: s.name, look: .view(AnyView(SightBadge(sight: s))))
@@ -129,7 +140,7 @@ struct RouteDetailView: View {
         replanning = true
         Task {
             defer { replanning = false }
-            if let plan = try? await Routing.plan(through: route.waypoints, mode: route.mode, context: profile.today), plan.polyline.count > 1 {
+            if let plan = try? await Routing.plan(through: route.waypoints, mode: route.mode, context: profile.today, scenic: route.scenic), plan.polyline.count > 1 {
                 route.apply(plan)   // new line, turns and climb chart together
                 // Sights follow the new line: found afresh for Leisure, offline.
                 await pick()
@@ -143,14 +154,70 @@ struct RouteDetailView: View {
         }
     }
 
+    /// Ride to a sight: it becomes a pin between the two pins it falls between, then re-plan.
+    private func addStop(_ sight: Sight) {
+        let line = route.polyline.map(\.cl), cum = Geo.cumulative(line), pins = route.waypoints
+        guard pins.count >= 2, !Self.isPin(sight, in: pins) else { return }
+        // Snap each pin forward from the last, so an out-and-back's return pins get return-leg distances.
+        var from = 0
+        let alongs = pins.map { p -> Double in
+            guard let s = Geo.snap(p.cl, to: line, cumulative: cum, from: from) else { return 0 }
+            from = s.index
+            return s.along
+        }
+        var updated = pins
+        updated.insert(Coord(sight.coordinate), at: Self.stopIndex(along: sight.offsetAlong, pinAlongs: alongs))
+        route.waypointData = Blob.encode(updated)
+        replan()
+    }
+
+    /// Drop a sight: a pin placed on it goes (never the start or finish), else it leaves the picks.
+    private func removeStop(_ sight: Sight) {
+        let pins = route.waypoints
+        let kept = pins.enumerated().filter { i, p in
+            i == 0 || i == pins.count - 1 || Geo.distance(p.cl, sight.coordinate) > Self.pinRadius
+        }.map(\.element)
+        if kept.count < pins.count {
+            route.waypointData = Blob.encode(kept)
+            replan()
+        } else {
+            let left = route.sights.filter { $0.id != sight.id }
+            route.sightData = left.isEmpty ? nil : Blob.encode(left)
+            try? context.save()
+        }
+    }
+
+    nonisolated static let pinRadius: Double = 30
+    nonisolated static func isPin(_ sight: Sight, in pins: [Coord]) -> Bool {
+        pins.contains { Geo.distance($0.cl, sight.coordinate) <= pinRadius }
+    }
+    /// Where a stop `along` metres into the ride goes among pins at `pinAlongs`: after the
+    /// last pin before it, never before the start or after the finish.
+    nonisolated static func stopIndex(along: Double, pinAlongs: [Double]) -> Int {
+        let after = pinAlongs.dropFirst().dropLast().firstIndex { $0 > along } ?? pinAlongs.count - 1
+        return max(1, min(after, pinAlongs.count - 1))
+    }
+
+    static func selfCheck() {
+        assert(stopIndex(along: 500, pinAlongs: [0, 1000]) == 1, "between start and finish")
+        assert(stopIndex(along: 1500, pinAlongs: [0, 1000, 2000]) == 2, "after the middle pin")
+        assert(stopIndex(along: 200, pinAlongs: [0, 1000, 2000]) == 1, "before the middle pin")
+        assert(stopIndex(along: 9000, pinAlongs: [0, 1000, 2000]) == 2, "never after the finish")
+    }
+
     /// Kit's quick picks now, saved; the model's later if it answers for this same line.
     private func pick() async {
         guard route.mode != .fast, route.polyline.count > 1 else { return }
         let (line, mode, profile) = (route.polyline, route.mode, profile)
-        let found = await Task.detached { Kit.picks(along: line, mode: mode, profile: profile) }.value
+        let level = RiderLevel.effective(profile: profile, rides: rides)
+        let (found, stops) = await Task.detached {
+            (Kit.picks(along: line, mode: mode, profile: profile), RestStops.along(line, mode: mode, level: level))
+        }.value
         guard route.polyline == line else { return }
         kitByModel = false
+        restLevel = level
         route.sightData = found.quick.isEmpty ? nil : Blob.encode(found.quick)
+        route.restStopData = stops.isEmpty ? nil : Blob.encode(stops)
         try? context.save()
         Task {
             // Not once the ride has started: it already copied the quick picks, and the

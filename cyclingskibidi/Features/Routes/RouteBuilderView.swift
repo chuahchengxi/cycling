@@ -25,6 +25,13 @@ struct RouteBuilderView: View {
     @State private var waypoints: [Coord] = []
     @State private var plan = RoutePlan()
     @State private var planning = false
+    /// Direct ↔ Scenic (Leisure only); the plan follows on release.
+    @State private var scenic = Route.defaultScenic
+    /// Direct distance for the current pins, planned once per pin change.
+    @State private var direct: (waypoints: [Coord], distance: Double)?
+    @State private var draggingScenic = false
+    /// The scenic value the current plan was asked for, so a settled slider doesn't re-plan twice.
+    @State private var plannedScenic = Route.defaultScenic
     @State private var error: String?
     @State private var name = ""
     @State private var naming = false
@@ -66,10 +73,6 @@ struct RouteBuilderView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { naming = true }
-                        .disabled(plan.polyline.isEmpty || planning || (mode != .fast && sightsLoading))
-                }
             }
             .searchable(text: $query, prompt: "Search for a place")
             .onSubmit(of: .search, runSearch)
@@ -86,6 +89,7 @@ struct RouteBuilderView: View {
             .sheet(item: $selectedSight) { SightSheet(sight: $0) }
             .sheet(isPresented: $editingInterests) { InterestsSheet() }
             .onChange(of: mode) { _, _ in replan() }
+            .onChange(of: profileRaw) { _, _ in direct = nil }   // today's context changes the direct line too
             .onChange(of: profileRaw) { _, _ in replan() }   // "For you" edits re-pick
         }
     }
@@ -121,23 +125,24 @@ struct RouteBuilderView: View {
         Group {
             if !results.isEmpty {
                 List(results) { item in
-                    Button {
-                        let c = item.coordinate
-                        waypoints.append(Coord(c))
-                        focus = .region(.init(center: c, latitudinalMeters: 1500, longitudinalMeters: 1500))
-                        replan()
-                        results = []
-                        query = ""
-                    } label: {
-                        VStack(alignment: .leading) {
-                            Text(item.name).font(.body)
-                            Text([Discovery.icon(for: item.category).label, item.address].filter { !$0.isEmpty }.joined(separator: " · "))
-                                .font(.caption).foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text(item.name).font(.body)
+                        Text([Discovery.icon(for: item.category).label, item.address].filter { !$0.isEmpty }.joined(separator: " · "))
+                            .font(.caption).foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            if PresetLoops.isBikePlace(item) {
+                                actionButton("Start here") { addWaypoint(item.coordinate, atStart: true) }
+                                actionButton("Return the bike here") { addWaypoint(item.coordinate) }
+                            } else {
+                                actionButton("Add as a stop") { addWaypoint(item.coordinate) }
+                            }
                         }
+                        .buttonStyle(.bordered)
                     }
+                    .padding(.vertical, 4)
                 }
                 .listStyle(.plain)
-                .frame(maxHeight: 260)
+                .frame(maxHeight: 300)
                 .background(.regularMaterial)
             }
         }
@@ -160,6 +165,33 @@ struct RouteBuilderView: View {
                 }
             }
 
+            if mode == .leisure, waypoints.count >= 2 {
+                VStack(alignment: .leading, spacing: 2) {
+                    Slider(value: $scenic, in: 0...1) {
+                        Text("Scenery")
+                    } minimumValueLabel: {
+                        Text("Direct").font(.footnote).foregroundStyle(.secondary).lineLimit(1).fixedSize()
+                    } maximumValueLabel: {
+                        Text("Scenic").font(.footnote).foregroundStyle(.secondary).lineLimit(1).fixedSize()
+                    } onEditingChanged: { editing in
+                        draggingScenic = editing
+                        if !editing { replan() }
+                    }
+                    .accessibilityValue(scenic < 0.05 ? "Direct" : scenic > 0.95 ? "Most scenic" : "\(Int((scenic * 100).rounded())) percent scenic")
+                    .accessibilityHint("Direct is shortest; scenic bends toward water and parks, up to 30 percent longer.")
+                    // VoiceOver and Switch Control adjust without a drag: re-plan once they settle.
+                    .task(id: scenic) {
+                        guard !draggingScenic, scenic != plannedScenic else { return }
+                        try? await Task.sleep(for: .milliseconds(500))
+                        if !Task.isCancelled, !draggingScenic { replan() }
+                    }
+                    if !planning, let d = direct, d.waypoints == waypoints, let extra = Self.extraLabel(scenic: plan.distance, direct: d.distance) {
+                        Text("\(extra) for the scenery").font(.footnote.monospacedDigit().weight(.semibold))
+                            .accessibilityLabel("\(extra) longer than direct")
+                    }
+                }
+            }
+
             if mode == .leisure, let region = mapRegion {
                 DiscoveryPanel(region: region) { coord in
                     waypoints.append(Coord(coord))
@@ -178,20 +210,28 @@ struct RouteBuilderView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             } else {
-                FlowLayout {
-                    Pill(text: Fmt.km(plan.distance))
-                    Pill(text: Fmt.duration(plan.expected))
-                    Pill(text: difficulty.rawValue, tint: difficulty.color)
-                    Pill(text: mode.rawValue, tint: .accentColor)
-                    if plan.ascent > 0 { Pill(text: "↗ \(Int(plan.ascent)) m") }
-                    if plan.offConnectorMeters > 0 {
-                        Pill(text: "⚠︎ \(Fmt.km(plan.offConnectorMeters)) off-connector", tint: .orange)
+                // Figma v3 · 02: three big figures, then the extras as Kit tags.
+                HStack(alignment: .top) {
+                    KitStat(value: Fmt.km(plan.distance), caption: "distance")
+                    Spacer()
+                    KitStat(value: Fmt.duration(plan.expected), caption: "at \(mode.rawValue.lowercased()) pace")
+                    Spacer()
+                    KitStat(value: difficulty.rawValue, caption: "difficulty")
+                }
+                if plan.ascent > 0 || plan.offConnectorMeters > 0 {
+                    FlowLayout {
+                        if plan.ascent > 0 { KitChip(text: "↗ \(Int(plan.ascent)) m", caps: false) }
+                        if plan.offConnectorMeters > 0 {
+                            KitChip(text: "\(Fmt.km(plan.offConnectorMeters)) off-connector", icon: "kit-icon-hazard", fill: KitColor.gold, caps: false)
+                                .kitSurface()
+                        }
                     }
                 }
             }
 
             if mode != .fast, let sights, !sights.isEmpty, !sightsLoading { KitCard(count: sights.count, byModel: kitByModel) }
             if mode != .fast { placesSection }
+            if waypoints.isEmpty { loopsSection }   // never wipes pins the rider placed
 
             HStack {
                 Button(role: .destructive) {
@@ -217,12 +257,20 @@ struct RouteBuilderView: View {
             }
             .font(.subheadline)
             .buttonStyle(.bordered)
+
+            if !plan.polyline.isEmpty {
+                KitButton(title: "Save route", icon: "kit-icon-check", style: .primary) { naming = true }
+                    .disabled(!canSave)
+                    .opacity(canSave ? 1 : 0.5)
+            }
         }
         .padding(16)
         .frame(maxWidth: .infinity)
         .background(.regularMaterial, in: .rect(cornerRadius: 22))
         .padding(12)
     }
+
+    private var canSave: Bool { !plan.polyline.isEmpty && !planning && !(mode != .fast && sightsLoading) }
 
     private var difficulty: Difficulty {
         .rated(distanceMeters: plan.distance, ascentMeters: plan.ascent)
@@ -261,7 +309,8 @@ struct RouteBuilderView: View {
                                     }
                                     .padding(.horizontal, 12)
                                     .frame(minHeight: 44, alignment: .leading)
-                                    .background(.quaternary, in: .rect(cornerRadius: 12))
+                                    .background(KitColor.paper)
+                                    .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityLabel("\(sight.name), \(Discovery.icon(for: sight.category).label), \(Fmt.km(sight.offsetAlong)) along the route")
@@ -271,6 +320,59 @@ struct RouteBuilderView: View {
                 }
             }
         }
+    }
+
+    /// Three ready-made park connector circuits; picking one replaces the pins
+    /// and switches the map to Leisure so the whole line follows connectors.
+    private var loopsSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Loops").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(PresetLoops.all) { loop in
+                        Button { use(loop) } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(loop.name).font(.footnote.weight(.semibold)).lineLimit(1)
+                                Text(loop.blurb).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
+                            }
+                            .frame(width: 240, alignment: .leading)
+                            .padding(.horizontal, 12)
+                            .frame(minHeight: 44, alignment: .leading)
+                            .background(KitColor.paper)
+                            .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("\(loop.name). \(loop.blurb)")
+                    }
+                }
+            }
+        }
+    }
+
+    private func actionButton(_ title: String, _ action: @escaping () -> Void) -> some View {
+        Button(action: action) { Text(title).frame(minHeight: 44) }
+    }
+
+    private func addWaypoint(_ c: CLLocationCoordinate2D, atStart: Bool = false) {
+        if atStart { waypoints.insert(Coord(c), at: 0) } else { waypoints.append(Coord(c)) }
+        focus = .region(.init(center: c, latitudinalMeters: 1500, longitudinalMeters: 1500))
+        replan()
+        results = []
+        query = ""
+    }
+
+    private func use(_ loop: PresetLoop) {
+        waypoints = loop.waypoints
+        if let first = waypoints.first {
+            focus = .region(.init(center: first.cl, latitudinalMeters: 12_000, longitudinalMeters: 12_000))
+        }
+        sights = nil
+        sightsLoading = false
+        direct = nil
+        results = []
+        query = ""
+        // onChange(of: mode) replans by itself; only replan here when the mode is already Leisure.
+        if mode == .leisure { replan() } else { mode = .leisure }
     }
 
     // MARK: Actions
@@ -291,8 +393,17 @@ struct RouteBuilderView: View {
         let currentWaypoints = waypoints
         planTask = Task {
             do {
-                let fresh = try await Routing.plan(through: currentWaypoints, mode: currentMode, context: profile.today)
+                let s = scenic
+                plannedScenic = s
+                let fresh = try await Routing.plan(through: currentWaypoints, mode: currentMode, context: profile.today, scenic: s)
                 guard gen == generation else { return }
+                // The extra-distance label needs the direct length once per pin set.
+                if currentMode == .leisure, direct?.waypoints != currentWaypoints {
+                    // A failed comparison plan only loses the label, never the route.
+                    let d = s == 0 ? fresh : try? await Routing.plan(through: currentWaypoints, mode: .leisure, context: profile.today)
+                    guard gen == generation else { return }
+                    if let d { direct = (currentWaypoints, d.distance) }
+                }
                 plan = fresh
                 planning = false
                 if currentMode != .fast, !fresh.polyline.isEmpty {
@@ -320,6 +431,12 @@ struct RouteBuilderView: View {
         }
     }
 
+    /// "+1.2 km" beside the slider; nil when Scenic adds under 50 m (nothing worth showing).
+    nonisolated static func extraLabel(scenic: Double, direct: Double) -> String? {
+        let extra = scenic - direct
+        return extra < 50 ? nil : "+" + (extra / 1000).formatted(.number.precision(.fractionLength(1))) + " km"
+    }
+
     /// A model answer lands only if no newer pin or mode change has happened since it was asked.
     nonisolated static func apply(_ result: [Sight], forGeneration g: Int, current: Int) -> [Sight]? {
         g == current ? result : nil
@@ -329,6 +446,7 @@ struct RouteBuilderView: View {
         let route = Route.make(
             name: name.isEmpty ? "Route \(Date.now.formatted(date: .abbreviated, time: .shortened))" : name,
             mode: mode, waypoints: waypoints, plan: plan, sights: sights ?? [])
+        route.scenicRaw = mode == .leisure ? scenic : nil
         context.insert(route)
         try? context.save()
         (onSaved ?? { dismiss() })()
@@ -345,12 +463,13 @@ private struct WaypointPin: View {
     let last: Bool
 
     var body: some View {
-        ZStack {
-            Circle().fill(last ? Color.red : index == 0 ? .green : .blue)
-            Text("\(index + 1)").font(.caption2.bold()).foregroundStyle(.white)
-        }
-        .frame(width: 26, height: 26)
-        .shadow(radius: 2)
+        // Kit squares: start sage, end ink, the rest paper (as RouteSketch draws them).
+        Text("\(index + 1)").font(.caption2.bold())
+            .foregroundStyle(last ? KitColor.paper : KitColor.ink)
+            .frame(width: 26, height: 26)
+            .background(last ? KitColor.ink : index == 0 ? KitColor.sage : KitColor.paper)
+            .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
+            .environment(\.colorScheme, .light)
     }
 }
 

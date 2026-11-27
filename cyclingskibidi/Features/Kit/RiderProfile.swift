@@ -93,11 +93,41 @@ nonisolated enum RiderLevel: String, Codable, CaseIterable, Sendable {
     }
 }
 
+extension RiderLevel {
+    /// Pace from the last five real rides, both arrays newest first. A ride
+    /// with no distance or no moving time is a paused/failed recording: skip
+    /// it rather than let it skew the mean or divide by zero.
+    nonisolated static func estimated(distances: [Double], movingSeconds: [Double]) -> RiderLevel? {
+        let usable = zip(distances, movingSeconds).filter { distance, seconds in
+            distance > 0 && seconds > 0
+        }
+        guard usable.count >= 5 else { return nil }
+        let recent = usable.prefix(5)
+        let d = recent.reduce(0) { $0 + $1.0 / 1000 } / 5                  // km per ride
+        let v = recent.reduce(0) { $0 + ($1.0 / 1000) / ($1.1 / 3600) } / 5 // km/h per ride
+        // ponytail: 30 km / 22 km/h for strong and 12 km / 15 km/h for beginner
+        // are calibration constants for casual city rides, not a fitness model;
+        // swap them if the estimate ever feels wrong for a real rider.
+        if d >= 30 || v >= 22 { return .strong }
+        if d < 12 && v < 15 { return .beginner }
+        return .regular
+    }
+
+    /// The level Kit plans with: the rider's own pace once five finished rides
+    /// exist, otherwise the level they picked in the profile.
+    static func effective(profile: RiderProfile, rides: [Ride]) -> RiderLevel {
+        let newestFirst = rides.sorted { $0.startedAt > $1.startedAt }
+        return estimated(distances: newestFirst.map(\.distanceMeters),
+                         movingSeconds: newestFirst.map(\.movingSeconds)) ?? profile.level
+    }
+}
+
 nonisolated struct RiderProfile: Codable, Equatable, Sendable {
     var likes: Set<Interest> = []
     var today: Set<RideContext> = []
     var level: RiderLevel = .regular
     var weights: [String: Double] = [:]   // learned, per category (Kit learning)
+    var fallSensitivity: FallSensitivity = .normal
 
     static let storageKey = "riderProfile"
 
@@ -111,6 +141,21 @@ nonisolated struct RiderProfile: Codable, Equatable, Sendable {
 }
 
 extension RiderProfile {
+    /// Old profiles have no fall sensitivity: decode it with a default rather
+    /// than failing the whole profile.
+    enum CodingKeys: String, CodingKey {
+        case likes, today, level, weights, fallSensitivity
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        likes = try c.decodeIfPresent(Set<Interest>.self, forKey: .likes) ?? []
+        today = try c.decodeIfPresent(Set<RideContext>.self, forKey: .today) ?? []
+        level = try c.decodeIfPresent(RiderLevel.self, forKey: .level) ?? .regular
+        weights = try c.decodeIfPresent([String: Double].self, forKey: .weights) ?? [:]
+        fallSensitivity = try c.decodeIfPresent(FallSensitivity.self, forKey: .fallSensitivity) ?? .normal
+    }
+
     static func selfCheck() {
         let p = RiderProfile(likes: [.food, .nature], today: [.kids], level: .strong, weights: ["hawker": 0.5])
         assert(decode(p.encoded) == p, "profile round-trips through its JSON")
@@ -121,5 +166,27 @@ extension RiderProfile {
         for tag in ["nature", "food", "architecture", "heritage", "wildlife"] {
             assert(Interest.allCases.filter { $0.personaTags.contains(tag) }.count == 1, "\(tag) maps from one interest")
         }
+
+        // Level from real rides: five usable rides re-estimate the chosen level.
+        func sample(_ km: Double, _ kmh: Double, count: Int) -> ([Double], [Double]) {
+            let seconds = km * 1000 * 3.6 / kmh
+            return (Array(repeating: km * 1000, count: count),
+                    Array(repeating: seconds, count: count))
+        }
+        let four = sample(8, 12, count: 4)
+        assert(RiderLevel.estimated(distances: four.0, movingSeconds: four.1) == nil,
+               "fewer than five rides keeps the chosen level")
+        let beginner = sample(8, 12, count: 5)
+        assert(RiderLevel.estimated(distances: beginner.0, movingSeconds: beginner.1) == .beginner,
+               "five short, slow rides estimate beginner")
+        let strong = sample(35, 18, count: 5)
+        assert(RiderLevel.estimated(distances: strong.0, movingSeconds: strong.1) == .strong,
+               "five long rides estimate strong even at a moderate speed")
+        let regular = sample(15, 18, count: 5)
+        assert(RiderLevel.estimated(distances: regular.0, movingSeconds: regular.1) == .regular,
+               "five mid-distance, mid-pace rides estimate regular")
+        let paused = RiderLevel.estimated(distances: [8_000] + beginner.0,
+                                          movingSeconds: [0] + beginner.1)
+        assert(paused == .beginner, "a ride with zero moving seconds is skipped, not divided by")
     }
 }
