@@ -55,6 +55,7 @@ struct cyclingskibidiApp: App {
         PixelArt.selfCheck()
         RouteDetailView.selfCheck()
         KitColor.selfCheck()
+        AlertScheme.selfCheck()
         NoBike.selfCheck()
         Task { await Routing.selfCheckNoBike() }
         Task { await RestStops.selfCheckReal() }

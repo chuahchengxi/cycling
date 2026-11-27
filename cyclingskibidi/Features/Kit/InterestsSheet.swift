@@ -45,15 +45,6 @@ struct InterestsSheet: View {
                         .pickerStyle(.segmented)
                         Text(profile.level.detail).font(.footnote).foregroundStyle(.secondary)
                     }
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Fall detection").font(.headline)
-                        Picker("Fall detection", selection: $profile.fallSensitivity) {
-                            ForEach(FallSensitivity.allCases, id: \.self) { Text($0.label).tag($0) }
-                        }
-                        .pickerStyle(.segmented)
-                        Text("If you fall, you get 30 seconds to say you're OK before the alarm rings for help.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                    }
                 }
                 .padding(20)
             }
@@ -72,7 +63,12 @@ struct InterestsSheet: View {
                 .background(.bar)
             }
         }
-        .onAppear { profile = RiderProfile.decode(raw) ?? RiderProfile() }
+        .onAppear {
+            if let saved = RiderProfile.decode(raw) { profile = saved; return }
+            // First run: keep the fall setting chosen during the welcome.
+            let pending = UserDefaults.standard.string(forKey: OnboardingView.pendingSensitivityKey)
+            profile.fallSensitivity = pending.flatMap(FallSensitivity.init(rawValue:)) ?? .normal
+        }
     }
 
     private func section<Chips: View>(_ title: String, _ subtitle: String, @ViewBuilder chips: () -> Chips) -> some View {

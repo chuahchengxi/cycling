@@ -358,7 +358,9 @@ struct NavigateView: View {
     private func begin() {
         line = route.polyline.coordinates
         recorder.onReroute = { plan in line = plan.polyline.coordinates }
+        recorder.voiceEnabled = AppSettings.flag(AppSettings.voice)
         recorder.onAlarmWarn = { _ in   // first warning: a tap on the wrist and a short tone, no takeover yet
+            guard AppSettings.flag(AppSettings.warnBeep) else { return }
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
             AudioServicesPlayAlertSound(SystemSoundID(1005))
         }

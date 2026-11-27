@@ -36,11 +36,21 @@ struct ContentView: View {
     @Query private var obstacles: [Obstacle]
     @AppStorage(RiderProfile.storageKey) private var profileRaw = ""
     @State private var askInterests = false
+    @AppStorage(AppSettings.onboarded) private var onboarded = false
+    private var showWelcome: Bool {
+        #if DEBUG
+        if Demo.screen != nil { return false }   // demo screenshots skip onboarding
+        #endif
+        return !onboarded
+    }
 
     var body: some View {
         NavigationStack(path: $path) {
             RouteListView()
         }
+        // The welcome, then (first run only) the interests sheet.
+        .fullScreenCover(isPresented: Binding(get: { showWelcome }, set: { _ in }),
+                         onDismiss: { askInterests = profileRaw.isEmpty }) { OnboardingView() }
         .environment(trip)
         .fullScreenCover(item: $trip.route) { route in
             NavigateView(route: route)
@@ -49,7 +59,7 @@ struct ContentView: View {
         // First launch: ask once. Continue always writes the profile, so it never shows again.
         .sheet(isPresented: $askInterests) { InterestsSheet() }
         .onAppear {
-            askInterests = profileRaw.isEmpty
+            askInterests = profileRaw.isEmpty && onboarded
             #if DEBUG
             if Demo.screen != nil { askInterests = false }   // demo screenshots skip onboarding
             #endif

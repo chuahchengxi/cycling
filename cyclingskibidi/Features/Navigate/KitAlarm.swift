@@ -51,6 +51,10 @@ struct KitAlarmView: View {
     let onSecondary: () -> Void
     let onNotThere: () -> Void
 
+    @AppStorage(AlertScheme.storageKey) private var scheme: AlertScheme = .kit
+    private var fill: UInt32 { alarm.tone == .obstacle ? scheme.fills.obstacle : scheme.fills.noAccess }
+    private var text: Color { Color(hex: AlertScheme.text(on: fill)) }
+
     private var metres: Int { Int(alarm.distance.rounded()) }
     private var label: RoadLabelKind? {
         switch alarm.kind {
@@ -86,11 +90,11 @@ struct KitAlarmView: View {
             .padding(24)
             .padding(.top, 40)
         }
-        .foregroundStyle(KitColor.ink)
+        .foregroundStyle(text)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-        .background((alarm.tone == .obstacle ? KitColor.gold : KitColor.terracotta).ignoresSafeArea())
-        .overlay(alignment: .top) {   // walk stretches carry a gold band on the no-access red
-            if alarm.kind == .walk { KitColor.gold.frame(height: 10).ignoresSafeArea() }
+        .background(Color(hex: fill).ignoresSafeArea())
+        .overlay(alignment: .top) {   // walk stretches carry a band of the hazard colour on the no-access fill
+            if alarm.kind == .walk { Color(hex: scheme.fills.obstacle).frame(height: 10).ignoresSafeArea() }
         }
         .kitSurface()
         .accessibilityElement(children: .contain)
