@@ -28,7 +28,7 @@ struct RouteDetailView: View {
         #if DEBUG
         if Demo.screen == "detail-full" { return .large }
         #endif
-        return .fraction(0.28)
+        return SheetView.collapsedDetent
     }()
     @State private var focus: MapFocus?
     /// Bundled closures and the rider's own closed marks this route rides — checked when opened.
@@ -92,7 +92,7 @@ struct RouteDetailView: View {
                 Button("Ride anyway") { start() }
                 Button("Cancel", role: .cancel) {}
             }
-            .presentationDetents([.fraction(0.28), .large], selection: $detent)
+            .presentationDetents([SheetView.collapsedDetent, .large], selection: $detent)
             .presentationBackgroundInteraction(.enabled)
             .presentationDragIndicator(.visible)
             .interactiveDismissDisabled()

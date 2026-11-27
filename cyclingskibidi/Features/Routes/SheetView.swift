@@ -30,14 +30,16 @@ struct SheetView: View {
     /// No-bike crossings and walk stretches, worked out once per line off the main actor.
     @State private var noBike: (crossings: [(line: NoBikeLine?, along: Double, legLength: Double)], walk: [(name: String, along: Double, length: Double)]) = ([], [])
 
-    private var collapsed: Bool { currentDetent == .fraction(0.28) }
+    /// Just the summary line and Start: no empty space above the button.
+    static let collapsedDetent = PresentationDetent.height(160)
+    private var collapsed: Bool { currentDetent == Self.collapsedDetent }
 
     var body: some View {
         VStack(spacing: 0) {
             if collapsed {
                 summary.padding(.top, 24)
-                Spacer(minLength: 12)
-                startButton.padding([.horizontal, .bottom], 20)
+                startButton.padding(.horizontal, 20).padding(.top, 16)
+                Spacer(minLength: 0)
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 24) {
@@ -353,9 +355,15 @@ struct SheetView: View {
     /// Kit/button primary (Figma v3 · 03): the one sage button on the brief.
     private var startButton: some View {
         let disabled = route.polyline.count < 2 || replanning
-        return KitButton(title: "Start ride", icon: "kit-icon-play", style: .primary, action: onStart)
-            .disabled(disabled)
-            .opacity(disabled ? 0.5 : 1)
+        // HIG: the sheet's one primary action, native and prominent; green like Maps' Go.
+        return Button(action: onStart) {
+            Label("Start ride", systemImage: "play.fill").font(.headline).frame(maxWidth: .infinity, minHeight: 34)
+        }
+        .buttonStyle(.borderedProminent)
+        .buttonBorderShape(.capsule)
+        .controlSize(.large)
+        .tint(.green)
+        .disabled(disabled)
     }
 }
 

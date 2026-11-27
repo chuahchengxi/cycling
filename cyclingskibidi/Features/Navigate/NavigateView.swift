@@ -31,6 +31,7 @@ struct NavigateView: View {
     @State private var showSheet = true
     /// A sight the rider tapped on the map: its full brief in a Kit card. (Passing one goes in the banner.)
     @State private var tappedSight: Sight?
+    @State private var confirmEnd = false
 
     private var recorder: RideRecorder { trip.recorder }
 
@@ -280,7 +281,7 @@ struct NavigateView: View {
                 .accessibilityLabel("Next turn: \(step.instruction), in \(Fmt.km(recorder.distanceToManeuver))")
             }
             KitTimer(elapsed: recorder.movingSeconds, toGo: Fmt.km(recorder.remainingDistance),
-                     left: Fmt.clock(recorder.remainingSeconds), arrival: Fmt.eta(recorder.remainingSeconds),
+                     left: Fmt.duration(recorder.remainingSeconds), arrival: Fmt.eta(recorder.remainingSeconds),
                      progress: recorder.progress)
                 .padding(.horizontal, 16)
                 .padding(.top, recorder.currentStep == nil ? 18 : 8)
@@ -310,7 +311,11 @@ struct NavigateView: View {
                     recorder.phase == .running ? recorder.pause() : recorder.resume()
                 }
                 // A hold, so a bump or a wet glove can't end the ride.
-                HoldButton(title: "Hold to end ride", icon: "kit-icon-stop", style: .destructive, seconds: 1.5, action: end)
+                KitButton(title: "End ride", icon: "kit-icon-stop", style: .destructive) { confirmEnd = true }
+                    .confirmationDialog("End this ride?", isPresented: $confirmEnd, titleVisibility: .visible) {
+                        Button("End ride", role: .destructive, action: end)
+                        Button("Keep riding", role: .cancel) {}
+                    } message: { Text("Your ride is saved to your stats.") }
             }
             #if DEBUG
             KitButton(title: "Simulate fall", icon: "kit-icon-hazard", style: .tertiary) { recorder.fallDetected() }

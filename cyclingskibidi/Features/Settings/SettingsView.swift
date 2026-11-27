@@ -129,7 +129,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Sounds")
                 } footer: {
-                    Text("The help alarm always rings, even on silent and through the loudspeaker. Other alarms flash, vibrate and speak their warning even with spoken directions off; that speech follows the silent switch.")
+                    Text("The help alarm always rings, even on silent and through the loudspeaker. Other alarms flash, vibrate and speak their warning even with spoken directions off. Spoken directions play with the screen locked and lower your music while they speak.")
                 }
 
                 Section {

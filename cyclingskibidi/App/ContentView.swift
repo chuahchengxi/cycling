@@ -54,7 +54,7 @@ struct ContentView: View {
         .fullScreenCover(isPresented: Binding(get: { showWelcome }, set: { _ in }),
                          onDismiss: { if firstRun { askInterests = true; firstRun = false } }) { OnboardingView() }
         .environment(trip)
-        .fullScreenCover(item: $trip.route) { route in
+        .fullScreenCover(item: $trip.route, onDismiss: { path = NavigationPath() }) { route in   // ride over: back to Routes
             NavigateView(route: route)
                 .environment(trip)
         }

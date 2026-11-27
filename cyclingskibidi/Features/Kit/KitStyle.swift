@@ -9,6 +9,7 @@
 //
 
 import SwiftUI
+import CoreText
 
 extension KitColor {
     /// Chart and inset fill (Figma "board").
@@ -26,9 +27,18 @@ extension KitColor {
 }
 
 extension Font {
-    /// Kit's numerals (Jersey 10 in Figma). Monospaced heavy until the font is bundled;
-    /// swap this one line then. Follows Dynamic Type.
-    static func kitNumber(_ style: Font.TextStyle) -> Font { .system(style, design: .monospaced).weight(.heavy) }
+    /// Kit's numerals: Jersey 10, the pixel face in the Figma file (SIL OFL, bundled).
+    /// Jersey sits small on its body, so it runs 1.3x the text style's size; it scales
+    /// with Dynamic Type through `relativeTo`.
+    static func kitNumber(_ style: Font.TextStyle) -> Font {
+        _ = KitFont.registered
+        let base: CGFloat = switch style {
+        case .largeTitle: 34; case .title: 28; case .title2: 22; case .title3: 20
+        case .headline, .body: 17; case .callout: 16; case .subheadline: 15
+        case .footnote: 13; case .caption: 12; default: 11
+        }
+        return .custom(KitFont.jersey, size: (base * 1.3).rounded(), relativeTo: style)
+    }
     /// Small-caps style label used on Kit chips and bubbles ("KIT · PICKED FOR YOU").
     static let kitLabel = Font.caption2.weight(.bold)
 }
@@ -50,6 +60,23 @@ extension View {
             .tint(KitColor.accentStrong)
             .scrollContentBackground(.hidden)
             .background(KitColor.paper.ignoresSafeArea())
+    }
+}
+
+/// Registers the bundled pixel font once, without an Info.plist entry.
+enum KitFont {
+    static let jersey = "Jersey10-Regular"
+    static let registered: Bool = {
+        guard let url = Bundle.main.url(forResource: jersey, withExtension: "ttf")
+                ?? Bundle.main.url(forResource: jersey, withExtension: "ttf", subdirectory: "Fonts") else {
+            assertionFailure("Jersey 10 is missing from the bundle"); return false
+        }
+        return CTFontManagerRegisterFontsForURL(url as CFURL, .process, nil)
+            || UIFont(name: jersey, size: 12) != nil   // already registered
+    }()
+
+    static func selfCheck() {
+        assert(registered && UIFont(name: jersey, size: 12) != nil, "Jersey 10 registers and loads")
     }
 }
 

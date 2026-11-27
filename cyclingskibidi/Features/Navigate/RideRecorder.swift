@@ -179,7 +179,7 @@ final class RideRecorder {
     private var passedSights: Set<UUID> = []
     /// Hazards already announced on this approach; re-armed once the rider is clear.
     private var warnedHazards: Set<String> = []
-    private let speaker = AVSpeechSynthesizer()
+    private let speaker = VoicePrompt()
 
     /// Called when the rider has left the route and a new line is needed.
     var onReroute: ((RoutePlan) -> Void)?
@@ -293,7 +293,7 @@ final class RideRecorder {
         task?.cancel(); task = nil
         phase = .finished
         endFall(stopMonitor: true)
-        speaker.stopSpeaking(at: .immediate)
+        speaker.stop()
 
         let ride = Ride(startedAt: startedAt, routeName: routeName, source: .app)
         ride.endedAt = .now
@@ -781,9 +781,7 @@ final class RideRecorder {
     nonisolated(unsafe) static var speechOff = false   // the launch self-checks stay quiet
     private func announce(_ text: String, safety: Bool = false) {
         guard voiceEnabled || safety, !Self.speechOff, !text.isEmpty else { return }
-        let utterance = AVSpeechUtterance(string: text)
-        utterance.rate = AVSpeechUtteranceDefaultSpeechRate
-        speaker.speak(utterance)
+        speaker.say(text)
     }
 
     #if DEBUG
@@ -1168,4 +1166,39 @@ struct HazardAlert: Equatable {
     let kind: ObstacleKind
     let distance: Double
     let note: String
+}
+
+/// Spoken guidance the way Maps does it: a playback session in voice-prompt mode, active
+/// only while Kit speaks, so it plays with the screen locked and in the background, ducks
+/// music for the sentence, and hands the audio back afterwards. Without a session the
+/// utterances queued up and only came out once the ride ended.
+final class VoicePrompt: NSObject, AVSpeechSynthesizerDelegate {
+    private let synth = AVSpeechSynthesizer()
+
+    override init() {
+        super.init()
+        synth.delegate = self
+    }
+
+    func say(_ text: String) {
+        let session = AVAudioSession.sharedInstance()
+        try? session.setCategory(.playback, mode: .voicePrompt, options: [.duckOthers, .interruptSpokenAudioAndMixWithOthers])
+        try? session.setActive(true)
+        let u = AVSpeechUtterance(string: text)
+        u.rate = AVSpeechUtteranceDefaultSpeechRate
+        synth.speak(u)
+    }
+
+    func stop() { synth.stopSpeaking(at: .immediate) }
+
+    nonisolated func speechSynthesizer(_ s: AVSpeechSynthesizer, didFinish u: AVSpeechUtterance) { release(s) }
+    nonisolated func speechSynthesizer(_ s: AVSpeechSynthesizer, didCancel u: AVSpeechUtterance) { release(s) }
+
+    /// Last sentence done: un-duck the rider's music. A ringing alarm keeps its own session.
+    nonisolated private func release(_ s: AVSpeechSynthesizer) {
+        Task { @MainActor in
+            guard !s.isSpeaking, !AlarmSound.shared.isPlaying else { return }
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
+    }
 }
