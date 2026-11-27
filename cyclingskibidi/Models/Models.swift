@@ -230,6 +230,8 @@ final class Obstacle {
     var note: String = ""
     var reportedAt: Date = Date.now
     var confirmations: Int = 0
+    /// "It's not there" taps on its alarm: a mark that keeps being wrong is worth clearing.
+    var falseAlarms: Int = 0
     /// Last day the mark applies, Singapore time; nil = until the rider removes it.
     var expiresAt: Date? = nil
 

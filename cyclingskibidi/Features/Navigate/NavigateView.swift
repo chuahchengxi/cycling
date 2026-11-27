@@ -11,6 +11,7 @@
 import SwiftUI
 import SwiftData
 import MapKit
+import AudioToolbox
 
 struct NavigateView: View {
     let route: Route
@@ -67,7 +68,7 @@ struct NavigateView: View {
                     if let failure = recorder.rerouteFailure {
                         RerouteFailureBanner(message: failure) { recorder.dismissRerouteFailure() }
                     }
-                    if let hazard = recorder.nearHazard {
+                    if let hazard = recorder.nearHazard, recorder.alarm == nil {   // the takeover replaces the banner
                         HazardBanner(alert: hazard).transition(.move(edge: .top).combined(with: .opacity))
                     }
                 }
@@ -77,12 +78,12 @@ struct NavigateView: View {
                 sideButtons.padding(.bottom, geo.safeAreaInsets.bottom + Self.collapsedSheet + 12)
             }
             .overlay { passBySight }
-            .overlay { noBikeAlarm }
+            .overlay { kitAlarm }
             .overlay(alignment: .bottom) { if placing { placementBar } }
             .animation(.default, value: recorder.passingSight?.id)
             .animation(.default, value: placing)
             .animation(.default, value: recorder.nearHazard == nil)
-            .animation(.default, value: recorder.noBikeAhead == nil)
+            .animation(.default, value: recorder.alarm?.key)
             .animation(.default, value: recorder.walkingThrough)
             .ignoresSafeArea(edges: .bottom)
         }
@@ -90,7 +91,7 @@ struct NavigateView: View {
         // Every marked hazard warns on approach, whatever route is being ridden.
         .onChange(of: obstacles, initial: true) { recorder.hazards = obstacles.filter(\.isActive) }
         .sheet(isPresented: Binding(   // the full-screen alarm hides the nav sheet, whoever asks for it back
-            get: { showSheet && recorder.noBikeAhead == nil }, set: { if recorder.noBikeAhead == nil { showSheet = $0 } })) {
+            get: { showSheet && recorder.alarm == nil }, set: { if recorder.alarm == nil { showSheet = $0 } })) {
             navSheet
                 // The 150 pt detent can't grow, so its numbers stop at AX1 and shrink rather than truncate.
                 .dynamicTypeSize(...DynamicTypeSize.accessibility1)
@@ -103,7 +104,7 @@ struct NavigateView: View {
         // Presented from the main nav view, never stacked on the persistent nav
         // sheet — that sheet is hidden while placing, so the two never coexist.
         .sheet(item: $pending, onDismiss: { showSheet = true }) { item in
-            ObstacleReportView(coordinate: item.coordinate, onSaveClosed: recorder.rerouteAround)
+            ObstacleReportView(coordinate: item.coordinate, onSaveClosed: { recorder.rerouteAround(closed: $0) })
                 .presentationDetents([.medium])
         }
         .alert("Location is off", isPresented: .constant(recorder.authorizationDenied)) {
@@ -131,17 +132,20 @@ struct NavigateView: View {
         }
     }
 
-    /// Full-screen expressway alarm (Figma v3 · 12) while an off-route rider closes on an entrance.
+    /// Full-screen Kit alarm: a no-bike entrance (Figma v3 · 12), a hazard, a closure or a walk stretch.
     @ViewBuilder
-    private var noBikeAlarm: some View {
-        if let ahead = recorder.noBikeAhead {
-            NoBikeAlarm(entrance: ahead.entrance, distance: ahead.distance,
-                        onWayRound: { recorder.rerouteNow() },
-                        onShowMap: {
-                            recorder.dismissNoBike()
-                            focus = .region(MKCoordinateRegion(center: ahead.entrance.coordinate, latitudinalMeters: 400, longitudinalMeters: 400))
-                        },
-                        onNotThere: { recorder.silenceNoBike() })
+    private var kitAlarm: some View {
+        if let alarm = recorder.alarm {
+            KitAlarmView(alarm: alarm,
+                         onPrimary: { recorder.alarmPrimary() },
+                         onSecondary: {
+                             if case .noBikes = alarm.kind {
+                                 recorder.dismissAlarm()
+                                 focus = .region(MKCoordinateRegion(center: alarm.coordinate.cl, latitudinalMeters: 400, longitudinalMeters: 400))
+                             } else { recorder.alarmSecondary() }
+                         },
+                         onNotThere: { recorder.silenceAlarm() })
+                .id(alarm.key)   // a new alarm replays its haptic and tone
                 .transition(.opacity)
         }
     }
@@ -307,6 +311,10 @@ struct NavigateView: View {
     private func begin() {
         line = route.polyline.coordinates
         recorder.onReroute = { plan in line = plan.polyline.coordinates }
+        recorder.onAlarmWarn = { _ in   // first warning: a tap on the wrist and a short tone, no takeover yet
+            UINotificationFeedbackGenerator().notificationOccurred(.warning)
+            AudioServicesPlayAlertSound(SystemSoundID(1005))
+        }
         recorder.start()
     }
 

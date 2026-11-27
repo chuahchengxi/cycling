@@ -87,6 +87,30 @@ final class RideRecorder {
     /// The nearest marked hazard within `hazardWarn`, for the banner; nil when clear.
     private(set) var nearHazard: HazardAlert?
 
+    // MARK: Kit alarms (plan 6): one full-screen takeover at a time
+    /// A hazard, closure or walk stretch inside `takeoverDistance`; the no-bike alarm wins over it.
+    private(set) var obstacleAlarm: KitAlarm?
+    var alarm: KitAlarm? {
+        guard let n = noBikeAhead else { return obstacleAlarm }
+        let expressway = n.entrance.kind == "expressway"
+        return KitAlarm(key: n.entrance.key, kind: .noBikes(expressway: expressway),
+                        title: expressway ? "Expressway ahead: bikes not allowed" : "No bikes ahead",
+                        detail: n.entrance.name.isEmpty
+                            ? (expressway ? "This slip road joins an expressway." : "Bikes aren't allowed on this way.")
+                            : "This is the way onto \(n.entrance.name).",
+                        distance: n.distance, coordinate: Coord(n.entrance.coordinate))
+    }
+    /// "It's not there" spots, for the rest of this ride (reroutes included).
+    private(set) var silencedAlarms: Set<String> = []
+    /// Alarms whose first sound + haptic has played this approach.
+    private(set) var warnedAlarms: Set<String> = []
+    private var shownAlarms: Set<String> = []
+    private var alarmClosest = Double.infinity
+    /// Closures and walk stretches the current line touches (recomputed on load and reroute).
+    var alarmZones: [AlarmZone] = []
+    /// The first warning (sound + haptic) for an alarm still `warnDistance` away.
+    var onAlarmWarn: ((KitAlarm) -> Void)?
+
     var voiceEnabled = true
 
     var currentStep: StoredStep? { steps[safe: stepIndex] }
@@ -161,6 +185,8 @@ final class RideRecorder {
         rerouteFailure = nil; rerouteBlockedReason = nil
         nearHazard = nil
         warnedHazards.removeAll()
+        obstacleAlarm = nil; warnedAlarms = []; shownAlarms = []
+        refreshAlarmZones()
     }
 
     func start() {
@@ -233,6 +259,7 @@ final class RideRecorder {
         rerouteFailure = nil; rerouteBlockedReason = nil
         noBikeAhead = nil; silencedNoBike = []; walkingThrough = nil; entranceLast = [:]; entranceAlarmed = []; noBikeLastFix = nil
         nearHazard = nil; warnedHazards.removeAll()
+        obstacleAlarm = nil; silencedAlarms = []; warnedAlarms = []; shownAlarms = []; alarmZones = []
         // A ride cannot inherit the previous ride's pace or distance.
         rollingSpeed = 0; lastRecorded = nil; offRouteStreak = 0
     }
@@ -345,6 +372,7 @@ final class RideRecorder {
             if rerouteBlockedReason != nil { rerouteBlockedReason = nil }
         }
         checkNoBike(at: fix)
+        checkAlarms(at: fix, speed: speed)
     }
 
     /// The banner always shows the turn the rider is riding towards, so the
@@ -486,6 +514,90 @@ final class RideRecorder {
         }
     }
 
+    /// First sound + haptic this far out; the takeover comes within 12 s of riding, never under 100 m.
+    static let warnDistance = 250.0
+    static let alarmRearm = 300.0
+    nonisolated static func takeoverDistance(speed: Double) -> Double { max(100, speed * 12) }
+
+    /// Active closures and walk stretches whose circles the line passes through.
+    nonisolated static func alarmZones(_ closures: [Closure], polyline: [CLLocationCoordinate2D],
+                                       cumulative: [Double], on date: Date) -> [AlarmZone] {
+        guard polyline.count >= 2 else { return [] }
+        return closures.filter { $0.isActive(on: date) }.compactMap { c in
+            let touching = c.noGoCircles.filter {
+                (Geo.snap($0.coord.cl, to: polyline, cumulative: cumulative)?.lateral ?? .infinity) <= $0.radiusMeters
+            }
+            return touching.isEmpty ? nil
+                : AlarmZone(key: "zone:\(c.id)", walk: c.kind == .noCycling, name: c.name, note: c.note, circles: touching)
+        }
+    }
+
+    private func refreshAlarmZones() {
+        alarmZones = Self.alarmZones(Closures.bundled() + Closures.marked, polyline: polyline, cumulative: cumulative, on: Closures.now)
+    }
+
+    /// Hazards, closures and walk stretches: warn once at `warnDistance`, take over once per
+    /// approach inside `takeoverDistance`, nearest first, one at a time. A showing alarm follows
+    /// the distance and clears itself once the rider is `awayMetres` past its closest point.
+    func checkAlarms(at fix: CLLocationCoordinate2D, speed: Double) {
+        var candidates = hazards.map { h in
+            KitAlarm(key: Self.key(h), kind: .hazard(h.kind), title: h.kind.rawValue,
+                     detail: h.note.isEmpty ? "Marked on this way. Slow down." : h.note,
+                     distance: Geo.distance(fix, h.coordinate), coordinate: Coord(h.coordinate))
+        }
+        for z in alarmZones {
+            let edge = z.circles.map { (c: $0, d: max(0, Geo.distance(fix, $0.coord.cl) - $0.radiusMeters)) }.min { $0.d < $1.d }!
+            candidates.append(KitAlarm(key: z.key, kind: z.walk ? .walk : .closure,
+                                       title: z.walk ? "Walk your bike: \(z.name)" : "\(z.name) is closed",
+                                       detail: z.walk ? "No cycling on this stretch." : (z.note.isEmpty ? "Closed ahead." : z.note),
+                                       distance: edge.d, coordinate: edge.c.coord, radius: edge.c.radiusMeters))
+        }
+        for c in candidates where c.distance > Self.alarmRearm { warnedAlarms.remove(c.key); shownAlarms.remove(c.key) }
+
+        if let showing = obstacleAlarm {
+            guard let now = candidates.first(where: { $0.key == showing.key }) else { obstacleAlarm = nil; return }
+            alarmClosest = min(alarmClosest, now.distance)
+            if now.distance > alarmClosest + Self.awayMetres { obstacleAlarm = nil } else { obstacleAlarm?.distance = now.distance; return }
+        }
+        let live = candidates.filter { !silencedAlarms.contains($0.key) }
+        for c in live where c.distance <= Self.warnDistance && warnedAlarms.insert(c.key).inserted { onAlarmWarn?(c) }
+        let reach = Self.takeoverDistance(speed: speed)
+        guard let next = live.filter({ $0.distance <= reach && !shownAlarms.contains($0.key) }).min(by: { $0.distance < $1.distance })
+        else { return }
+        shownAlarms.insert(next.key)
+        obstacleAlarm = next
+        alarmClosest = next.distance
+        announce("\(next.title), \(max(10, Int((next.distance / 10).rounded()) * 10)) metres.")
+    }
+
+    func dismissAlarm() { if noBikeAhead != nil { dismissNoBike() } else { obstacleAlarm = nil } }
+
+    /// "It's not there": silent for the rest of the ride; a hazard also counts a false alarm.
+    func silenceAlarm() {
+        if noBikeAhead != nil { silenceNoBike(); return }
+        guard let a = obstacleAlarm else { return }
+        silencedAlarms.insert(a.key)
+        hazards.first { Self.key($0) == a.key }?.falseAlarms += 1
+        obstacleAlarm = nil
+    }
+
+    /// The filled button: route round it (or, on a walk stretch, walk it).
+    func alarmPrimary() {
+        guard let a = alarm else { return }
+        switch a.kind {
+        case .hazard: obstacleAlarm = nil; rerouteAround(closed: a.coordinate.cl)
+        case .closure, .noBikes: obstacleAlarm = nil; rerouteNow()
+        case .walk: dismissAlarm()
+        }
+    }
+
+    /// The second button: carry on, or find a way round the walk stretch. ("Show me on the map"
+    /// for a no-bike entrance moves the camera, so the view handles it.)
+    func alarmSecondary() {
+        guard let a = alarm else { return }
+        if case .walk = a.kind { obstacleAlarm = nil; rerouteAround(closed: a.coordinate.cl, radius: a.radius + 20) } else { dismissAlarm() }
+    }
+
     private static func key(_ h: Obstacle) -> String { "\(h.latitude),\(h.longitude),\(h.reportedAt.timeIntervalSince1970)" }
 
     private func markOffRoute(from fix: CLLocationCoordinate2D) {
@@ -509,11 +621,11 @@ final class RideRecorder {
     /// to the existing destination. Keeps the current route on failure.
     /// The new mark is passed explicitly: the store's copy may not have reached
     /// `Closures.marked` yet. Every earlier mark is avoided by `Routing.plan` itself.
-    func rerouteAround(closed coordinate: CLLocationCoordinate2D) {
+    func rerouteAround(closed coordinate: CLLocationCoordinate2D, radius: Double = Closures.markedRadius) {
         guard let destination, let start = snapped ?? location ?? polyline.first, !rerouting else { return }
         rerouteFailure = nil
         rerouting = true
-        let nogo = NoGoCircle(coord: Coord(coordinate), radiusMeters: Closures.markedRadius)
+        let nogo = NoGoCircle(coord: Coord(coordinate), radiusMeters: radius)
         Task { [weak self] in
             defer { self?.rerouting = false }
             guard let plan = try? await Routing.plan(through: [Coord(start), destination], mode: self?.mode ?? .moderate,
@@ -561,6 +673,7 @@ final class RideRecorder {
         // Places already passed stay passed (same IDs), so they don't pop up again.
         sights = Discovery.sightsAlong(sights, polyline: polyline, cumulative: cumulative, small: 150)
         passingSight = nil
+        refreshAlarmZones()
         onReroute?(plan)
         announce("Route updated. \(plan.steps.first?.instruction ?? "")")
         return true
@@ -596,6 +709,7 @@ final class RideRecorder {
         r.polyline = []; r.cumulative = []
         step(at(50)); step(at(30))
         assert(r.noBikeAhead?.entrance.key == slip.key && abs((r.noBikeAhead?.distance ?? 0) - 30) < 1, "approaching an entrance off route must alarm: \(String(describing: r.noBikeAhead))")
+        assert(r.alarm?.kind == .noBikes(expressway: true) && r.alarm?.tone == .noAccess, "the no-bike alarm is a Kit alarm")
         // A successful reroute mid-approach must not switch the alarm off (the gate is this fix's position).
         var good = RoutePlan(); good.polyline = [Coord(lat: 1.29, lon: 103.79), Coord(lat: 1.29, lon: 103.80)]
         r.applyReroute(good); step(at(25))
@@ -672,6 +786,80 @@ final class RideRecorder {
         r.consume(fix(10))
         assert(r.movingSeconds == 5, "outside a walk zone, moving time counts: \(r.movingSeconds)")
     }
+    /// Plan 6 Task 1: one alarm model for hazards, closures and walk stretches.
+    static func selfCheckAlarms() {
+        let metre = 1 / 111_195.0
+        let r = RideRecorder(); r.voiceEnabled = false
+        var warned: [String] = []
+        r.onAlarmWarn = { warned.append($0.key) }
+        let pothole = Obstacle(kind: .pothole, at: .init(latitude: 1.3, longitude: 103.8))
+        r.hazards = [pothole]
+        func south(_ m: Double) -> CLLocationCoordinate2D { .init(latitude: 1.3 - m * metre, longitude: 103.8) }
+        // Closing at 5 m/s: warned at 240 m, taken over at 90 m, cleared 20 m past.
+        r.checkAlarms(at: south(240), speed: 5)
+        assert(r.alarm == nil && r.warnedAlarms.count == 1 && warned.count == 1, "240 m: warn once, no takeover")
+        r.checkAlarms(at: south(200), speed: 5)
+        assert(warned.count == 1, "the warning sounds once per approach")
+        r.checkAlarms(at: south(90), speed: 5)
+        assert(r.alarm?.kind == .hazard(.pothole) && abs((r.alarm?.distance ?? 0) - 90) < 1 && r.alarm?.tone == .obstacle,
+               "90 m at 5 m/s takes over: \(String(describing: r.alarm))")
+        r.checkAlarms(at: south(40), speed: 5); r.checkAlarms(at: south(0), speed: 5)
+        assert(abs((r.alarm?.distance ?? 99) - 0) < 1, "the takeover follows the distance")
+        r.checkAlarms(at: south(-20), speed: 5)
+        assert(r.alarm == nil, "20 m past and moving away clears it")
+        // At 10 m/s the takeover reaches 120 m.
+        assert(takeoverDistance(speed: 10) == 120 && takeoverDistance(speed: 3) == 100, "12 s of warning, never under 100 m")
+        r.reset(); r.voiceEnabled = false; r.hazards = [pothole]
+        r.checkAlarms(at: south(115), speed: 10)
+        assert(r.alarm != nil, "115 m at 10 m/s takes over")
+
+        // Two hazards 30 m apart: the nearer first; the other after a dismiss.
+        let gravel = Obstacle(kind: .gravel, at: south(-30))
+        r.reset(); r.voiceEnabled = false; r.hazards = [pothole, gravel]
+        r.checkAlarms(at: south(90), speed: 5)
+        assert(r.alarm?.kind == .hazard(.pothole), "the nearer hazard takes over")
+        r.dismissAlarm()
+        r.checkAlarms(at: south(60), speed: 5)
+        assert(r.alarm?.kind == .hazard(.gravel), "after a dismiss the other shows on the next fix")
+        r.dismissAlarm()
+
+        // "Not there": silent for the ride, through a reroute; counts a false alarm; reset clears it.
+        r.reset(); r.voiceEnabled = false; r.hazards = [pothole]
+        r.checkAlarms(at: south(90), speed: 5)
+        let before = pothole.falseAlarms
+        r.silenceAlarm()
+        assert(pothole.falseAlarms == before + 1, "Not there counts a false alarm")
+        r.checkAlarms(at: south(400), speed: 5)
+        var line = RoutePlan(); line.polyline = [Coord(south(500)), Coord(south(-500))]
+        r.applyReroute(line)
+        r.checkAlarms(at: south(90), speed: 5)
+        assert(r.alarm == nil, "a silenced hazard stays silent after leaving and a reroute")
+        r.reset(); r.voiceEnabled = false; r.hazards = [pothole]
+        r.checkAlarms(at: south(90), speed: 5)
+        assert(r.alarm != nil, "reset() clears the silences")
+
+        // A closure the line touches and a walk stretch alarm; an expired closure doesn't.
+        let poly = [south(1000), south(-1000)], cum = Geo.cumulative(poly)
+        func closure(_ id: String, _ kind: Closure.Kind, at m: Double, until: String? = nil) -> Closure {
+            Closure(id: id, name: id, circles: [.init(lat: 1.3 - m * metre, lon: 103.8, radiusM: 40, coordSource: "test")],
+                    starts: nil, validUntil: until, note: "", sourceUrl: "", kind: kind)
+        }
+        let zones = alarmZones([closure("Shut", .closure, at: -300), closure("Waves", .noCycling, at: -700),
+                                closure("Old", .closure, at: -500, until: "2020-01-01"),
+                                Closure(id: "Far", name: "Far", circles: [.init(lat: 1.3, lon: 103.81, radiusM: 40, coordSource: "test")],
+                                        starts: nil, validUntil: nil, note: "", sourceUrl: "", kind: .closure)],
+                               polyline: poly, cumulative: cum, on: Closures.now)
+        assert(zones.map(\.name) == ["Shut", "Waves"], "only active zones on the line: \(zones.map(\.name))")
+        r.reset(); r.voiceEnabled = false; r.alarmZones = zones
+        r.checkAlarms(at: south(-300 + 40 + 90), speed: 5)
+        assert(r.alarm?.kind == .closure && r.alarm?.tone == .noAccess && abs((r.alarm?.distance ?? 0) - 90) < 1,
+               "a closure on the line takes over, measured to its edge: \(String(describing: r.alarm))")
+        r.dismissAlarm()
+        r.checkAlarms(at: south(-700 + 40 + 90), speed: 5)
+        assert(r.alarm?.kind == .walk && r.alarm?.buttons.primary == "I'll walk my bike", "a walk stretch takes over")
+        r.dismissAlarm()
+    }
+
     nonisolated static func selfCheck() {
         assert(band(at: 500) == nil, "beyond the first tier, say nothing")
         assert(band(at: 380) == 0, "heads-up")
