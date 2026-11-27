@@ -60,6 +60,8 @@ nonisolated struct FallDetector {
     mutating func feed(_ s: MotionSample) -> Bool {
         guard sensitivity != .off, !confirmed else { return false }
         if s.rotation > sensitivity.tumbleRadPerSec { lastTumble = s.t }
+        // Never lay still in time: the rider got up and rode on, so look for the next impact.
+        if let c = candidate, c.stillStart == nil, s.t - c.impactTime > Self.stillStartWindow { candidate = nil }
 
         guard var c = candidate else {
             if s.accelG > sensitivity.impactG {
@@ -140,6 +142,7 @@ extension FallDetector {
         let kerb = [(dt, 3.5, 1.0), (10.5, 0.05, 0.2)]          // hard bump, no tumble
         let soft = [(dt, 3.2, 7.0), (10.5, 0.05, 0.2)]          // only High should catch this
         let lateStill = [(dt, 5.0, 7.0), (3.5, 0.3, 1.0), (10.5, 0.05, 0.2)]
+        let rodeOn = [(dt, 5.0, 7.0), (20.0, 0.3, 1.0), (dt, 5.0, 7.0), (10.5, 0.05, 0.2)]
         let tumbleFirst = [(dt, 0.1, 7.0), (0.28, 0.1, 0.2), (dt, 5.0, 0.2), (10.5, 0.05, 0.2)]
 
         assert(fires(.normal, noise) == 0, "steady riding must never confirm a fall")
@@ -150,6 +153,7 @@ extension FallDetector {
         assert(fires(.normal, soft) == 0, "3.2 g is below Normal's impact threshold")
         assert(fires(.low, soft) == 0, "3.2 g is below Low's impact threshold")
         assert(fires(.normal, lateStill) == 0, "stillness starting over 3 s after impact is too late")
+        assert(fires(.normal, rodeOn) == 1, "a bump the rider rode on from must not blind the detector to a later fall")
         assert(fires(.normal, tumbleFirst) == 1, "a tumble 0.28 s before impact still pairs")
         for s in [noise, fall, pickedUp, kerb, soft, lateStill, tumbleFirst] {
             assert(fires(.off, s) == 0, "off must never detect")

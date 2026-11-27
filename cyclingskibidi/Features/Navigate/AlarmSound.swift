@@ -18,10 +18,12 @@ final class AlarmSound {
 
     private let engine = AVAudioEngine()
     private var playing = false
+    private var source: AVAudioSourceNode?
     var isPlaying: Bool { playing }
 
+    /// Starting while a tone plays switches to the new one (Are you OK? → HELP).
     func start(_ style: Style) {
-        guard !playing else { return }
+        stop()
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.playback, options: [])
         try? session.setActive(true)
@@ -60,19 +62,22 @@ final class AlarmSound {
             return noErr
         }
         engine.attach(source)
+        self.source = source
         engine.connect(source, to: engine.mainMixerNode, format: format)
         engine.mainMixerNode.outputVolume = 1.0
         do {
             try engine.start()
             playing = true
         } catch {
-            try? session.setActive(false, options: .notifyOthersOnDeactivation)
+            stop()
         }
     }
 
     func stop() {
-        guard playing else { return }
+        guard let source else { return }
         engine.stop()
+        engine.detach(source)   // one source node at a time, never stacked
+        self.source = nil
         playing = false
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
