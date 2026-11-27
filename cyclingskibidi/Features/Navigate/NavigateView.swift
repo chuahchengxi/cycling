@@ -24,6 +24,10 @@ struct NavigateView: View {
     @Query private var obstacles: [Obstacle]
 
     @State private var focus: MapFocus? = .user(heading: true)
+    /// The camera rides along (tilted, ahead of you, zoom by speed) until the rider pans; Recenter resumes.
+    @State private var following = true
+    /// Which figures the ride box shows (Settings → During a ride).
+    @AppStorage(RideStat.storageKey) private var rideStats = ""
     @State private var detent: PresentationDetent = .height(190)
     @State private var line: [CLLocationCoordinate2D] = []
     @State private var placing = false
@@ -63,7 +67,13 @@ struct NavigateView: View {
                                offRoute: recorder.offRoute,
                                rerouting: recorder.rerouting,
                                message: bannerMessage,
-                               onStop: { if let s = recorder.passingSight { recorder.kitVerdict(s, stopped: true) }; recorder.passingSight = nil },
+                               onStop: {
+                                   if let s = recorder.passingSight { recorder.kitVerdict(s, stopped: true) }
+                                   recorder.passingSight = nil
+                                   // Stopping is a break: pause the clock and show Resume.
+                                   recorder.pause()
+                                   detent = .fraction(0.5)
+                               },
                                onSkip: { if let s = recorder.passingSight { recorder.kitVerdict(s, stopped: false) }; recorder.passingSight = nil },
                                onDismiss: { recorder.dismissRerouteFailure() },
                                onTimeout: { recorder.passingSight = nil })
@@ -158,6 +168,7 @@ struct NavigateView: View {
                          onSecondary: {
                              if case .noBikes = alarm.kind {
                                  recorder.dismissAlarm()
+                                 following = false
                                  focus = .region(MKCoordinateRegion(center: alarm.coordinate.cl, latitudinalMeters: 400, longitudinalMeters: 400))
                              } else { recorder.alarmSecondary() }
                          },
@@ -201,7 +212,9 @@ struct NavigateView: View {
         OfflineMap(lines: [MapLine(coords: line, color: .systemBlue, width: 7)],
                    pins: mapPins, focus: focus, showsUser: true,
                    onTap: { coord in if placing { place(at: coord) } },
+                   onUserMove: { following = false },
                    onFeatureTap: { tappedSight = $0 })
+            .onChange(of: recorder.snapped.map { "\($0.latitude),\($0.longitude)" }) { follow() }
     }
 
     private var mapPins: [MapPin] {
@@ -234,12 +247,9 @@ struct NavigateView: View {
                 placing = true
                 showSheet = false
             }
-            KitIconButton(icon: "kit-icon-sound", label: recorder.voiceEnabled ? "Mute guidance" : "Unmute guidance", size: 52) {
-                recorder.voiceEnabled.toggle()
-            }
-            .overlay { if !recorder.voiceEnabled { Rectangle().fill(KitColor.ink).frame(width: 3, height: 34).rotationEffect(.degrees(45)).allowsHitTesting(false) } }
             KitIconButton(icon: "kit-icon-locate", label: "Recenter map", size: 52) {
-                focus = .user(heading: true)
+                following = true
+                if recorder.snapped == nil { focus = .user(heading: true) } else { follow() }
             }
         }
         .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
@@ -280,8 +290,8 @@ struct NavigateView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Next turn: \(step.instruction), in \(Fmt.km(recorder.distanceToManeuver))")
             }
-            KitTimer(elapsed: recorder.movingSeconds, toGo: Fmt.km(recorder.remainingDistance),
-                     left: Fmt.duration(recorder.remainingSeconds), arrival: Fmt.eta(recorder.remainingSeconds),
+            KitTimer(elapsed: recorder.movingSeconds,
+                     stats: RideStat.decode(rideStats).map { ($0.value(recorder), $0.caption) },
                      progress: recorder.progress)
                 .padding(.horizontal, 16)
                 .padding(.top, recorder.currentStep == nil ? 18 : 8)
@@ -299,9 +309,12 @@ struct NavigateView: View {
 
     private var controls: some View {
         VStack(spacing: 12) {
-            HStack(spacing: 24) {
-                KitStat(value: Fmt.km(recorder.distance), caption: "ridden", style: .title3).frame(maxWidth: .infinity)
-                KitStat(value: Fmt.speed(recorder.speed), caption: "speed", style: .title3).frame(maxWidth: .infinity)
+            // Speed and distance ridden, unless the ride box already shows them.
+            let extra = [RideStat.ridden, .speed].filter { !RideStat.decode(rideStats).contains($0) }
+            if !extra.isEmpty {
+                HStack(spacing: 24) {
+                    ForEach(extra) { KitStat(value: $0.value(recorder), caption: $0.caption, style: .title3).frame(maxWidth: .infinity) }
+                }
             }
 
             HStack(spacing: 12) {
@@ -339,11 +352,38 @@ struct NavigateView: View {
 
     // MARK: Actions
 
+    /// Point the ride camera at the rider's next stretch.
+    private func follow() {
+        guard following, let at = recorder.snapped else { return }
+        let cam = Self.rideCamera(at: at, course: recorder.course, speed: recorder.speed, toTurn: recorder.distanceToManeuver)
+        focus = .camera(center: cam.center, heading: recorder.course, distance: cam.distance, pitch: cam.pitch)
+    }
+
+    /// Zoomed out with speed (more road ahead), in for a close turn; looking ahead so the
+    /// rider sits low on screen with the way forward above them.
+    nonisolated static func rideCamera(at p: CLLocationCoordinate2D, course: Double, speed: Double, toTurn: Double)
+        -> (center: CLLocationCoordinate2D, distance: Double, pitch: Double) {
+        let near = toTurn > 0 && toTurn < 120
+        let distance = near ? 350 : min(max(450 + speed * 60, 450), 1000)   // ~700 m at 15 km/h
+        let ahead = distance * 0.2, b = course * .pi / 180
+        let center = CLLocationCoordinate2D(latitude: p.latitude + ahead * cos(b) / 111_320,
+                                            longitude: p.longitude + ahead * sin(b) / (111_320 * cos(p.latitude * .pi / 180)))
+        return (center, distance, near ? 35 : 50)
+    }
+
+    static func selfCheckCamera() {
+        let p = CLLocationCoordinate2D(latitude: 1.3, longitude: 103.8)
+        let slow = rideCamera(at: p, course: 0, speed: 2, toTurn: 500), fast = rideCamera(at: p, course: 0, speed: 8, toTurn: 500)
+        assert(fast.distance > slow.distance, "faster shows more road")
+        assert(rideCamera(at: p, course: 0, speed: 8, toTurn: 80).distance < fast.distance, "a close turn zooms in")
+        assert(slow.center.latitude > p.latitude, "looks ahead northward at course 0")
+        assert(rideCamera(at: p, course: 90, speed: 2, toTurn: 500).center.longitude > p.longitude, "looks ahead east at course 90")
+    }
+
     private func begin() {
         guard trip.finished == nil, recorder.phase == .idle else { return }   // never restart a ride that's over
         line = route.polyline.coordinates
         recorder.onReroute = { plan in line = plan.polyline.coordinates }
-        recorder.voiceEnabled = AppSettings.flag(AppSettings.voice)
         recorder.onAlarmWarn = { _ in   // first warning: a tap on the wrist and a short tone, no takeover yet
             guard AppSettings.flag(AppSettings.warnBeep) else { return }
             UINotificationFeedbackGenerator().notificationOccurred(.warning)
@@ -564,11 +604,63 @@ private struct PassByCountdown: View {
 }
 
 /// Kit/timer (Figma 214:59): ride time, the three numbers and pixel progress, in a Kit card.
+/// A figure the ride box can show; the rider picks up to four in Settings.
+nonisolated enum RideStat: String, CaseIterable, Identifiable {
+    case toGo, left, arrival, speed, ridden
+
+    static let storageKey = "rideStats"
+    static let defaults: [RideStat] = [.toGo, .left, .speed, .ridden]
+    /// Four fit across the box without growing the collapsed sheet.
+    static let maxShown = 4
+
+    var id: String { rawValue }
+    var caption: String {
+        switch self {
+        case .toGo: "to go"
+        case .left: "left"
+        case .arrival: "arrival"
+        case .speed: "speed"
+        case .ridden: "ridden"
+        }
+    }
+    var title: String {
+        switch self {
+        case .toGo: "Distance to go"
+        case .left: "Time left"
+        case .arrival: "Arrival time"
+        case .speed: "Speed"
+        case .ridden: "Distance ridden"
+        }
+    }
+
+    @MainActor func value(_ r: RideRecorder) -> String {
+        switch self {
+        case .toGo: Fmt.km(r.remainingDistance)
+        case .left: Fmt.duration(r.remainingSeconds)
+        case .arrival: Fmt.eta(r.remainingSeconds)
+        case .speed: Fmt.speed(r.speed)
+        case .ridden: Fmt.km(r.distance)
+        }
+    }
+
+    /// Stored as "toGo,speed"; empty or unreadable means the defaults. Always in box order.
+    static func decode(_ raw: String) -> [RideStat] {
+        let picked = Set(raw.split(separator: ",").compactMap { RideStat(rawValue: String($0)) })
+        return picked.isEmpty ? defaults : allCases.filter(picked.contains)
+    }
+    static func encode(_ stats: [RideStat]) -> String { stats.map(\.rawValue).joined(separator: ",") }
+
+    static func selfCheck() {
+        assert(decode("") == defaults, "nothing saved: defaults")
+        assert(decode("speed,toGo") == [.toGo, .speed], "box order, not tap order")
+        assert(decode(encode([.arrival, .ridden])) == [.arrival, .ridden], "round trip")
+        assert(defaults.count <= maxShown)
+    }
+}
+
 struct KitTimer: View {
     let elapsed: Double
-    let toGo: String
-    let left: String
-    let arrival: String
+    let stats: [(value: String, caption: String)]
     let progress: Double
 
     var body: some View {
@@ -576,9 +668,9 @@ struct KitTimer: View {
             Text(Fmt.clock(elapsed)).font(.kitNumber(.title)).monospacedDigit()
                 .accessibilityLabel("Riding for \(Fmt.clock(elapsed))")
             HStack(spacing: 0) {
-                KitStat(value: toGo, caption: "to go").frame(maxWidth: .infinity)
-                KitStat(value: left, caption: "left").frame(maxWidth: .infinity)
-                KitStat(value: arrival, caption: "arrival").frame(maxWidth: .infinity)
+                ForEach(stats.indices, id: \.self) { i in
+                    KitStat(value: stats[i].value, caption: stats[i].caption).frame(maxWidth: .infinity)
+                }
             }
             KitSegmentBar(progress: progress, segments: 24)
         }

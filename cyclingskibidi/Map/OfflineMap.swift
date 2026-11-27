@@ -31,18 +31,43 @@ struct MapPin: Identifiable {
     var title = ""
     var look: Look
     var onTap: (() -> Void)?
+    /// Drawn above its coordinate (bottom edge on it) and over every other pin: Kit's card for a tapped place.
+    var callout = false
+    /// Drawn above a callout too (route pins: start, finish, numbered stops).
+    var onTop = false
+
+    /// Kit's card for a place, pointing down at it, moving with the map.
+    static func callout(for s: Sight, onClose: @escaping () -> Void, onMore: @escaping () -> Void) -> MapPin {
+        MapPin(id: "callout-\(s.id.uuidString)", coordinate: s.coordinate, title: s.name,
+               look: .view(AnyView(VStack(spacing: -2) {
+                   PassBySightCard(sight: s, onClose: onClose, onMore: onMore)
+                   CalloutTail().fill(KitColor.ink).frame(width: 20, height: 11)
+               }.frame(width: 300))),
+               callout: true)
+    }
+}
+
+/// The little triangle under a callout, pointing at its place.
+struct CalloutTail: Shape {
+    func path(in r: CGRect) -> Path {
+        Path { p in p.move(to: .init(x: r.minX, y: r.minY)); p.addLine(to: .init(x: r.maxX, y: r.minY)); p.addLine(to: .init(x: r.midX, y: r.maxY)); p.closeSubpath() }
+    }
 }
 
 /// Where the camera should go. A new value (new `token`) is applied once; the
 /// rider is free to pan afterwards.
 struct MapFocus: Equatable {
-    enum Kind { case user(heading: Bool), region(MKCoordinateRegion) }
+    enum Kind { case user(heading: Bool), region(MKCoordinateRegion), camera(MKMapCamera) }
     var kind: Kind
     var token = UUID()
     static func == (a: MapFocus, b: MapFocus) -> Bool { a.token == b.token }
 
     static func user(heading: Bool = false) -> MapFocus { MapFocus(kind: .user(heading: heading)) }
     static func region(_ r: MKCoordinateRegion) -> MapFocus { MapFocus(kind: .region(r)) }
+    /// A tilted camera looking along `heading` (the ride view).
+    static func camera(center: CLLocationCoordinate2D, heading: Double, distance: Double, pitch: Double) -> MapFocus {
+        MapFocus(kind: .camera(MKMapCamera(lookingAtCenter: center, fromDistance: distance, pitch: pitch, heading: heading)))
+    }
     /// Frame a line with a little air round it.
     static func fit(_ coords: [CLLocationCoordinate2D], pad: Double = 1.4, minSpan: Double = 0.005) -> MapFocus? {
         guard let la0 = coords.map(\.latitude).min(), let la1 = coords.map(\.latitude).max(),
@@ -72,6 +97,8 @@ struct OfflineMap: UIViewRepresentable {
     var interactive = true
     var onTap: ((CLLocationCoordinate2D) -> Void)?
     var onRegionChange: ((MKCoordinateRegion) -> Void)?
+    /// The rider panned, zoomed or rotated the map by hand.
+    var onUserMove: (() -> Void)?
     /// A tap on one of Apple's landmarks, as a Sight (our own place when it's the same one).
     var onFeatureTap: ((Sight) -> Void)?
 
@@ -103,15 +130,31 @@ struct OfflineMap: UIViewRepresentable {
         map.addSubview(compass)
         var compassTop = compass.topAnchor.constraint(equalTo: map.safeAreaLayoutGuide.topAnchor, constant: 10)
         if showsUserButton {
+            // On a Liquid Glass disc, so it reads as a button rather than a stray arrow.
+            let glass = UIVisualEffectView()
+            if #available(iOS 26, *) {
+                let effect = UIGlassEffect()
+                effect.isInteractive = true
+                glass.effect = effect
+                glass.cornerConfiguration = .capsule()
+            } else {
+                glass.effect = UIBlurEffect(style: .systemThinMaterial)
+                glass.layer.cornerRadius = 24
+                glass.clipsToBounds = true
+            }
+            glass.translatesAutoresizingMaskIntoConstraints = false
             let button = MKUserTrackingButton(mapView: map)
             button.translatesAutoresizingMaskIntoConstraints = false
-            map.addSubview(button)
+            glass.contentView.addSubview(button)
+            map.addSubview(glass)
             NSLayoutConstraint.activate([
-                button.trailingAnchor.constraint(equalTo: map.safeAreaLayoutGuide.trailingAnchor, constant: -10),
-                button.topAnchor.constraint(equalTo: map.safeAreaLayoutGuide.topAnchor, constant: 10),
+                glass.widthAnchor.constraint(equalToConstant: 48), glass.heightAnchor.constraint(equalToConstant: 48),
+                button.centerXAnchor.constraint(equalTo: glass.centerXAnchor), button.centerYAnchor.constraint(equalTo: glass.centerYAnchor),
+                glass.trailingAnchor.constraint(equalTo: map.safeAreaLayoutGuide.trailingAnchor, constant: -12),
+                glass.topAnchor.constraint(equalTo: map.safeAreaLayoutGuide.topAnchor, constant: 12),
             ])
-            compassTop = compass.topAnchor.constraint(equalTo: button.bottomAnchor, constant: 10)
-            NSLayoutConstraint.activate([compass.centerXAnchor.constraint(equalTo: button.centerXAnchor)])
+            compassTop = compass.topAnchor.constraint(equalTo: glass.bottomAnchor, constant: 10)
+            NSLayoutConstraint.activate([compass.centerXAnchor.constraint(equalTo: glass.centerXAnchor)])
         } else {
             NSLayoutConstraint.activate([compass.trailingAnchor.constraint(equalTo: map.safeAreaLayoutGuide.trailingAnchor, constant: -10)])
         }
@@ -133,6 +176,8 @@ struct OfflineMap: UIViewRepresentable {
             c.applied = focus
             switch focus.kind {
             case .user(let heading): map.setUserTrackingMode(heading ? .followWithHeading : .follow, animated: true)
+            case .camera(let cam):
+                map.setCamera(cam, animated: c.hasAppeared)
             case .region(let r):
                 // Before the first layout the map has no size and would fit the region to nothing.
                 if map.bounds.isEmpty {
@@ -200,8 +245,7 @@ struct OfflineMap: UIViewRepresentable {
             guard let map = g.view as? MKMapView, let onTap = parent?.onTap else { return }
             let pt = g.location(in: map)
             // A tap on a pin is the pin's, not the map's.
-            if let hit = map.hitTest(pt, with: nil), hit is MKAnnotationView || hit.superview is MKAnnotationView
-                || hit.superview?.superview is MKAnnotationView { return }
+            if sequence(first: map.hitTest(pt, with: nil), next: { $0?.superview }).contains(where: { $0 is MKAnnotationView }) { return }
             let coord = map.convert(pt, toCoordinateFrom: map)
             // A landmark tap selects the feature a moment later; then it's the landmark's tap, not a dropped pin.
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
@@ -217,7 +261,11 @@ struct OfflineMap: UIViewRepresentable {
                 r.strokeColor = l.style.color
                 r.lineWidth = l.style.width
                 r.lineCap = .round; r.lineJoin = .round
-                if l.style.dashed { r.lineDashPattern = [2, 6].map { NSNumber(value: $0 * Double(l.style.width) / 3) } }
+                // Square dashes, 10 on / 7 off at 6 pt (Figma's 9.8 / 7 at 7 pt): round caps made blobs.
+                if l.style.dashed {
+                    r.lineCap = .butt
+                    r.lineDashPattern = [10, 7].map { NSNumber(value: $0 * Double(l.style.width) / 6) }
+                }
                 return r
             }
             if let c = overlay as? StyledDisc {
@@ -237,16 +285,22 @@ struct OfflineMap: UIViewRepresentable {
                 v.markerTintColor = tint
                 v.titleVisibility = .hidden
                 v.displayPriority = .required
+                v.zPriority = .max   // start / finish flags stay above a place's card pointing nearby
                 return v
             case .view(let content):
                 let v = MKAnnotationView(annotation: a, reuseIdentifier: nil)
                 let host = UIHostingController(rootView: content)
                 host.view.backgroundColor = .clear
-                let size = host.sizeThatFits(in: CGSize(width: 200, height: 200))
+                let size = host.sizeThatFits(in: CGSize(width: 340, height: 800))
                 host.view.frame = CGRect(origin: .zero, size: size)
                 v.frame = host.view.frame
                 v.addSubview(host.view)
                 v.displayPriority = .required
+                if a.pin.onTop { v.zPriority = .max }
+                if a.pin.callout {
+                    v.centerOffset = CGPoint(x: 0, y: -size.height / 2 - 18)   // tail tip just above the place's badge
+                    v.zPriority = MKAnnotationViewZPriority(rawValue: MKAnnotationViewZPriority.max.rawValue - 1)   // under the flags only
+                }
                 v.accessibilityLabel = a.pin.title
                 objc_setAssociatedObject(v, &hostKey, host, .OBJC_ASSOCIATION_RETAIN)
                 return v
@@ -263,6 +317,24 @@ struct OfflineMap: UIViewRepresentable {
             guard let a = annotation as? PinAnnotation else { return }
             map.deselectAnnotation(a, animated: false)
             a.pin.onTap?()
+        }
+
+        /// A callout near the edge pans the map just enough to show all of it.
+        func mapView(_ map: MKMapView, didAdd views: [MKAnnotationView]) {
+            guard let v = views.first(where: { ($0.annotation as? PinAnnotation)?.pin.callout == true }) else { return }
+            let safe = map.bounds.inset(by: map.safeAreaInsets).insetBy(dx: 8, dy: 8)
+            let f = v.frame
+            let dx = f.minX < safe.minX ? f.minX - safe.minX : f.maxX > safe.maxX ? f.maxX - safe.maxX : 0
+            let dy = f.minY < safe.minY ? f.minY - safe.minY : 0
+            guard dx != 0 || dy != 0 else { return }
+            let mid = CGPoint(x: map.bounds.midX + dx, y: map.bounds.midY + dy)
+            map.setCenter(map.convert(mid, toCoordinateFrom: map), animated: true)
+        }
+
+        func mapView(_ map: MKMapView, regionWillChangeAnimated animated: Bool) {
+            // A gesture, not our own camera moves: the map's own recognizers are mid-touch.
+            let byHand = map.subviews.first?.gestureRecognizers?.contains { $0.state == .began || $0.state == .changed } ?? false
+            if byHand { parent?.onUserMove?() }
         }
 
         func mapView(_ map: MKMapView, regionDidChangeAnimated animated: Bool) {

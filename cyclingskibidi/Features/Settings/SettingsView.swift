@@ -11,7 +11,6 @@ import SwiftUI
 /// AppStorage keys outside the rider profile.
 nonisolated enum AppSettings {
     static let onboarded = "onboarded"
-    static let voice = "voiceGuidance"        // spoken directions at the start of a ride
     static let warnBeep = "alarmWarnBeep"     // beep + buzz at 250 m, before an alarm takes over
 
     /// Read outside a view (the recorder's warn callback). Missing = on.
@@ -77,9 +76,9 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage(RiderProfile.storageKey) private var profileRaw = ""
     @AppStorage(AlertScheme.storageKey) private var scheme: AlertScheme = .kit
-    @AppStorage(AppSettings.voice) private var voice = true
     @AppStorage(AppSettings.warnBeep) private var warnBeep = true
     @AppStorage(AppSettings.onboarded) private var onboarded = true
+    @AppStorage(RideStat.storageKey) private var rideStats = ""
 
     @State private var showInterests = false
     @State private var showMarks = false
@@ -124,12 +123,26 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    let shown = RideStat.decode(rideStats)
+                    ForEach(RideStat.allCases) { stat in
+                        Toggle(stat.title, isOn: Binding(
+                            get: { shown.contains(stat) },
+                            set: { on in rideStats = RideStat.encode(on ? shown + [stat] : shown.filter { $0 != stat }) }))
+                        // At least one, at most four: what fits across the box.
+                        .disabled(shown.contains(stat) ? shown.count == 1 : shown.count >= RideStat.maxShown)
+                    }
+                } header: {
+                    Text("During a ride")
+                } footer: {
+                    Text("Pick up to \(RideStat.maxShown) figures for the box under the next turn. The moving time always shows.")
+                }
+
+                Section {
                     Toggle("Beep and buzz before an alarm", isOn: $warnBeep)
-                    Toggle("Spoken directions", isOn: $voice)
                 } header: {
                     Text("Sounds")
                 } footer: {
-                    Text("The help alarm always rings, even on silent and through the loudspeaker. Other alarms flash, vibrate and speak their warning even with spoken directions off. Spoken directions play with the screen locked and lower your music while they speak.")
+                    Text("The help alarm always rings, even on silent and through the loudspeaker. Other alarms flash, vibrate and speak their warning. Directions are on screen only.")
                 }
 
                 Section {

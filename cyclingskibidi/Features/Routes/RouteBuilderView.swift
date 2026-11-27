@@ -50,6 +50,8 @@ struct RouteBuilderView: View {
     /// A place tapped on the map: Kit's card over the map, Details opens the full sheet.
     @State private var tapped: Sight?
     @State private var editingInterests = false
+    /// The collapsed sheet's content, measured: the small detent fits it exactly.
+    @State private var topHeight: CGFloat = 200
     /// The model's picks replaced the quick ones for the current line.
     @State private var kitByModel = false
     @AppStorage(RiderProfile.storageKey) private var profileRaw = ""
@@ -65,19 +67,7 @@ struct RouteBuilderView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .bottom) {
-                map
-                controls
-                if let s = tapped {
-                    VStack {
-                        PassBySightCard(sight: s, onClose: { tapped = nil }, onMore: { tapped = nil; selectedSight = s })
-                            .padding(.horizontal, 16).padding(.top, 8)
-                        Spacer()
-                    }
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
-            }
-            .animation(.default, value: tapped?.id)
+            map
             // The map runs under the bar; the title and buttons float over it.
             .toolbarBackground(.hidden, for: .navigationBar)
             .navigationTitle("New route")
@@ -94,16 +84,8 @@ struct RouteBuilderView: View {
             .onSubmit(of: .search, runSearch)
             .onChange(of: query) { if query.isEmpty { results = [] } }
             .overlay(alignment: .top) { searchResults }
-            .alert("Name this route", isPresented: $naming) {
-                TextField("Route name", text: $name)
-                Button("Save", action: save)
-                Button("Cancel", role: .cancel) {}
-            }
-            .alert("Couldn't route that leg", isPresented: .constant(error != nil)) {
-                Button("OK") { error = nil }
-            } message: { Text(error ?? "") }
-            .sheet(item: $selectedSight) { SightSheet(sight: $0) }
-            .sheet(isPresented: $editingInterests) { InterestsSheet() }
+            // The panel is a native sheet: summary on top, drag up for Kit's places.
+            .sheet(isPresented: .constant(true)) { panelSheet }
             .onChange(of: mode) { _, _ in replan() }
             #if DEBUG
             .task { if Demo.screen == "builder-route", waypoints.isEmpty, let loop = PresetLoops.all.dropFirst().first { use(loop) } }
@@ -126,19 +108,46 @@ struct RouteBuilderView: View {
     private var mapLines: [MapLine] {
         // Off-connector stretches (roads/paths) drawn distinctly so the rider sees
         // exactly what leaves the PCN and can reject or redirect it.
-        [MapLine(coords: plan.polyline.coordinates, color: .systemBlue, width: 6)]
-            + plan.offConnectorSegments.map { MapLine(coords: $0.coordinates, color: .systemOrange, width: 6, dashed: true) }
+        // Figma (03 Route builder): off-connector stretches are square terracotta dashes with
+        // map in the gaps, so the blue line is broken where they are, not drawn underneath.
+        Self.connectorRuns(plan.polyline, off: plan.offConnectorSegments).map { MapLine(coords: $0.coordinates, color: .systemBlue, width: 6) }
+            + plan.offConnectorSegments.map { MapLine(coords: $0.coordinates, color: UIColor(KitColor.terracotta), width: 6, dashed: true) }
+    }
+
+    /// The stretches of `line` not in any off-connector segment (matched edge by edge).
+    nonisolated static func connectorRuns(_ line: [Coord], off: [[Coord]]) -> [[Coord]] {
+        func key(_ a: Coord, _ b: Coord) -> String { "\(a.lat),\(a.lon)>\(b.lat),\(b.lon)" }
+        let offEdges = Set(off.flatMap { s in zip(s, s.dropFirst()).map { key($0, $1) } })
+        var runs: [[Coord]] = [], run: [Coord] = []
+        for (a, b) in zip(line, line.dropFirst()) {
+            if offEdges.contains(key(a, b)) {
+                if run.count > 1 { runs.append(run) }
+                run = []
+            } else {
+                if run.isEmpty { run = [a] }
+                run.append(b)
+            }
+        }
+        if run.count > 1 { runs.append(run) }
+        return runs
+    }
+
+    static func selfCheck() {
+        let p = (0..<5).map { Coord(lat: Double($0), lon: 0, alt: 0) }
+        assert(connectorRuns(p, off: []) == [p], "no off stretch: one run")
+        assert(connectorRuns(p, off: [[p[1], p[2], p[3]]]) == [[p[0], p[1]], [p[3], p[4]]], "gap where it's off")
+        assert(connectorRuns(p, off: [p]).isEmpty, "all off: no blue")
     }
 
     private var mapPins: [MapPin] {
         let pins = waypoints.enumerated().map { index, point in
             MapPin(id: "wp\(index)", coordinate: point.cl, title: "Pin \(index + 1)",
-                   look: .view(AnyView(WaypointPin(index: index, last: index == waypoints.count - 1))))
+                   look: .view(AnyView(WaypointPin(index: index, last: index == waypoints.count - 1))), onTop: true)
         }
         return pins + (sights ?? []).map { sight in
             MapPin(id: sight.id.uuidString, coordinate: sight.coordinate, title: sight.name,
                    look: .view(AnyView(SightBadge(sight: sight))), onTap: { tapped = sight })
-        }
+        } + (tapped.map { s in [.callout(for: s, onClose: { tapped = nil }, onMore: { tapped = nil; selectedSight = s })] } ?? [])
     }
 
     private var searchResults: some View {
@@ -168,23 +177,43 @@ struct RouteBuilderView: View {
         }
     }
 
-    // MARK: Bottom bar
+    // MARK: Bottom sheet
 
-    /// Native glass panel, capped so the map and route stay visible; it scrolls when full.
-    private var controls: some View {
-        ViewThatFits(in: .vertical) {
-            panel
-            ScrollView { panel }.scrollBounceBehavior(.basedOnSize)
+    /// Collapsed: distance, time, difficulty, mode and Undo / Clear. Drag up for the
+    /// scenery slider, Kit's places and the search.
+    private var panelSheet: some View {
+        ScrollView {
+            VStack(spacing: 12) {
+                top.onGeometryChange(for: CGFloat.self, of: \.size.height) { topHeight = $0 }
+                if waypoints.count >= 2 { more }
+            }
+            .padding(16).padding(.top, 8)
         }
-        .frame(maxHeight: 380)
-        .frame(maxWidth: .infinity)
-        .background(.regularMaterial, in: .rect(cornerRadius: 22))
-        .padding(12)
+        .scrollBounceBehavior(.basedOnSize)
+        .presentationDetents(waypoints.count >= 2 ? [.height(topHeight + 26), .medium, .large]
+                             // Before a route there's little to show: a floor keeps it from shrinking to a cramped strip.
+                             : [.height(max(topHeight + 40, 180))])
+        .presentationBackgroundInteraction(.enabled)
+        .presentationDragIndicator(waypoints.count >= 2 ? .visible : .hidden)
+        .interactiveDismissDisabled()
+        // Presented from the sheet: only the topmost sheet can present.
+        .alert("Name this route", isPresented: $naming) {
+            TextField("Route name", text: $name)
+            Button("Save", action: save)
+            Button("Cancel", role: .cancel) {}
+        }
+        .alert("Couldn't route that leg", isPresented: .constant(error != nil)) {
+            Button("OK") { error = nil }
+        } message: { Text(error ?? "") }
+        .sheet(item: $selectedSight) { SightSheet(sight: $0) }
+        .sheet(isPresented: $editingInterests) { InterestsSheet() }
     }
 
-    private var panel: some View {
+    @ViewBuilder
+    private var top: some View {
         VStack(spacing: 12) {
             if waypoints.count >= 2 {
+                summary
                 HStack {
                     Picker("Mode", selection: $mode) {
                         ForEach(RideMode.allCases) { Text($0.rawValue).tag($0) }
@@ -195,109 +224,149 @@ struct RouteBuilderView: View {
                             .buttonStyle(.bordered)
                     }
                 }
-            }
-
-            if mode == .leisure, waypoints.count >= 2 {
-                VStack(alignment: .leading, spacing: 2) {
-                    Slider(value: $scenic, in: 0...1) {
-                        Text("Scenery")
-                    } minimumValueLabel: {
-                        Text("Direct").font(.footnote).foregroundStyle(.secondary).lineLimit(1).fixedSize()
-                    } maximumValueLabel: {
-                        Text("Scenic").font(.footnote).foregroundStyle(.secondary).lineLimit(1).fixedSize()
-                    } onEditingChanged: { editing in
-                        draggingScenic = editing
-                        if !editing { replan() }
-                    }
-                    .accessibilityValue(scenic < 0.05 ? "Direct" : scenic > 0.95 ? "Most scenic" : "\(Int((scenic * 100).rounded())) percent scenic")
-                    .accessibilityHint("Direct is shortest; scenic bends toward water and parks, up to 30 percent longer.")
-                    // VoiceOver and Switch Control adjust without a drag: re-plan once they settle.
-                    .task(id: scenic) {
-                        guard !draggingScenic, scenic != plannedScenic else { return }
-                        try? await Task.sleep(for: .milliseconds(500))
-                        if !Task.isCancelled, !draggingScenic { replan() }
-                    }
-                    if !planning, let d = direct, d.waypoints == waypoints, let extra = Self.extraLabel(scenic: plan.distance, direct: d.distance) {
-                        Text("\(extra) for the scenery").font(.footnote.monospacedDigit().weight(.semibold))
-                            .accessibilityLabel("\(extra) longer than direct")
-                    }
-                }
-            }
-
-            if mode == .leisure, let region = mapRegion {
-                DiscoveryPanel(region: region) { coord in
-                    waypoints.append(Coord(coord))
-                    focus = .region(.init(center: coord, latitudinalMeters: 1500, longitudinalMeters: 1500))
-                    replan()
-                }
-            }
-
-            if planning {
-                ProgressView("Finding a route…").font(.footnote)
-            } else if plan.polyline.isEmpty {
-                Text(waypoints.count < 2
-                     ? "Tap the map to drop pins. Two or more makes a route."
-                     : "No route between those pins yet.")
+            } else {
+                discovery
+                Text("Tap the map to drop pins. Two or more makes a route.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
-            } else {
-                // Figma v3 · 02: three big figures, then the extras as Kit tags.
-                HStack(alignment: .firstTextBaseline) {
-                    figure(Fmt.km(plan.distance), "Distance")
-                    figure(Fmt.duration(plan.expected), "At \(mode.rawValue.lowercased()) pace")
-                    figure(difficulty.rawValue, "Difficulty")
+                if waypoints.isEmpty { loopsSection }   // never wipes pins the rider placed
+            }
+            undoClear
+        }
+    }
+
+    @ViewBuilder
+    private var summary: some View {
+        if planning {
+            ProgressView("Finding a route…").font(.footnote)
+        } else if plan.polyline.isEmpty {
+            Text("No route between those pins yet.").font(.footnote).foregroundStyle(.secondary)
+        } else {
+            // Figma v3 · 02: three big figures.
+            HStack(alignment: .firstTextBaseline) {
+                figure(Fmt.km(plan.distance), "Distance")
+                figure(Fmt.duration(plan.expected), "At \(mode.rawValue.lowercased()) pace")
+                figure(difficulty.rawValue, "Difficulty")
+            }
+            if plan.offConnectorMeters > 0 {
+                Label("\(Fmt.km(plan.offConnectorMeters)) is off the park connectors", systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote).foregroundStyle(.orange)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    /// Below the fold: the scenery slider, climbing, Kit's places, the search.
+    @ViewBuilder
+    private var more: some View {
+        if mode == .leisure {
+            VStack(alignment: .leading, spacing: 2) {
+                Slider(value: $scenic, in: 0...1) {
+                    Text("Scenery")
+                } minimumValueLabel: {
+                    Text("Direct").font(.footnote).foregroundStyle(.secondary).lineLimit(1).fixedSize()
+                } maximumValueLabel: {
+                    Text("Scenic").font(.footnote).foregroundStyle(.secondary).lineLimit(1).fixedSize()
+                } onEditingChanged: { editing in
+                    draggingScenic = editing
+                    if !editing { replan() }
                 }
-                if plan.ascent > 0 {
-                    Label("\(Int(plan.ascent)) m of climbing", systemImage: "arrow.up.right")
-                        .font(.footnote).foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityValue(scenic < 0.05 ? "Direct" : scenic > 0.95 ? "Most scenic" : "\(Int((scenic * 100).rounded())) percent scenic")
+                .accessibilityHint("Direct is shortest; scenic bends toward water and parks, up to 30 percent longer.")
+                // VoiceOver and Switch Control adjust without a drag: re-plan once they settle.
+                .task(id: scenic) {
+                    guard !draggingScenic, scenic != plannedScenic else { return }
+                    try? await Task.sleep(for: .milliseconds(500))
+                    if !Task.isCancelled, !draggingScenic { replan() }
                 }
-                if plan.offConnectorMeters > 0 {
-                    Label("\(Fmt.km(plan.offConnectorMeters)) is off the park connectors", systemImage: "exclamationmark.triangle.fill")
-                        .font(.footnote).foregroundStyle(.orange)
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                if !planning, let d = direct, d.waypoints == waypoints, let extra = Self.extraLabel(scenic: plan.distance, direct: d.distance) {
+                    Text("\(extra) for the scenery").font(.footnote.monospacedDigit().weight(.semibold))
+                        .accessibilityLabel("\(extra) longer than direct")
                 }
             }
-
-            if mode != .fast, let sights, !sights.isEmpty, !sightsLoading {
-                // One quiet line here; the full Kit bubble lives on the route brief.
-                Label {
-                    Text(kitByModel ? "Kit picked \(sights.count) places for what you like" : "Kit's quick picks: \(sights.count) places for what you like")
-                } icon: { KitAvatar(size: 22) }
+        }
+        if !planning, plan.ascent > 0 {
+            Label("\(Int(plan.ascent)) m of climbing", systemImage: "arrow.up.right")
                 .font(.footnote).foregroundStyle(.secondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            if mode != .fast { placesSection }
-            if waypoints.isEmpty { loopsSection }   // never wipes pins the rider placed
-
-            HStack {
-                Button {
-                    waypoints.removeLast()
-                    replan()
-                } label: {
-                    Label("Undo pin", systemImage: "arrow.uturn.backward")
-                }
-                .disabled(waypoints.isEmpty)
-
-                Spacer()
-
-                Button(role: .destructive) {
-                    waypoints = []
-                    plan = RoutePlan()
-                    generation += 1
-                    sights = nil
-                    sightsLoading = false
-                } label: {
-                    Label("Clear", systemImage: "trash")
-                }
-                .disabled(waypoints.isEmpty)
-            }
-            .font(.subheadline)
-            .buttonStyle(.bordered)
-            .buttonBorderShape(.capsule)
         }
-        .padding(16)
+        if mode != .fast, let sights, !sights.isEmpty, !sightsLoading {
+            // One quiet line here; the full Kit bubble lives on the route brief.
+            Label {
+                Text(kitByModel ? "Kit picked \(sights.count) places for what you like" : "Kit's quick picks: \(sights.count) places for what you like")
+            } icon: { KitAvatar(size: 22) }
+            .font(.footnote).foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        pinList
+        if mode != .fast { placesSection }
+        discovery
+    }
+
+    /// Every pin, each removable on its own; the route re-plans through the rest.
+    private var pinList: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Pins").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+            ForEach(waypoints.indices, id: \.self) { i in
+                HStack(spacing: 12) {
+                    WaypointPin(index: i, last: i == waypoints.count - 1)
+                    Text(i == 0 ? "Start" : i == waypoints.count - 1 ? "Finish" : "Stop \(i)")
+                    Spacer()
+                    Button(role: .destructive) {
+                        waypoints.remove(at: i)
+                        replan()
+                    } label: {
+                        Image(systemName: "minus.circle.fill").font(.title3).frame(minWidth: 44, minHeight: 44)
+                    }
+                    .buttonStyle(.plain)
+                    .foregroundStyle(.red)
+                    .accessibilityLabel("Delete pin \(i + 1)")
+                }
+            }
+            Button(role: .destructive, action: clearAll) {
+                Label("Clear all pins", systemImage: "trash").font(.subheadline)
+            }
+            .buttonStyle(.bordered).buttonBorderShape(.capsule)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func clearAll() {
+        waypoints = []
+        plan = RoutePlan()
+        generation += 1
+        sights = nil
+        sightsLoading = false
+    }
+
+    @ViewBuilder
+    private var discovery: some View {
+        if mode == .leisure, let region = mapRegion {
+            DiscoveryPanel(region: region) { coord in
+                waypoints.append(Coord(coord))
+                focus = .region(.init(center: coord, latitudinalMeters: 1500, longitudinalMeters: 1500))
+                replan()
+            }
+        }
+    }
+
+    private var undoClear: some View {
+        HStack {
+            Button {
+                waypoints.removeLast()
+                replan()
+            } label: {
+                Label("Undo pin", systemImage: "arrow.uturn.backward")
+            }
+            .disabled(waypoints.isEmpty)
+
+            Spacer()
+            // Single pins (and Clear all) are in the Pins list when the sheet is dragged up.
+        }
+        .font(.subheadline)
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
     }
 
     private func figure(_ value: String, _ caption: String) -> some View {
@@ -334,25 +403,31 @@ struct RouteBuilderView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } else {
+                // Every place in ride order, one per row: the whole visit list at a glance.
                 VStack(alignment: .leading, spacing: 6) {
                     Text("Places along the way").font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 10) {
-                            ForEach(sights) { sight in
-                                Button { selectedSight = sight } label: {
+                    VStack(spacing: 0) {
+                        ForEach(sights) { sight in
+                            Button { selectedSight = sight } label: {
+                                HStack(spacing: 12) {
+                                    Image(systemName: Discovery.icon(for: sight.category).symbol)
+                                        .frame(width: 28).foregroundStyle(.secondary)
                                     VStack(alignment: .leading, spacing: 2) {
-                                        Text(sight.name).font(.footnote.weight(.semibold)).lineLimit(1)
-                                        Text("\(sight.note ?? Discovery.icon(for: sight.category).label) · \(Fmt.km(sight.offsetAlong))")
-                                            .font(.caption2)
-                                            .foregroundStyle(.secondary)
+                                        Text(sight.name).font(.subheadline.weight(.semibold)).lineLimit(2)
+                                        Text(sight.note ?? Discovery.icon(for: sight.category).label)
+                                            .font(.caption).foregroundStyle(.secondary).lineLimit(2)
                                     }
-                                    .padding(.horizontal, 12).padding(.vertical, 8)
-                                    .frame(minHeight: 44, alignment: .leading)
-                                    .background(.fill.tertiary, in: .rect(cornerRadius: 12))
+                                    Spacer(minLength: 8)
+                                    Text(Fmt.km(sight.offsetAlong)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
+                                    Image(systemName: "chevron.right").font(.caption).foregroundStyle(.tertiary)
                                 }
-                                .buttonStyle(.plain)
-                                .accessibilityLabel("\(sight.name), \(Discovery.icon(for: sight.category).label), \(Fmt.km(sight.offsetAlong)) along the route")
+                                .padding(.vertical, 10)
+                                .frame(minHeight: 44)
+                                .contentShape(.rect)
                             }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("\(sight.name), \(Discovery.icon(for: sight.category).label), \(Fmt.km(sight.offsetAlong)) along the route")
+                            if sight.id != sights.last?.id { Divider().padding(.leading, 40) }
                         }
                     }
                 }

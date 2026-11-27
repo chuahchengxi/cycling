@@ -60,7 +60,6 @@ struct cyclingskibidiApp: App {
         RideMode.selfCheck()
         Routing.selfCheck()
         RideRecorder.speechOff = true
-        RideRecorder.selfCheck()
         RideRecorder.selfCheckState()
         RideRecorder.selfCheckNoBike()
         RideRecorder.selfCheckAlarms()
@@ -80,6 +79,9 @@ struct cyclingskibidiApp: App {
         HeatHint.selfCheck()
         PixelArt.selfCheck()
         RouteDetailView.selfCheck()
+        RouteBuilderView.selfCheck()
+        NavigateView.selfCheckCamera()
+        RideStat.selfCheck()
         KitColor.selfCheck()
         AlertScheme.selfCheck()
         BannerMessage.selfCheck()

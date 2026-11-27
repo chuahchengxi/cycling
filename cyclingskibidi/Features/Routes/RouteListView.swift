@@ -153,15 +153,15 @@ struct RouteListView: View {
             .onChange(of: rides.count) { _, n in if n < statsSeen { statsSeen = n } }   // a deleted ride never hides the next one
         }
         ToolbarItem(placement: .topBarTrailing) {
+            Button { creating = true } label: { Label("Create route", systemImage: "plus") }
+        }
+        ToolbarItem(placement: .topBarTrailing) {
             Menu {
                 Button { showingSettings = true } label: { Label("Settings", systemImage: "gearshape") }
                 Button { showingInterests = true } label: { Label("Your interests", systemImage: "heart") }
                 Button { showingMarks = true } label: { Label("Your marks", systemImage: "exclamationmark.triangle") }
                 Button { showingCredits = true } label: { Label("Credits", systemImage: "info.circle") }
             } label: { Label("More", systemImage: "ellipsis.circle") }
-        }
-        ToolbarItem(placement: .topBarTrailing) {
-            Button { creating = true } label: { Label("Create route", systemImage: "plus") }
         }
     }
 }
