@@ -5,7 +5,7 @@
 //  Debug-only. You cannot ride a bike from behind Xcode, so this seeds a real
 //  route and a finished ride and can jump straight to any screen:
 //
-//      -demo:list | -demo:detail | -demo:navigate | -demo:finished
+//      -demo:list | -demo:detail | -demo:navigate | -demo:finished | -demo:fall | -demo:help
 //
 //  Pair it with `xcrun simctl location <udid> start --speed 6 ride.gpx` to feed
 //  the navigation engine a moving rider.

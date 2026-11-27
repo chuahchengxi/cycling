@@ -1,0 +1,32 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="icon/sound">
+<g id="sound">
+<path d="M10 2H12V4H10V2Z" fill="#2B2A27"/>
+<path d="M8 4H12V6H8V4Z" fill="#2B2A27"/>
+<path d="M18 4H20V6H18V4Z" fill="#2B2A27"/>
+<path d="M0 6L8 6V8H0V6Z" fill="#2B2A27"/>
+<path d="M10 6L12 6V8H10V6Z" fill="#2B2A27"/>
+<path d="M20 6L22 6V8H20V6Z" fill="#2B2A27"/>
+<path d="M0 8H2V10H0V8Z" fill="#2B2A27"/>
+<path d="M10 8H12V10H10V8Z" fill="#2B2A27"/>
+<path d="M16 8H18V10H16V8Z" fill="#2B2A27"/>
+<path d="M20 8H22V10H20V8Z" fill="#2B2A27"/>
+<path d="M0 10H2V12H0V10Z" fill="#2B2A27"/>
+<path d="M10 10H12V12H10V10Z" fill="#2B2A27"/>
+<path d="M18 10H22L22 12H18V10Z" fill="#2B2A27"/>
+<path d="M0 12H2V14H0V12Z" fill="#2B2A27"/>
+<path d="M10 12H12V14H10V12Z" fill="#2B2A27"/>
+<path d="M18 12H22V14H18V12Z" fill="#2B2A27"/>
+<path d="M0 14H2V16H0V14Z" fill="#2B2A27"/>
+<path d="M10 14H12V16H10V14Z" fill="#2B2A27"/>
+<path d="M16 14H18V16H16V14Z" fill="#2B2A27"/>
+<path d="M20 14H22L22 16H20V14Z" fill="#2B2A27"/>
+<path d="M0 16L8 16V18H0V16Z" fill="#2B2A27"/>
+<path d="M10 16H12V18H10V16Z" fill="#2B2A27"/>
+<path d="M20 16H22V18H20V16Z" fill="#2B2A27"/>
+<path d="M8 18H12V20H8V18Z" fill="#2B2A27"/>
+<path d="M18 18H20V20H18V18Z" fill="#2B2A27"/>
+<path d="M10 20H12V22H10V20Z" fill="#2B2A27"/>
+</g>
+</g>
+</svg>

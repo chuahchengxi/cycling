@@ -146,35 +146,6 @@ struct KitAlarmView: View {
     }
 }
 
-/// Kit/button (Figma 220:695): square, 2 pt ink border, ink text, a 20 pt pixel icon.
-/// Primary is sage with a hard 3 pt shadow, one per screen; secondary paper; tertiary a
-/// shorter paper button with smaller text.
-struct KitButton: View {
-    enum Style { case primary, secondary, tertiary }
-    let title: String
-    let icon: String
-    var style: Style = .secondary
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 8) {
-                Image(icon).renderingMode(.template).resizable().frame(width: 20, height: 20).accessibilityHidden(true)
-                Text(title).font(style == .tertiary ? .subheadline.weight(.semibold) : .headline)
-            }
-            .foregroundStyle(KitColor.ink)
-            .padding(.horizontal, 20)
-            .frame(maxWidth: .infinity, minHeight: style == .tertiary ? 52 : 56)
-            .background(style == .primary ? KitColor.sage : KitColor.paper)
-            .overlay(Rectangle().stroke(KitColor.ink, lineWidth: 2))
-            .background(alignment: .topLeading) {
-                if style == .primary { KitColor.shadow.offset(x: 3, y: 3) }
-            }
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 /// Kit/hazard-tape (225:2110): ochre and ink tape scrolling sideways; still with Reduce Motion.
 struct KitHazardTape: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -203,6 +174,8 @@ struct KitHazardTape: View {
 /// Kit wobbles with a pixel "!". Still with Reduce Motion.
 struct KitAlarmedFigure: View {
     let ring: Color
+    /// 1 = the 200 pt pulse of v3 · 07; the fall check uses 1.2, the HELP screen 0.9.
+    var scale: CGFloat = 1
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
@@ -237,6 +210,8 @@ struct KitAlarmedFigure: View {
             .frame(width: 200, height: 200)
         }
         .frame(width: 200, height: 200)
+        .scaleEffect(scale)
+        .frame(width: 200 * scale, height: 200 * scale)
         .accessibilityHidden(true)
     }
 }

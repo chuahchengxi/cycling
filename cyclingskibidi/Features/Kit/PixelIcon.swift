@@ -220,13 +220,16 @@ struct PlacePin: View {
     }
 }
 
-/// Press and hold to act: a fill sweeps across while held; letting go early
-/// cancels. VoiceOver users get the action directly (double-tap is deliberate).
+/// Press and hold to act, as a Kit button: a darker fill sweeps across while held and an
+/// optional pixel bar fills below; letting go early cancels. VoiceOver users get the
+/// action directly (double-tap is deliberate).
 struct HoldButton: View {
     let title: String
+    var icon: String? = "kit-icon-stop"
+    var style: KitButton.Style = .tertiary
     let seconds: Double
-    /// Deep reds: white text passes WCAG AA on both the track and the fill.
-    var tint: Color = Color(.sRGB, red: 0.72, green: 0.04, blue: 0.04)
+    /// Pixel progress under the button (on, off), as on the HELP screen.
+    var bar: (on: Color, off: Color)? = nil
     let action: () -> Void
 
     @State private var pressedAt: Date?
@@ -238,21 +241,16 @@ struct HoldButton: View {
     var body: some View {
         TimelineView(.animation(paused: pressedAt == nil)) { context in
             let fill = pressedAt.map { Self.progress(held: context.date.timeIntervalSince($0), of: seconds) } ?? 0
-            Text(title)
-                .font(.title3.bold())
-                .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, minHeight: 52)
-                .background(alignment: .leading) {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Color(.sRGB, red: 0.42, green: 0.05, blue: 0.05)
-                            tint.frame(width: geo.size.width * fill)
-                        }
+            VStack(spacing: 16) {
+                KitButtonLabel(title: title, icon: icon, style: style)
+                    .overlay(alignment: .leading) {
+                        GeometryReader { geo in Color.black.opacity(0.18).frame(width: geo.size.width * fill) }
+                            .allowsHitTesting(false)
                     }
-                }
-                .clipShape(.rect(cornerRadius: 18))
+                if let bar { KitSegmentBar(progress: fill, segments: 12, on: bar.on, off: bar.off, height: 6).accessibilityHidden(true) }
+            }
         }
-        .contentShape(.rect(cornerRadius: 18))
+        .contentShape(Rectangle())
         .onLongPressGesture(minimumDuration: seconds, perform: {
             pressedAt = nil
             action()

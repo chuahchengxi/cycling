@@ -74,6 +74,14 @@ struct ContentView: View {
         #if DEBUG
         .task { await openDemoScreen() }
         .overlay { if let a = Demo.alarm { KitAlarmView(alarm: a, onPrimary: {}, onSecondary: {}, onNotThere: {}) } }
+        .overlay {
+            switch Demo.screen {
+            case "fall": AreYouOKView(deadline: .now.addingTimeInterval(24), onOK: {}, onRingNow: {})
+            case "help": HelpAlarmView(since: .now, place: "Punggol Promenade", kmAlong: 14.2,
+                                       coordinate: .init(latitude: 1.41235, longitude: 103.91012), onStop: {})
+            default: EmptyView()
+            }
+        }
         #endif
     }
 
