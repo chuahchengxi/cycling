@@ -69,6 +69,87 @@ nonisolated enum PixelArt {
         "..##....##..",
         "....####....",
     ]
+
+    // MARK: Place icons (map pins and Along the way rows)
+
+    static let food: [String] = [
+        ".......#..#.", "......#..#..", ".....#..#...", "....#..#....",
+        "............", "############", "#..........#", ".#........#.",
+        ".#........#.", "..#......#..", "...######...", "....####....",
+    ]
+    static let photo: [String] = [
+        "............", "....####....", "...#....#...", "############",
+        "#..........#", "#...####...#", "#..#....#..#", "#..#....#..#",
+        "#...####...#", "#..........#", "############", "............",
+    ]
+    static let water: [String] = [
+        ".....##.....", ".....##.....", "....####....", "....####....",
+        "...######...", "..########..", "..#.######..", ".##.#######.",
+        ".##..######.", ".###..#####.", "..########..", "...######...",
+    ]
+    static let rest: [String] = [
+        "............", "............", "############", "############",
+        "............", "############", "############", ".#........#.",
+        ".#........#.", ".#........#.", ".#........#.", "............",
+    ]
+    static let heritage: [String] = [
+        "############", "#..........#", ".##########.", ".#........#.",
+        ".#.######.#.", ".#........#.", ".#.######.#.", ".#........#.",
+        ".#.####...#.", ".##########.", "#..........#", "############",
+    ]
+    static let architecture: [String] = [
+        ".....##.....", "...######...", ".##########.", "############",
+        "............", ".#..#..#..#.", ".#..#..#..#.", ".#..#..#..#.",
+        ".#..#..#..#.", ".#..#..#..#.", "############", "############",
+    ]
+    static let wildlife: [String] = [
+        "..##....##..", "..##....##..", "............", "##........##",
+        "##..####..##", "...######...", "..########..", "..########..",
+        "..########..", "...##..##...", "............", "............",
+    ]
+    static let art: [String] = [
+        "...######...", ".##......##.", "#..##......#", "#..##..##..#",
+        "#......##..#", "#.##.......#", "#.##...###.#", "#......#.#.#",
+        ".#.....###.#", "..##......#.", "....#....#..", ".....####...",
+    ]
+    static let cafe: [String] = [
+        "...#..#.....", "..#..#......", "...#..#.....", "............",
+        "#########...", "#.......####", "#.......#..#", "#.......#..#",
+        "#.......####", ".#.....#....", "..#####.....", "############",
+    ]
+    static let kids: [String] = [
+        ".....##.....", ".....##.....", "......#.....", "..########..",
+        "......#.....", "......#.....", ".....#.#....", "....#...#...",
+        "...#.....#..", "............", "############", "#..........#",
+    ]
+    static let tourist: [String] = [
+        ".....##.....", ".....##.....", "....####....", "############",
+        ".##########.", "..########..", "...######...", "...######...",
+        "..###..###..", "..##....##..", ".##......##.", "............",
+    ]
+    static let quiet: [String] = [
+        ".....##.....", "...######...", "..########..", ".##########.",
+        ".##########.", "############", ".##########.", "..########..",
+        "....####....", ".....##.....", ".....##.....", "...######...",
+    ]
+    static let bridge: [String] = [
+        "............", "............", "....####....", "..##....##..",
+        ".#........#.", "############", "#..#....#..#", "#..#....#..#",
+        "#..........#", "#..........#", "############", "............",
+    ]
+
+    /// places.json category → icon. Anything unknown falls back to `photo`.
+    static let byCategory: [String: [String]] = [
+        "park": quiet, "nationalPark": wildlife, "beach": quiet, "museum": architecture,
+        "aquarium": wildlife, "zoo": wildlife, "amusementPark": kids, "cafe": cafe,
+        "marina": photo, "stadium": architecture, "library": architecture, "attraction": tourist,
+        "viewpoint": photo, "hawker": food, "restaurant": food, "worship": heritage,
+        "bridge": bridge, "waterway": photo, "reservoir": quiet, "heritage": heritage,
+        "artwork": art, "playground": kids, "drinkingWater": water, "toilets": rest,
+        "shelter": rest, "bikeParking": rest, "repair": rest,
+    ]
+
+    static func forCategory(_ category: String) -> [String] { byCategory[category] ?? photo }
 }
 
 extension PixelArt {
@@ -78,6 +159,9 @@ extension PixelArt {
             "expressway": expressway,
             "walkBike": walkBike,
             "closed": closed,
+            "food": food, "photo": photo, "water": water, "rest": rest, "heritage": heritage,
+            "architecture": architecture, "wildlife": wildlife, "art": art, "cafe": cafe,
+            "kids": kids, "tourist": tourist, "quiet": quiet, "bridge": bridge,
         ]
         for (name, rows) in bitmaps {
             assert(rows.count == 12, "\(name) has 12 rows, got \(rows.count)")
@@ -107,6 +191,76 @@ extension PixelArt {
             }
             assert(kind.art == expectedArt, "\(kind.rawValue) uses the right bitmap")
         }
+
+        // Every place a pin or row can show has its own icon, not the fallback.
+        for category in Discovery.leisureCategories.union(RestStops.amenityCategories) {
+            assert(byCategory[category] != nil, "\(category) has no pixel icon")
+        }
+        assert(forCategory("hawker") == food && forCategory("nope") == photo, "forCategory maps and falls back")
+
+        assert(HoldButton.progress(held: 1.5, of: 3) == 0.5, "hold progress is held / seconds")
+        assert(HoldButton.progress(held: 5, of: 3) == 1 && HoldButton.progress(held: -1, of: 3) == 0, "hold progress clamps")
+    }
+}
+
+/// A place's pixel icon on a filled disc, for map pins. Says what the place is to VoiceOver.
+struct PlacePin: View {
+    let category: String
+    let name: String
+
+    var body: some View {
+        PixelIcon(rows: PixelArt.forCategory(category), size: 16)
+            .foregroundStyle(.white)
+            .padding(6)
+            .background(Color(.systemGreen).mix(with: .black, by: 0.25), in: .circle)
+            .overlay(Circle().strokeBorder(.white, lineWidth: 2))
+            .shadow(radius: 2)
+            .accessibilityElement()
+            .accessibilityLabel("\(Discovery.icon(for: category).label): \(name)")
+    }
+}
+
+/// Press and hold to act: a fill sweeps across while held; letting go early
+/// cancels. VoiceOver users get the action directly (double-tap is deliberate).
+struct HoldButton: View {
+    let title: String
+    let seconds: Double
+    var tint: Color = .red
+    let action: () -> Void
+
+    @State private var pressedAt: Date?
+
+    nonisolated static func progress(held: Double, of seconds: Double) -> Double {
+        min(1, max(0, held / seconds))
+    }
+
+    var body: some View {
+        TimelineView(.animation(paused: pressedAt == nil)) { context in
+            let fill = pressedAt.map { Self.progress(held: context.date.timeIntervalSince($0), of: seconds) } ?? 0
+            Text(title)
+                .font(.title3.bold())
+                .foregroundStyle(.white)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(alignment: .leading) {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            tint.opacity(0.55)
+                            tint.frame(width: geo.size.width * fill)
+                        }
+                    }
+                }
+                .clipShape(.rect(cornerRadius: 18))
+        }
+        .contentShape(.rect(cornerRadius: 18))
+        .onLongPressGesture(minimumDuration: seconds, perform: {
+            pressedAt = nil
+            action()
+        }, onPressingChanged: { pressing in pressedAt = pressing ? .now : nil })
+        .accessibilityElement()
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel(title)
+        .accessibilityHint("Press and hold to \(title.lowercased())")
+        .accessibilityAction { action() }
     }
 }
 

@@ -49,6 +49,7 @@ struct cyclingskibidiApp: App {
         RestStops.selfCheck()
         HeatHint.selfCheck()
         PixelArt.selfCheck()
+        RouteDetailView.selfCheck()
         KitColor.selfCheck()
         NoBike.selfCheck()
         Task { await Routing.selfCheckNoBike() }

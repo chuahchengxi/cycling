@@ -81,7 +81,7 @@ struct RouteDetailView: View {
                 checkClosures()
                 replanFailed = false
                 if blockingClosures.isEmpty { start() } else { confirmClosedStart = true }
-            }, onReplan: { replan() })
+            }, onReplan: { replan() }, onAddStop: addStop, onRemoveStop: removeStop)
             .confirmationDialog(closedStartTitle, isPresented: $confirmClosedStart, titleVisibility: .visible) {
                 if !replanFailed { Button(blockingClosures.count == 1 ? "Re-plan around it" : "Re-plan around them") { replan(thenStart: true) } }
                 Button("Ride anyway") { start() }
@@ -147,6 +147,51 @@ struct RouteDetailView: View {
             checkClosures()
             if blockingClosures.isEmpty { start() } else { replanFailed = true; confirmClosedStart = true }
         }
+    }
+
+    /// Ride to a sight: it becomes a pin between the two pins it falls between, then re-plan.
+    private func addStop(_ sight: Sight) {
+        let line = route.polyline.map(\.cl), cum = Geo.cumulative(line), pins = route.waypoints
+        guard pins.count >= 2, !Self.isPin(sight, in: pins) else { return }
+        let alongs = pins.map { Geo.snap($0.cl, to: line, cumulative: cum)?.along ?? 0 }
+        var updated = pins
+        updated.insert(Coord(sight.coordinate), at: Self.stopIndex(along: sight.offsetAlong, pinAlongs: alongs))
+        route.waypointData = Blob.encode(updated)
+        replan()
+    }
+
+    /// Drop a sight: a pin placed on it goes (never the start or finish), else it leaves the picks.
+    private func removeStop(_ sight: Sight) {
+        let pins = route.waypoints
+        let kept = pins.enumerated().filter { i, p in
+            i == 0 || i == pins.count - 1 || Geo.distance(p.cl, sight.coordinate) > Self.pinRadius
+        }.map(\.element)
+        if kept.count < pins.count {
+            route.waypointData = Blob.encode(kept)
+            replan()
+        } else {
+            let left = route.sights.filter { $0.id != sight.id }
+            route.sightData = left.isEmpty ? nil : Blob.encode(left)
+            try? context.save()
+        }
+    }
+
+    nonisolated static let pinRadius: Double = 30
+    nonisolated static func isPin(_ sight: Sight, in pins: [Coord]) -> Bool {
+        pins.contains { Geo.distance($0.cl, sight.coordinate) <= pinRadius }
+    }
+    /// Where a stop `along` metres into the ride goes among pins at `pinAlongs`: after the
+    /// last pin before it, never before the start or after the finish.
+    nonisolated static func stopIndex(along: Double, pinAlongs: [Double]) -> Int {
+        let after = pinAlongs.dropFirst().dropLast().firstIndex { $0 > along } ?? pinAlongs.count - 1
+        return max(1, min(after, pinAlongs.count - 1))
+    }
+
+    static func selfCheck() {
+        assert(stopIndex(along: 500, pinAlongs: [0, 1000]) == 1, "between start and finish")
+        assert(stopIndex(along: 1500, pinAlongs: [0, 1000, 2000]) == 2, "after the middle pin")
+        assert(stopIndex(along: 200, pinAlongs: [0, 1000, 2000]) == 1, "before the middle pin")
+        assert(stopIndex(along: 9000, pinAlongs: [0, 1000, 2000]) == 2, "never after the finish")
     }
 
     /// Kit's quick picks now, saved; the model's later if it answers for this same line.

@@ -459,15 +459,7 @@ struct DiscoveryPanel: View {
 struct SightBadge: View {
     let sight: Sight
 
-    var body: some View {
-        Image(systemName: Discovery.icon(for: sight.category).symbol)
-            .font(.caption.bold())
-            .foregroundStyle(.white)
-            .padding(6)
-            .background(.green, in: .circle)
-            .overlay(Circle().strokeBorder(.white, lineWidth: 2))
-            .shadow(radius: 2)
-    }
+    var body: some View { PlacePin(category: sight.category, name: sight.name) }
 }
 
 /// The "what it's about" content, all from the bundled data: the category, the

@@ -92,6 +92,9 @@ struct NavigateView: View {
         .sheet(isPresented: Binding(   // the full-screen alarm hides the nav sheet, whoever asks for it back
             get: { showSheet && recorder.noBikeAhead == nil }, set: { if recorder.noBikeAhead == nil { showSheet = $0 } })) {
             navSheet
+                // The 150 pt detent can't grow, so its numbers stop at AX1 and shrink rather than truncate.
+                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
+                .minimumScaleFactor(0.6)
                 .presentationDetents([.height(150), .fraction(0.45), .large], selection: $detent)
                 .presentationBackgroundInteraction(.enabled)
                 .presentationDragIndicator(.visible)
@@ -198,8 +201,9 @@ struct NavigateView: View {
             Text("Tap the blue route to place the obstacle")
                 .font(.subheadline.weight(.medium))
             Spacer(minLength: 8)
-            Button("Cancel") { placing = false; pending = nil; showSheet = true }
-                .font(.subheadline.bold())
+            Button { placing = false; pending = nil; showSheet = true } label: {
+                Text("Cancel").font(.subheadline.bold()).frame(minHeight: 52)
+            }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
@@ -213,14 +217,27 @@ struct NavigateView: View {
 
     private var navSheet: some View {
         VStack(spacing: 0) {
+            // Next turn, then km to go, then the (smaller) timer.
+            if let step = recorder.currentStep {
+                HStack(spacing: 10) {
+                    Image(systemName: step.maneuver.symbol).font(.headline).accessibilityHidden(true)
+                    Text("\(Fmt.km(recorder.distanceToManeuver)) · \(step.instruction)")
+                        .font(.subheadline.weight(.semibold)).lineLimit(1)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 18)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Next turn: \(step.instruction), in \(Fmt.km(recorder.distanceToManeuver))")
+            }
             HStack(alignment: .firstTextBaseline, spacing: 16) {
                 VStack(alignment: .leading, spacing: 0) {
                     Text(Fmt.km(recorder.remainingDistance)).font(.title.bold())
                     Text("to go").font(.caption2).foregroundStyle(.secondary)
                 }
-                Divider().frame(height: 34)
+                Divider().frame(height: 28)
                 VStack(alignment: .leading, spacing: 0) {
-                    Text(Fmt.clock(recorder.remainingSeconds)).font(.title.bold())
+                    Text(Fmt.clock(recorder.remainingSeconds)).font(.headline).monospacedDigit()
                     Text("left").font(.caption2).foregroundStyle(.secondary)
                 }
                 Spacer()
@@ -230,7 +247,7 @@ struct NavigateView: View {
                 }
             }
             .padding(.horizontal, 20)
-            .padding(.top, 22)
+            .padding(.top, recorder.currentStep == nil ? 22 : 8)
 
             ProgressView(value: recorder.progress)
                 .padding(.horizontal, 20)
@@ -261,23 +278,16 @@ struct NavigateView: View {
                 Label(recorder.phase == .running ? "Pause" : "Resume",
                       systemImage: recorder.phase == .running ? "pause.fill" : "play.fill")
                     .font(.title3.bold())
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
+                    .frame(maxWidth: .infinity, minHeight: 52)
             }
             .buttonStyle(.bordered)
             .buttonBorderShape(.roundedRectangle(radius: 18))
 
-            Button(action: end) {
-                Text("End Ride")
-                    .font(.title3.bold())
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.red)
-            .buttonBorderShape(.roundedRectangle(radius: 18))
+            // A hold, so a bump or a wet glove can't end the ride.
+            HoldButton(title: "End ride", seconds: 1.5, action: end)
         }
         .padding(.horizontal, 20)
+        .padding(.bottom, 12)
     }
 
     private var turnList: some View {
@@ -339,18 +349,20 @@ struct PassBySightCard: View {
                 Button(action: onClose) {
                     Image(systemName: "xmark.circle.fill")
                         .font(.title2).foregroundStyle(.secondary)
+                        .frame(minWidth: 52, minHeight: 52)
                 }
+                .accessibilityLabel("Close")
             }
             SightDetail(sight: sight)
             if let onVerdict {
                 // Kit learns from these (Figma v3 · 04).
                 HStack(spacing: 10) {
                     Button { onVerdict(true) } label: {
-                        Label("Stop here", systemImage: "flag.checkered").frame(maxWidth: .infinity, minHeight: 44)
+                        Label("Stop here", systemImage: "flag.checkered").frame(maxWidth: .infinity, minHeight: 52)
                     }
                     .buttonStyle(.borderedProminent)
                     Button { onVerdict(false) } label: {
-                        Label("Skip", systemImage: "xmark").frame(maxWidth: .infinity, minHeight: 44)
+                        Label("Skip", systemImage: "xmark").frame(maxWidth: .infinity, minHeight: 52)
                     }
                     .buttonStyle(.bordered)
                 }
@@ -371,24 +383,29 @@ struct GuidanceBanner: View {
     let rerouting: Bool
 
     var body: some View {
-        HStack(spacing: 16) {
-            Image(systemName: rerouting ? "arrow.triangle.2.circlepath" : (offRoute ? "exclamationmark.triangle.fill" : (step?.maneuver.symbol ?? "arrow.up")))
-                .font(.system(.largeTitle, weight: .semibold))
-                .frame(width: 54)
-
-            VStack(alignment: .leading, spacing: 2) {
+        // Arrow and distance are always the big top row; the instruction sits under it.
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 12) {
+                Image(systemName: rerouting ? "arrow.triangle.2.circlepath" : (offRoute ? "exclamationmark.triangle.fill" : (step?.maneuver.symbol ?? "arrow.up")))
+                    .font(.system(.largeTitle, weight: .semibold))
+                    .accessibilityHidden(true)
                 // Rerouting always wins the headline, whether it was triggered by
                 // drifting off the line or by marking a closure on it.
-                Text(rerouting ? "Recalculating…" : (offRoute ? "Off route" : Fmt.km(distance)))
-                    .font(.system(.title, design: .rounded, weight: .bold))
-                Text(step?.instruction ?? "Follow the route")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
+                if rerouting || offRoute {
+                    Text(rerouting ? "Recalculating…" : "Off route")
+                        .lineLimit(1).minimumScaleFactor(0.5)
+                } else {
+                    Text(Fmt.km(distance)).lineLimit(1).fixedSize()   // "600 m" never wraps
+                }
+                Spacer(minLength: 0)
             }
-            Spacer(minLength: 0)
+            .font(.system(.largeTitle, design: .rounded, weight: .bold))
+            Text(step?.instruction ?? "Follow the route")
+                .font(.body)
+                .foregroundStyle(.secondary)
         }
         .foregroundStyle((rerouting || offRoute) ? Color.orange : Color.primary)
+        .accessibilityElement(children: .combine)
         .padding(18)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial, in: .rect(cornerRadius: 22))
@@ -409,8 +426,7 @@ struct RerouteFailureBanner: View {
             Text(message)
                 .font(.subheadline.weight(.medium))
             Spacer(minLength: 8)
-            Button("Dismiss", action: onDismiss)
-                .font(.subheadline.bold())
+            Button(action: onDismiss) { Text("Dismiss").font(.subheadline.bold()).frame(minHeight: 52) }
         }
         .foregroundStyle(Color.orange)
         .padding(14)
@@ -456,7 +472,8 @@ struct CircleButton: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .font(.headline)
-                .frame(width: 44, height: 44)
+                .dynamicTypeSize(...DynamicTypeSize.xxxLarge)   // the glyph stays inside its 52 pt disc
+                .frame(width: 52, height: 52)
                 .background(.regularMaterial, in: .circle)
                 .foregroundStyle(tint)
         }

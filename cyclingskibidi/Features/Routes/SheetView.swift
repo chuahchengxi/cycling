@@ -22,6 +22,9 @@ struct SheetView: View {
     @Binding var currentDetent: PresentationDetent
     var onStart: () -> Void
     var onReplan: () -> Void = {}
+    /// Ride to this sight as a stop, or drop it. Nil hides the actions.
+    var onAddStop: ((Sight) -> Void)? = nil
+    var onRemoveStop: ((Sight) -> Void)? = nil
 
     @State private var selectedSight: Sight?
     /// No-bike crossings and walk stretches, worked out once per line off the main actor.
@@ -277,20 +280,36 @@ struct SheetView: View {
             ForEach(route.sights) { sight in
                 Button { selectedSight = sight } label: {
                     HStack(spacing: 12) {
-                        Image(systemName: Discovery.icon(for: sight.category).symbol)
-                            .font(.title3).frame(width: 30).foregroundStyle(.green)
+                        PixelIcon(rows: PixelArt.forCategory(sight.category), size: 24)
+                            .foregroundStyle(.green).frame(width: 30)
+                            .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 2) {
-                            Text(sight.name).font(.subheadline.weight(.semibold))
+                            Text(sight.name).font(.body.weight(.semibold))
                             Text(sight.note ?? Discovery.icon(for: sight.category).label)
-                                .font(.caption).foregroundStyle(.secondary)
+                                .font(.footnote).foregroundStyle(.secondary)
                         }
                         Spacer(minLength: 8)
-                        Text(Fmt.km(sight.offsetAlong)).font(.caption).foregroundStyle(.secondary)
+                        Text(Fmt.km(sight.offsetAlong)).font(.footnote).foregroundStyle(.secondary)
+                        Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                            .accessibilityHidden(true)
                     }
+                    .frame(minHeight: 52)
+                    .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("\(sight.name), \(Discovery.icon(for: sight.category).label), \(Fmt.km(sight.offsetAlong))")
+                // The brief is a scroll view, not a List, so swipe actions can't attach:
+                // the same add / remove sit on long-press and in the VoiceOver actions rotor.
+                .contextMenu { stopActions(sight) }
+                .accessibilityActions { stopActions(sight) }
             }
         }
+    }
+
+    @ViewBuilder
+    private func stopActions(_ sight: Sight) -> some View {
+        if let onAddStop { Button("Add as a stop", systemImage: "plus.circle") { onAddStop(sight) } }
+        if let onRemoveStop { Button("Remove from the route", systemImage: "minus.circle", role: .destructive) { onRemoveStop(sight) } }
     }
 
     /// Rest stops (spec section 3): water and toilets under 20 km, else spaced by the rider's level.
@@ -302,8 +321,8 @@ struct SheetView: View {
                 .font(.subheadline).foregroundStyle(.secondary)
             ForEach(route.restStops) { stop in
                 HStack(alignment: .top, spacing: 12) {
-                    Image(systemName: stop.amenities.contains("drinkingWater") ? "drop.fill" : Discovery.icon(for: stop.amenities.first ?? "").symbol)
-                        .font(.title3).frame(width: 30).foregroundStyle(.teal)
+                    PixelIcon(rows: PixelArt.forCategory(stop.amenities.contains("drinkingWater") ? "drinkingWater" : stop.amenities.first ?? ""), size: 24)
+                        .frame(width: 30).foregroundStyle(.teal)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(stop.name).font(.subheadline.weight(.semibold))
