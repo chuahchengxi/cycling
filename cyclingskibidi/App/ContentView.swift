@@ -77,6 +77,8 @@ struct ContentView: View {
         .overlay {
             switch Demo.screen {
             case "onboarding": OnboardingView()
+            case "newroute": CreateRouteFlow()
+            case "stats": NavigationStack { StatsView() }
             case "settings": SettingsView()
             case "fall": AreYouOKView(deadline: .now.addingTimeInterval(24), onOK: {}, onRingNow: {})
             case "help": HelpAlarmView(since: .now, place: "Punggol Promenade", kmAlong: 14.2,

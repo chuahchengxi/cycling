@@ -22,6 +22,7 @@ struct CreateRouteFlow: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var path: [RideMode] = []
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -48,12 +49,12 @@ struct CreateRouteFlow: View {
                         path.append(m)
                     } label: {
                         HStack(spacing: 14) {
-                            Image(kitIcon(for: m)).renderingMode(.template).resizable()
+                            Image(m.kitIcon).renderingMode(.template).resizable()
                                 .frame(width: 22, height: 22)
                                 .frame(width: 40, height: 40)
                                 .background(m == .moderate ? KitColor.sage : KitColor.paper)
                                 .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
-                                .kitSurface()
+                                .environment(\.colorScheme, m == .moderate ? .light : colorScheme)
                             VStack(alignment: .leading, spacing: 3) {
                                 Text(m.rawValue).font(.headline)
                                 Text(m.subtitle).font(.subheadline).foregroundStyle(KitColor.muted)
@@ -82,13 +83,14 @@ struct CreateRouteFlow: View {
     }
 }
 
-/// Kit's pixel marks for the three ways to ride. No bolt asset exists, so Fast
-/// borrows the expressway mark — roads allowed, the defining trait of that mode.
-private func kitIcon(for mode: RideMode) -> String {
-    switch mode {
-    case .fast: return "kit-icon-expressway"
-    case .moderate: return "kit-icon-bike"
-    case .leisure: return "kit-icon-leaf"
+extension RideMode {
+    /// Kit's pixel mark for the mode (Figma v2 · 02).
+    var kitIcon: String {
+        switch self {
+        case .fast: "kit-icon-bolt"
+        case .moderate: "kit-icon-bike"
+        case .leisure: "kit-icon-leaf"
+        }
     }
 }
 

@@ -180,6 +180,7 @@ where T.RawValue == String, T.AllCases: RandomAccessCollection {
                 Text(isDefault ? title : value.rawValue)
                 Image("kit-icon-chevron").renderingMode(.template).resizable()
                     .frame(width: 14, height: 14)
+                    .rotationEffect(.degrees(90))
             }
             .font(.footnote.weight(.semibold))
             .foregroundStyle(KitColor.ink)
@@ -187,12 +188,13 @@ where T.RawValue == String, T.AllCases: RandomAccessCollection {
             .frame(minHeight: 44)
             .background(isDefault ? KitColor.paper : KitColor.sage)
             .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
-            .kitSurface()
+            .environment(\.colorScheme, isDefault ? colorScheme : .light)   // only sage keeps dark ink
         }
         .buttonStyle(.plain)
     }
 
     private var isDefault: Bool { value.rawValue == "Any" }
+    @Environment(\.colorScheme) private var colorScheme
 }
 
 struct Pill: View {
@@ -226,15 +228,11 @@ struct RouteCard: View {
                 .lineLimit(1)
 
             FlowLayout {
-                KitChip(text: Fmt.km(route.distanceMeters))
-                KitChip(text: Fmt.duration(route.currentExpectedSeconds))
-                KitChip(text: route.difficulty.rawValue, fill: kitFill(for: route.difficulty))
+                KitChip(text: Fmt.km(route.distanceMeters), caps: false)
+                KitChip(text: Fmt.duration(route.currentExpectedSeconds), caps: false)
+                KitChip(text: route.difficulty.rawValue, fill: kitFill(for: route.difficulty), caps: false)
                     .kitSurface()
-                if let icon = kitIcon(for: route.mode) {
-                    KitChip(text: route.mode.rawValue, icon: icon)
-                } else {
-                    KitChip(text: route.mode.rawValue)
-                }
+                KitChip(text: route.mode.rawValue, icon: route.mode.kitIcon, caps: false)
             }
             .padding(.top, 10)
         }
@@ -252,14 +250,6 @@ private func kitFill(for difficulty: Difficulty) -> Color {
     }
 }
 
-/// Fast is text only on the route cards; the others carry their pixel mark.
-private func kitIcon(for mode: RideMode) -> String? {
-    switch mode {
-    case .fast: return nil
-    case .moderate: return "kit-icon-bike"
-    case .leisure: return "kit-icon-leaf"
-    }
-}
 
 extension Difficulty {
     var color: Color {

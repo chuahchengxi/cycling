@@ -137,10 +137,10 @@ struct StatsView: View {
     /// Days that actually cover ground — the cells worth colouring in.
     private var ridingDays: Int { daily.filter { $0.km > 0 }.count }
 
-    /// Distance summed per calendar day, for the heatmap.
+    /// Distance summed per calendar day, for the heatmap. All rides: the grid is always 20 weeks.
     private var daily: [(day: Date, km: Double)] {
         let cal = Calendar.current
-        let grouped = Dictionary(grouping: scoped) { cal.startOfDay(for: $0.startedAt) }
+        let grouped = Dictionary(grouping: rides) { cal.startOfDay(for: $0.startedAt) }
         return grouped
             .map { (day: $0.key, km: $0.value.reduce(0) { $0 + $1.distanceKM }) }
             .sorted { $0.day < $1.day }
@@ -173,7 +173,7 @@ struct StatsView: View {
         if ridingDays > 0 {
             VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
-                    Text("Distance per day").font(.kitLabel).foregroundStyle(KitColor.muted)
+                    Text("Rides, last 20 weeks").font(.footnote.weight(.semibold))
                     Spacer(minLength: 4)
                     Text("Less").font(.caption2).foregroundStyle(KitColor.muted)
                     HStack(spacing: 2) {
@@ -193,8 +193,8 @@ struct StatsView: View {
             }
             .kitCard(KitColor.board, padding: 12)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Distance per day")
-            .accessibilityValue("\(Fmt.km(totalDistance)) over \(ridingDays) riding \(ridingDays == 1 ? "day" : "days")")
+            .accessibilityLabel("Rides, last 20 weeks")
+            .accessibilityValue("\(ridingDays) riding \(ridingDays == 1 ? "day" : "days")")
         } else if !scoped.isEmpty {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Distance per day").font(.kitLabel).foregroundStyle(KitColor.muted)
@@ -214,11 +214,9 @@ struct StatsView: View {
                 ForEach(Array(scoped.enumerated()), id: \.element.id) { index, ride in
                     NavigationLink(value: ride) { RideRow(ride: ride) }
                         .buttonStyle(.plain)
-                        .swipeActions(edge: .trailing) {
-                            Button(role: .destructive) { delete(IndexSet(integer: index)) } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
+                        // A scroll view, not a List, so no swipe: delete sits on long-press and in the VoiceOver rotor.
+                        .contextMenu { Button("Delete", systemImage: "trash", role: .destructive) { delete(IndexSet(integer: index)) } }
+                        .accessibilityAction(named: "Delete") { delete(IndexSet(integer: index)) }
                 }
             }
         }

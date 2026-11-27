@@ -99,11 +99,13 @@ struct KitChip: View {
     let text: String
     var icon: String? = nil
     var fill: Color = KitColor.paper
+    /// False for value tags ("5.4 km", "Easy") on route cards.
+    var caps = true
 
     var body: some View {
         HStack(spacing: 6) {
             if let icon { Image(icon).renderingMode(.template).resizable().frame(width: 16, height: 16).accessibilityHidden(true) }
-            Text(text.uppercased()).font(.kitLabel).tracking(0.9)
+            if caps { Text(text.uppercased()).font(.kitLabel).tracking(0.9) } else { Text(text).font(.footnote.weight(.medium)) }
         }
         .foregroundStyle(KitColor.ink)
         .padding(.horizontal, 10).padding(.vertical, 6)
