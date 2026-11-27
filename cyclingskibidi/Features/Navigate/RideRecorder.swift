@@ -18,6 +18,10 @@ final class RideRecorder {
 
     enum Phase { case idle, running, paused, finished }
 
+    enum FallPhase: Equatable {
+        case none, asking(deadline: Date), ringing(since: Date)
+    }
+
     // Ride state
     private(set) var phase: Phase = .idle
     private(set) var distance: Double = 0
@@ -30,6 +34,15 @@ final class RideRecorder {
     private(set) var snapped: CLLocationCoordinate2D?
     private(set) var course: Double = 0
     private(set) var authorizationDenied = false
+
+    // Fall takeover (plan 6): 30 s "Are you OK?" before the HELP alarm.
+    private(set) var fallPhase: FallPhase = .none
+    static let askSeconds = 30.0
+    /// Injectable so the DEBUG checks never wait on the clock or play audio.
+    var now: () -> Date = { .now }
+    var startSound: (AlarmSound.Style) -> Void = { AlarmSound.shared.start($0) }
+    var stopSound: () -> Void = { AlarmSound.shared.stop() }
+    private let fallMonitor = FallMonitor()
 
     // Navigation state
     private(set) var steps: [StoredStep] = []
@@ -201,6 +214,7 @@ final class RideRecorder {
         }
         phase = .running
         lastFixAt = nil
+        fallMonitor.start(sensitivity: loadProfile().fallSensitivity) { [weak self] in self?.fallDetected() }
         listen()
         // Only the departure direction, and only on a real start — the tiered
         // guidance handles every turn after, and resume shouldn't re-announce.
@@ -211,14 +225,49 @@ final class RideRecorder {
         guard phase == .running else { return }
         phase = .paused
         lastFixAt = nil
+        endFall(stopMonitor: true)
     }
 
     func resume() { if phase == .paused { start() } }
+
+    // MARK: - Fall takeover
+
+    /// Only a running ride with no takeover already showing can confirm a fall.
+    func fallDetected() {
+        guard phase == .running, fallPhase == .none else { return }
+        fallPhase = .asking(deadline: now().addingTimeInterval(Self.askSeconds))
+        startSound(.rising)
+    }
+
+    /// Driven once a second by the nav view: the countdown ends in HELP.
+    func tickFall() {
+        guard case .asking(let deadline) = fallPhase, now() >= deadline else { return }
+        fallPhase = .ringing(since: now())
+        startSound(.help)
+    }
+
+    func imOK() { endFall(stopMonitor: false) }
+
+    func ringNow() {
+        guard fallPhase != .none else { return }
+        fallPhase = .ringing(since: now())
+        startSound(.help)
+    }
+
+    func stopHelp() { endFall(stopMonitor: false) }
+
+    private func endFall(stopMonitor: Bool) {
+        let wasActive = fallPhase != .none
+        fallPhase = .none
+        if wasActive { stopSound() }
+        if stopMonitor { fallMonitor.stop() }
+    }
 
     /// Stops the stream and returns the ride, ready to be inserted.
     func finish() -> Ride {
         task?.cancel(); task = nil
         phase = .finished
+        endFall(stopMonitor: true)
         speaker.stopSpeaking(at: .immediate)
 
         let ride = Ride(startedAt: startedAt, routeName: routeName, source: .app)
@@ -253,6 +302,7 @@ final class RideRecorder {
     func reset() {
         task?.cancel(); task = nil
         phase = .idle
+        endFall(stopMonitor: true)
         track = []; distance = 0; movingSeconds = 0; speed = 0; maxSpeed = 0
         stepIndex = 0; distanceAlong = 0; offRoute = false; joinedRoute = false; announced.removeAll()
         sights = []; passedSights.removeAll(); passingSight = nil
@@ -858,6 +908,79 @@ final class RideRecorder {
         r.checkAlarms(at: south(-700 + 40 + 90), speed: 5)
         assert(r.alarm?.kind == .walk && r.alarm?.buttons.primary == "I'll walk my bike", "a walk stretch takes over")
         r.dismissAlarm()
+    }
+
+    /// Fall → countdown → HELP alarm (plan 6 Task 4). Sound calls are swapped for
+    /// recorders so these checks never touch the audio engine.
+    static func selfCheckFall() {
+        let r = RideRecorder()
+        let t0 = Date(timeIntervalSince1970: 1_700_000_000)
+        r.now = { t0 }
+        var tones: [AlarmSound.Style] = []
+        var silences = 0
+        r.startSound = { tones.append($0) }
+        r.stopSound = { silences += 1 }
+        var profile = RiderProfile()
+        r.loadProfile = { profile }
+        r.saveProfile = { profile = $0 }
+
+        func deadline(_ phase: FallPhase) -> Date? {
+            if case .asking(let d) = phase { return d }
+            return nil
+        }
+        func since(_ phase: FallPhase) -> Date? {
+            if case .ringing(let s) = phase { return s }
+            return nil
+        }
+
+        r.fallDetected()
+        assert(r.fallPhase == .none && tones.isEmpty, "a fall while idle is ignored")
+
+        r.phase = .running
+        r.fallDetected()
+        assert(deadline(r.fallPhase) == t0.addingTimeInterval(Self.askSeconds),
+               "a fall starts a 30 s countdown: \(String(describing: r.fallPhase))")
+        assert(tones == [.rising] && silences == 0, "the countdown uses the rising tone")
+
+        r.now = { t0.addingTimeInterval(Self.askSeconds - 1) }
+        r.tickFall()
+        assert(deadline(r.fallPhase) != nil, "the alarm must not ring before the deadline")
+        r.now = { t0.addingTimeInterval(Self.askSeconds) }
+        r.tickFall()
+        assert(since(r.fallPhase) == r.now() && tones == [.rising, .help],
+               "the deadline switches to HELP: \(tones)")
+        r.stopHelp()
+        assert(r.fallPhase == .none && silences == 1, "stopHelp silences and clears")
+
+        // "I'm OK" also clears without waiting for the deadline.
+        r.fallDetected()
+        r.imOK()
+        assert(r.fallPhase == .none && silences == 2, "I'm OK cancels the countdown")
+
+        // The red button skips the wait.
+        r.fallDetected()
+        r.ringNow()
+        assert(since(r.fallPhase) == r.now() && tones.last == .help, "ringNow goes straight to HELP")
+        r.stopHelp()
+
+        // Pause and finish tear the alarm down; a paused ride can't detect a fall.
+        r.fallDetected()
+        r.pause()
+        assert(r.fallPhase == .none && silences == 4, "pause clears the countdown")
+        r.fallDetected()
+        assert(r.fallPhase == .none, "a paused ride cannot detect a fall")
+        r.phase = .running
+        r.fallDetected()
+        _ = r.finish()
+        assert(r.fallPhase == .none && silences == 5, "finish clears the countdown")
+        r.reset()
+        assert(r.fallPhase == .none, "reset clears the countdown")
+
+        // Old profiles stored before this field existed still use Normal.
+        let json = "{\"likes\":[],\"today\":[],\"level\":\"regular\",\"weights\":{}}"
+        assert(RiderProfile.decode(json)?.fallSensitivity == .normal, "an old profile defaults to Normal")
+        assert(RiderProfile.decode(profile.encoded)?.fallSensitivity == profile.fallSensitivity,
+               "sensitivity round-trips")
     }
 
     nonisolated static func selfCheck() {

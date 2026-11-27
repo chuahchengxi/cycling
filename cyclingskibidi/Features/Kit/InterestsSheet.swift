@@ -45,6 +45,15 @@ struct InterestsSheet: View {
                         .pickerStyle(.segmented)
                         Text(profile.level.detail).font(.footnote).foregroundStyle(.secondary)
                     }
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Fall detection").font(.headline)
+                        Picker("Fall detection", selection: $profile.fallSensitivity) {
+                            ForEach(FallSensitivity.allCases, id: \.self) { Text($0.label).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        Text("If you fall, you get 30 seconds to say you're OK before the alarm rings for help.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
                 }
                 .padding(20)
             }

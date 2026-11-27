@@ -127,6 +127,7 @@ nonisolated struct RiderProfile: Codable, Equatable, Sendable {
     var today: Set<RideContext> = []
     var level: RiderLevel = .regular
     var weights: [String: Double] = [:]   // learned, per category (Kit learning)
+    var fallSensitivity: FallSensitivity = .normal
 
     static let storageKey = "riderProfile"
 
@@ -140,6 +141,21 @@ nonisolated struct RiderProfile: Codable, Equatable, Sendable {
 }
 
 extension RiderProfile {
+    /// Old profiles have no fall sensitivity: decode it with a default rather
+    /// than failing the whole profile.
+    enum CodingKeys: String, CodingKey {
+        case likes, today, level, weights, fallSensitivity
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        likes = try c.decodeIfPresent(Set<Interest>.self, forKey: .likes) ?? []
+        today = try c.decodeIfPresent(Set<RideContext>.self, forKey: .today) ?? []
+        level = try c.decodeIfPresent(RiderLevel.self, forKey: .level) ?? .regular
+        weights = try c.decodeIfPresent([String: Double].self, forKey: .weights) ?? [:]
+        fallSensitivity = try c.decodeIfPresent(FallSensitivity.self, forKey: .fallSensitivity) ?? .normal
+    }
+
     static func selfCheck() {
         let p = RiderProfile(likes: [.food, .nature], today: [.kids], level: .strong, weights: ["hawker": 0.5])
         assert(decode(p.encoded) == p, "profile round-trips through its JSON")

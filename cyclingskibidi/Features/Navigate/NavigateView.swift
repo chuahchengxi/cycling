@@ -12,6 +12,7 @@ import SwiftUI
 import SwiftData
 import MapKit
 import AudioToolbox
+import Combine
 
 struct NavigateView: View {
     let route: Route
@@ -79,19 +80,26 @@ struct NavigateView: View {
             }
             .overlay { passBySight }
             .overlay { kitAlarm }
+            .overlay { fallOverlay }
             .overlay(alignment: .bottom) { if placing { placementBar } }
             .animation(.default, value: recorder.passingSight?.id)
             .animation(.default, value: placing)
             .animation(.default, value: recorder.nearHazard == nil)
             .animation(.default, value: recorder.alarm?.key)
             .animation(.default, value: recorder.walkingThrough)
+            .animation(.default, value: recorder.fallPhase)
             .ignoresSafeArea(edges: .bottom)
         }
         .onAppear(perform: begin)
+        // The countdown's deadline lives on the recorder; the view just ticks it.
+        .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
+            recorder.tickFall()
+        }
         // Every marked hazard warns on approach, whatever route is being ridden.
         .onChange(of: obstacles, initial: true) { recorder.hazards = obstacles.filter(\.isActive) }
-        .sheet(isPresented: Binding(   // the full-screen alarm hides the nav sheet, whoever asks for it back
-            get: { showSheet && recorder.alarm == nil }, set: { if recorder.alarm == nil { showSheet = $0 } })) {
+        .sheet(isPresented: Binding(   // a full-screen takeover hides the nav sheet, whoever asks for it back
+            get: { showSheet && recorder.alarm == nil && recorder.fallPhase == .none },
+            set: { if recorder.alarm == nil && recorder.fallPhase == .none { showSheet = $0 } })) {
             navSheet
                 // The 150 pt detent can't grow, so its numbers stop at AX1 and shrink rather than truncate.
                 .dynamicTypeSize(...DynamicTypeSize.accessibility1)
@@ -135,7 +143,7 @@ struct NavigateView: View {
     /// Full-screen Kit alarm: a no-bike entrance (Figma v3 · 12), a hazard, a closure or a walk stretch.
     @ViewBuilder
     private var kitAlarm: some View {
-        if let alarm = recorder.alarm {
+        if recorder.fallPhase == .none, let alarm = recorder.alarm {
             KitAlarmView(alarm: alarm,
                          onPrimary: { recorder.alarmPrimary() },
                          onSecondary: {
@@ -148,6 +156,35 @@ struct NavigateView: View {
                 .id(alarm.key)   // a new alarm replays its haptic and tone
                 .transition(.opacity)
         }
+    }
+
+    /// A confirmed fall takes over the whole screen: first the countdown, then HELP.
+    @ViewBuilder
+    private var fallOverlay: some View {
+        switch recorder.fallPhase {
+        case .asking(let deadline):
+            AreYouOKView(deadline: deadline,
+                         onOK: { recorder.imOK() },
+                         onRingNow: { recorder.ringNow() })
+                .transition(.opacity)
+        case .ringing(let since):
+            HelpAlarmView(since: since, place: helpSpot.place, kmAlong: recorder.distanceAlong / 1000,
+                          coordinate: helpSpot.coordinate, onStop: { recorder.stopHelp() })
+                .transition(.opacity)
+        case .none:
+            EmptyView()
+        }
+    }
+
+    /// The place named on the HELP screen: the closest sight within 300 m, or a
+    /// generic connector. The rider's snapped fix is the fallback coordinate.
+    private var helpSpot: (place: String, coordinate: CLLocationCoordinate2D?) {
+        guard let rider = recorder.snapped ?? recorder.location else { return ("Park connector", nil) }
+        let nearest = recorder.sights
+            .map { ($0, Geo.distance(rider, $0.coordinate)) }
+            .filter { $0.1 <= 300 }
+            .min { $0.1 < $1.1 }?.0
+        return (nearest?.name ?? "Park connector", nearest?.coordinate ?? rider)
     }
 
     private var map: some View {
@@ -289,6 +326,16 @@ struct NavigateView: View {
 
             // A hold, so a bump or a wet glove can't end the ride.
             HoldButton(title: "End ride", seconds: 1.5, action: end)
+            #if DEBUG
+            Button {
+                recorder.fallDetected()
+            } label: {
+                Label("Simulate fall", systemImage: "bolt.triangle.fill")
+                    .font(.title3.bold())
+                    .frame(maxWidth: .infinity, minHeight: 52)
+            }
+            .buttonStyle(.bordered)
+            #endif
         }
         .padding(.horizontal, 20)
         .padding(.bottom, 12)

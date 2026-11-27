@@ -9,6 +9,15 @@
 nonisolated enum FallSensitivity: String, Codable, CaseIterable {
     case off, low, normal, high
 
+    var label: String {
+        switch self {
+        case .off: return "Off"
+        case .low: return "Low"
+        case .normal: return "Normal"
+        case .high: return "High"
+        }
+    }
+
     // ponytail: calibration constants — impact/tumble thresholds to tune on real rides.
     var impactG: Double {
         switch self {
