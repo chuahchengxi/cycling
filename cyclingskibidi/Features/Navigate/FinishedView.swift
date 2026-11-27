@@ -2,14 +2,12 @@
 //  FinishedView.swift
 //  cyclingskibidi
 //
-//  The end page, laid out the way the board draws it: FINISHED across the top,
-//  then the map overview beside a column of distance / time / average speed,
-//  the speed graph underneath, and Done at the bottom back to the route list.
+//  The end page (Figma v3 · 06 "Finished · Kit recap"): Kit pleased, "Nice ride.",
+//  four native stat cards, the Kit speed bars, what Kit noted, then Share and Done.
 //
 
 import SwiftUI
 import Charts
-import MapKit
 
 struct FinishedView: View {
     let ride: Ride
@@ -20,120 +18,84 @@ struct FinishedView: View {
     private var track: [TrackPoint] { ride.track }
 
     var body: some View {
-        VStack(spacing: 16) {
-            header
-            HStack(spacing: 12) {
-                mapOverview
-                    .frame(maxWidth: .infinity)
-                statColumn
-                    .frame(width: 150)
+        ScrollView {
+            VStack(spacing: 14) {
+                Image("kit-happy").resizable().interpolation(.none).frame(width: 96, height: 96).accessibilityHidden(true)
+                Text("Nice ride.").font(.largeTitle.bold())
+                Text(subtitle).font(.subheadline).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
+                    stat("Distance", Fmt.km(ride.distanceMeters))
+                    stat("Moving", Fmt.duration(ride.movingSeconds))
+                    stat("Avg speed", Fmt.speed(ride.averageSpeed))
+                    stat("Climbed", "\(Int(ride.ascentMeters)) m")
+                }
+                speedGraph
+                if let kitNote { KitBubble(label: "Kit · noted", text: kitNote) }
+                HStack(spacing: 12) {
+                    ShareLink(item: shareText) { KitButtonLabel(title: "Share", icon: "kit-icon-share") }
+                        .buttonStyle(.plain)
+                    KitButton(title: "Done", icon: "kit-icon-check", style: .primary, action: onDone)
+                }
             }
-            .frame(height: 280)
-
-            speedGraph
-                .frame(height: 200)
-
-            if let kitNote {
-                Label {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Kit · Noted").font(.caption.weight(.semibold)).textCase(.uppercase).foregroundStyle(.secondary)
-                        Text(kitNote).font(.subheadline)
-                    }
-                } icon: { Image(systemName: "cat.fill") }
-                .padding(12)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(.background, in: .rect(cornerRadius: 14))
-            }
-
-            Spacer(minLength: 0)
-
-            Button(action: onDone) {
-                Text("Done")
-                    .font(.title3.bold())
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-            }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.roundedRectangle(radius: 16))
+            .padding(.horizontal, 16)
+            .padding(.vertical, 24)
         }
-        .padding(20)
-        .background(Color(.systemGroupedBackground))
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
     }
 
     // MARK: Pieces
 
-    private var header: some View {
-        Text("FINISHED")
-            .font(.system(size: 30, weight: .heavy, design: .rounded))
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 18)
-            .background(.tint.opacity(0.15), in: .rect(cornerRadius: 18))
-            .foregroundStyle(.tint)
+    private var subtitle: String {
+        let when = ride.startedAt.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated).hour().minute())
+        return ride.routeName.isEmpty ? when : "\(ride.routeName) · \(when)"
     }
 
-    private var mapOverview: some View {
-        Group {
-            if track.count > 1 {
-                OfflineMap(lines: [MapLine(coords: track.map(\.cl), color: .systemBlue, width: 5)],
-                           pins: endPins(track.map(\.cl)), initialRegion: region, interactive: false)
-            } else {
-                ContentUnavailableView("No track", systemImage: "map")
-            }
+    private var shareText: String {
+        "\(ride.routeName.isEmpty ? "A ride" : ride.routeName): \(Fmt.km(ride.distanceMeters)) in \(Fmt.duration(ride.movingSeconds)), \(Fmt.speed(ride.averageSpeed)) average, \(Int(ride.ascentMeters)) m climbed."
+    }
+
+    /// Native card, as in the Figma frame: the stats are the rider's, not Kit's voice.
+    private func stat(_ caption: String, _ value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(caption).font(.footnote).foregroundStyle(.secondary)
+            Text(value).font(.title2.bold()).lineLimit(1).minimumScaleFactor(0.7)
         }
-        .clipShape(.rect(cornerRadius: 16))
+        .padding(.horizontal, 14).padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 22))
+        .accessibilityElement(children: .combine)
     }
 
-    private var statColumn: some View {
-        VStack(spacing: 8) {
-            StatBox(title: "Distance", value: String(format: "%.1f", ride.distanceKM), unit: "km")
-            StatBox(title: "Time", value: Fmt.clock(ride.movingSeconds), unit: "")
-            // The board gives average speed the tall box; it gets the climb
-            // totals and the top speed as well, since there is room.
-            VStack(spacing: 6) {
-                Text("Avg speed").font(.caption).foregroundStyle(.secondary)
-                Text(String(format: "%.1f", ride.averageSpeed * 3.6))
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                    .monospacedDigit()
-                Text("km/h").font(.caption2).foregroundStyle(.secondary)
-                Divider().padding(.horizontal, 12)
-                Text("max \(String(format: "%.1f", ride.maxSpeed * 3.6)) km/h")
-                    .font(.caption2).foregroundStyle(.secondary)
-                Text("↗ \(Int(ride.ascentMeters)) m   ↘ \(Int(ride.descentMeters)) m")
-                    .font(.caption2).foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(.background, in: .rect(cornerRadius: 14))
-        }
-    }
-
+    /// Kit/chart (v3 · 06): board, 2 pt ink border, sage bars, the fastest stretch in ochre.
     @ViewBuilder
     private var speedGraph: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Speed").font(.headline)
-            if track.count > 2 {
-                Chart(sampled, id: \.t) { point in
-                    AreaMark(x: .value("Time", point.t / 60),
-                             y: .value("Speed", point.speed * 3.6))
-                        .interpolationMethod(.monotone)
-                        .foregroundStyle(.linearGradient(colors: [.accentColor.opacity(0.55), .accentColor.opacity(0.05)],
-                                                         startPoint: .top, endPoint: .bottom))
-                    LineMark(x: .value("Time", point.t / 60),
-                             y: .value("Speed", point.speed * 3.6))
-                        .interpolationMethod(.monotone)
-                        .foregroundStyle(Color.accentColor)
+        if track.count > 2 {
+            let bars = KitChart.buckets(sampled.map { $0.speed * 3.6 })
+            let fastest = bars.indices.max { bars[$0] < bars[$1] }
+            let minutes = max((sampled.last?.t ?? 0) / 60, 0.1)
+            VStack(alignment: .leading, spacing: 10) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("Speed · max \(Int((ride.maxSpeed * 3.6).rounded())) km/h").font(.footnote.weight(.semibold))
+                    Spacer()
+                    Text(Fmt.duration(ride.movingSeconds)).font(.kitNumber(.headline))
                 }
-                .chartXAxisLabel("minutes")
-                .chartYAxisLabel("km/h")
-                .accessibilityElement(children: .ignore)
-                .accessibilityLabel("Speed over time")
-                .accessibilityValue("Avg \(Fmt.speed(ride.averageSpeed)), max \(Fmt.speed(ride.maxSpeed))")
-            } else {
-                Text("Not enough data for a speed graph.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                Chart(Array(bars.enumerated()), id: \.offset) { i, kmh in
+                    let step = minutes / Double(bars.count)
+                    RectangleMark(xStart: .value("Minutes", (Double(i) + 0.15) * step), xEnd: .value("Minutes", (Double(i) + 0.85) * step),
+                                  yStart: .value("km/h", 0), yEnd: .value("km/h", kmh))
+                        .foregroundStyle(i == fastest ? KitColor.gold : KitColor.accentStrong)
+                }
+                .chartXScale(domain: 0...minutes)
+                .chartYAxis(.hidden)
+                .chartXAxis { AxisMarks { AxisValueLabel().font(.kitNumber(.caption2)).foregroundStyle(KitColor.muted) } }
+                .frame(height: 110)
             }
+            .foregroundStyle(KitColor.ink)
+            .kitCard(KitColor.board)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("Speed over time")
+            .accessibilityValue("Avg \(Fmt.speed(ride.averageSpeed)), max \(Fmt.speed(ride.maxSpeed))")
         }
-        .padding(14)
-        .background(.background, in: .rect(cornerRadius: 16))
     }
 
     /// A 1 Hz track over two hours is 7000 points; the chart only needs a few
@@ -147,36 +109,6 @@ struct FinishedView: View {
             point.speed = window.map(\.speed).reduce(0, +) / Double(window.count)
             return point
         }
-    }
-
-    private var region: MKCoordinateRegion {
-        let lats = track.map(\.lat), lons = track.map(\.lon)
-        guard let minLat = lats.min(), let maxLat = lats.max(),
-              let minLon = lons.min(), let maxLon = lons.max() else {
-            return .init(center: .init(latitude: 0, longitude: 0),
-                         span: .init(latitudeDelta: 1, longitudeDelta: 1))
-        }
-        return .init(center: .init(latitude: (minLat + maxLat) / 2, longitude: (minLon + maxLon) / 2),
-                     span: .init(latitudeDelta: max((maxLat - minLat) * 1.4, 0.004),
-                                 longitudeDelta: max((maxLon - minLon) * 1.4, 0.004)))
-    }
-}
-
-struct StatBox: View {
-    let title: String
-    let value: String
-    let unit: String
-
-    var body: some View {
-        HStack(alignment: .firstTextBaseline) {
-            Text(title).font(.caption).foregroundStyle(.secondary)
-            Spacer()
-            Text(value).font(.headline).monospacedDigit()
-            if !unit.isEmpty { Text(unit).font(.caption2).foregroundStyle(.secondary) }
-        }
-        .padding(.horizontal, 12)
-        .frame(height: 46)
-        .background(.background, in: .rect(cornerRadius: 14))
     }
 }
 

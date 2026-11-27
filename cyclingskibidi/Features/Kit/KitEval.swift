@@ -84,6 +84,7 @@ nonisolated enum KitEval {
         let sorted = latencies.sorted()
         let median = sorted.isEmpty ? 0 : sorted[sorted.count / 2]
         print("KITEVAL SUMMARY rows \(rows), answered \(answered), accepted \(accepted), made-up IDs \(madeUp)/\(returned), over 8 s \(slow), median \(Int(median)) ms")
+        exit(0)   // -kiteval is a run, not a session
     }
 }
 #endif

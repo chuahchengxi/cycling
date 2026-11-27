@@ -73,10 +73,6 @@ struct RouteBuilderView: View {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                 }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") { naming = true }
-                        .disabled(plan.polyline.isEmpty || planning || (mode != .fast && sightsLoading))
-                }
             }
             .searchable(text: $query, prompt: "Search for a place")
             .onSubmit(of: .search, runSearch)
@@ -214,14 +210,21 @@ struct RouteBuilderView: View {
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             } else {
-                FlowLayout {
-                    Pill(text: Fmt.km(plan.distance))
-                    Pill(text: Fmt.duration(plan.expected))
-                    Pill(text: difficulty.rawValue, tint: difficulty.color)
-                    Pill(text: mode.rawValue, tint: .accentColor)
-                    if plan.ascent > 0 { Pill(text: "↗ \(Int(plan.ascent)) m") }
-                    if plan.offConnectorMeters > 0 {
-                        Pill(text: "⚠︎ \(Fmt.km(plan.offConnectorMeters)) off-connector", tint: .orange)
+                // Figma v3 · 02: three big figures, then the extras as Kit tags.
+                HStack(alignment: .top) {
+                    KitStat(value: Fmt.km(plan.distance), caption: "distance")
+                    Spacer()
+                    KitStat(value: Fmt.duration(plan.expected), caption: "at \(mode.rawValue.lowercased()) pace")
+                    Spacer()
+                    KitStat(value: difficulty.rawValue, caption: "difficulty")
+                }
+                if plan.ascent > 0 || plan.offConnectorMeters > 0 {
+                    FlowLayout {
+                        if plan.ascent > 0 { KitChip(text: "↗ \(Int(plan.ascent)) m", caps: false) }
+                        if plan.offConnectorMeters > 0 {
+                            KitChip(text: "\(Fmt.km(plan.offConnectorMeters)) off-connector", icon: "kit-icon-hazard", fill: KitColor.gold, caps: false)
+                                .kitSurface()
+                        }
                     }
                 }
             }
@@ -254,12 +257,20 @@ struct RouteBuilderView: View {
             }
             .font(.subheadline)
             .buttonStyle(.bordered)
+
+            if !plan.polyline.isEmpty {
+                KitButton(title: "Save route", icon: "kit-icon-check", style: .primary) { naming = true }
+                    .disabled(!canSave)
+                    .opacity(canSave ? 1 : 0.5)
+            }
         }
         .padding(16)
         .frame(maxWidth: .infinity)
         .background(.regularMaterial, in: .rect(cornerRadius: 22))
         .padding(12)
     }
+
+    private var canSave: Bool { !plan.polyline.isEmpty && !planning && !(mode != .fast && sightsLoading) }
 
     private var difficulty: Difficulty {
         .rated(distanceMeters: plan.distance, ascentMeters: plan.ascent)
@@ -298,7 +309,8 @@ struct RouteBuilderView: View {
                                     }
                                     .padding(.horizontal, 12)
                                     .frame(minHeight: 44, alignment: .leading)
-                                    .background(.quaternary, in: .rect(cornerRadius: 12))
+                                    .background(KitColor.paper)
+                                    .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
                                 }
                                 .buttonStyle(.plain)
                                 .accessibilityLabel("\(sight.name), \(Discovery.icon(for: sight.category).label), \(Fmt.km(sight.offsetAlong)) along the route")
@@ -326,7 +338,8 @@ struct RouteBuilderView: View {
                             .frame(width: 240, alignment: .leading)
                             .padding(.horizontal, 12)
                             .frame(minHeight: 44, alignment: .leading)
-                            .background(.quaternary, in: .rect(cornerRadius: 12))
+                            .background(KitColor.paper)
+                            .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
                         }
                         .buttonStyle(.plain)
                         .accessibilityLabel("\(loop.name). \(loop.blurb)")
@@ -450,12 +463,13 @@ private struct WaypointPin: View {
     let last: Bool
 
     var body: some View {
-        ZStack {
-            Circle().fill(last ? Color.red : index == 0 ? .green : .blue)
-            Text("\(index + 1)").font(.caption2.bold()).foregroundStyle(.white)
-        }
-        .frame(width: 26, height: 26)
-        .shadow(radius: 2)
+        // Kit squares: start sage, end ink, the rest paper (as RouteSketch draws them).
+        Text("\(index + 1)").font(.caption2.bold())
+            .foregroundStyle(last ? KitColor.paper : KitColor.ink)
+            .frame(width: 26, height: 26)
+            .background(last ? KitColor.ink : index == 0 ? KitColor.sage : KitColor.paper)
+            .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
+            .environment(\.colorScheme, .light)
     }
 }
 

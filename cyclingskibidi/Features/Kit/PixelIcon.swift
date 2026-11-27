@@ -203,18 +203,21 @@ extension PixelArt {
     }
 }
 
-/// A place's pixel icon on a filled disc, for map pins. Says what the place is to VoiceOver.
+/// A place's pixel icon on a Kit tile, for map pins. Says what the place is to VoiceOver.
 struct PlacePin: View {
     let category: String
     let name: String
 
     var body: some View {
+        // Figma v3 · 02 pins: a square pixel tile, 2 pt ink border; food terracotta,
+        // rest stops paper, everything else sage. Light scheme so the ink stays dark on the map.
         PixelIcon(rows: PixelArt.forCategory(category), size: 16)
-            .foregroundStyle(.white)
-            .padding(6)
-            .background(Color(.systemGreen).mix(with: .black, by: 0.25), in: .circle)
-            .overlay(Circle().strokeBorder(.white, lineWidth: 2))
-            .shadow(radius: 2)
+            .foregroundStyle(KitColor.ink)
+            .padding(5)
+            .background(["hawker", "restaurant", "cafe"].contains(category) ? KitColor.terracotta
+                        : RestStops.amenityCategories.contains(category) ? KitColor.paper : KitColor.sage)
+            .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
+            .environment(\.colorScheme, .light)
             .accessibilityElement()
             .accessibilityLabel("\(Discovery.icon(for: category).label): \(name)")
     }

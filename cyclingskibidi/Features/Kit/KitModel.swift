@@ -29,10 +29,13 @@ nonisolated enum KitModel {
         let draft = quick.map { "- \($0.osmID ?? $0.id.uuidString) \($0.name)" }.joined(separator: "\n")
         // "none" in a line made the model write "none" back; say what it means.
         let lines = candidates.prefix(40).map { $0.line.replacingOccurrences(of: "| none", with: "| no facts") }
+        // The keep rule (`accept`) rejects picks closer than half an even spacing; say so in km.
+        let spanKm = (candidates.map(\.sight.offsetAlong).max() ?? 0) / 1000
+        let apart = String(format: "%.1f", spanKm / Double(2 * max(count, 1)))
         return """
             The rider likes: \(likes).\(today)
-            Pick exactly \(count) places. Kit's draft is below: keep a draft place unless another place fits the rider \
-            better and the picks stay spread along the route.
+            Pick exactly \(count) places, each at least \(apart) km from the others along the route. Kit's draft is below: \
+            keep a draft place unless another place fits the rider better and the picks stay that far apart.
             Draft:
             \(draft)
             Places (ID | name | kind | km along the route | facts):
@@ -173,6 +176,7 @@ extension KitModel {
         assert(pr.contains("Food") && pr.contains("Heritage") && pr.contains("exactly 3"), "prompt has likes and count")
         assert(quick.allSatisfy { pr.contains("- \($0.osmID!) \($0.name)") }, "prompt has the draft")
         assert(!pr.contains("| none"), "no literal none")
+        assert(pr.contains("at least 1.5 km"), "prompt gives the spacing the keep rule needs (9 km / 6)")
         let fifty = (0..<50).map { c("x\($0)", km: Double($0) / 10) }
         assert(prompt(candidates: fifty, profile: RiderProfile(), count: 3, quick: []).components(separatedBy: "\n").filter { $0.hasPrefix("x") }.count == 40,
                "at most 40 candidate lines")

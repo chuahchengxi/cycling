@@ -78,6 +78,7 @@ struct ContentView: View {
             switch Demo.screen {
             case "onboarding": OnboardingView()
             case "newroute": CreateRouteFlow()
+            case "builder": RouteBuilderView(mode: .leisure)
             case "interests": InterestsSheet()
             case "mark": ObstacleReportView(coordinate: nil)
             case "stats": NavigationStack { StatsView() }

@@ -419,11 +419,12 @@ struct DiscoveryPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Image(systemName: "leaf.fill").foregroundStyle(.green)
+                Image("kit-icon-leaf").renderingMode(.template).resizable().frame(width: 20, height: 20)
+                    .foregroundStyle(KitColor.accentStrong).accessibilityHidden(true)
                 TextField("What do you feel like? (hawker, temples…)", text: $tastes)
                     .textFieldStyle(.roundedBorder)
                     .onSubmit(search)
-                Button(action: search) { Image(systemName: "magnifyingglass") }
+                Button(action: search) { Image(systemName: "magnifyingglass").foregroundStyle(KitColor.accentStrong) }
                     .accessibilityLabel("Search places")
             }
             if !results.isEmpty {
@@ -433,11 +434,15 @@ struct DiscoveryPanel: View {
                             Button {
                                 onPick(place.coordinate)
                             } label: {
-                                Text(place.name)
-                                    .font(.footnote.weight(.medium))
-                                    .lineLimit(1)
-                                    .padding(.horizontal, 12).padding(.vertical, 8)
-                                    .background(.quaternary, in: .capsule)
+                                HStack(spacing: 6) {
+                                    PixelIcon(rows: PixelArt.forCategory(place.category), size: 14).accessibilityHidden(true)
+                                    Text(place.name).font(.footnote.weight(.medium)).lineLimit(1)
+                                }
+                                .foregroundStyle(KitColor.ink)
+                                .padding(.horizontal, 10)
+                                .frame(minHeight: 44)
+                                .background(KitColor.paper)
+                                .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
                             }
                             .buttonStyle(.plain)
                         }
@@ -451,7 +456,10 @@ struct DiscoveryPanel: View {
     /// Leisure places on screen, matching the tastes typed (all of them when blank).
     private func search() {
         let radius = max(region.span.latitudeDelta, region.span.longitudeDelta) * PCNGraph.metresPerDegree / 2
+        // Many parks share a name ("Playground"): one chip each, the first (nearest) kept.
+        var seen = Set<String>()
         results = Discovery.search(tastes, near: region.center, within: max(radius, 1000), leisureOnly: true)
+            .filter { seen.insert($0.name).inserted }
     }
 }
 
