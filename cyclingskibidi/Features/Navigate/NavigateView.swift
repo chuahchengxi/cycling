@@ -599,6 +599,7 @@ struct ObstacleReportView: View {
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @State private var kind: ObstacleKind = .pothole
     @State private var note = ""
     @State private var keep: Keep = .week
@@ -621,46 +622,96 @@ struct ObstacleReportView: View {
         }
     }
 
+    private var columns: [GridItem] {
+        [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+    }
+
     var body: some View {
-        NavigationStack {
-            Form {
-                Section("What's there?") {
-                    Picker("Type", selection: $kind) {
-                        ForEach(ObstacleKind.allCases) { k in
-                            Label(k.rawValue, systemImage: k.symbol).tag(k)
-                        }
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                HStack(alignment: .center, spacing: 12) {
+                    Text("What's on the path?")
+                        .font(.title2.bold())
+                    Spacer(minLength: 8)
+                    Button { dismiss() } label: {
+                        Image("kit-icon-close").renderingMode(.template).resizable()
+                            .frame(width: 20, height: 20)
+                            .frame(width: 44, height: 44)
+                            .background(KitColor.paper)
+                            .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
                     }
-                    .pickerStyle(.inline)
-                    .labelsHidden()
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Close")
                 }
-                Section("Note (optional)") {
-                    TextField("e.g. deep, on the left", text: $note, axis: .vertical)
+
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(ObstacleKind.allCases) { k in kindButton(k) }
                 }
-                Section {
+
+                TextField("Note (optional): e.g. deep, on the left", text: $note, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .font(.subheadline)
+                    .padding(12)
+                    .frame(minHeight: 52, alignment: .top)
+                    .background(KitColor.paper)
+                    .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Keep it").font(.headline)
                     Picker("Keep it", selection: $keep) {
                         ForEach(Keep.allCases) { Text($0.label).tag($0) }
                     }
-                } footer: {
+                    .pickerStyle(.menu)
+                    .padding(.horizontal, 12)
+                    .frame(minHeight: 52)
+                    .background(KitColor.paper)
+                    .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
                     Text("Remove it sooner from Your marks once it's cleared.")
+                        .font(.footnote).foregroundStyle(KitColor.muted)
                 }
-            }
-            .navigationTitle("Obstacle Details")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        guard let coordinate else { return dismiss() }
-                        let mark = Obstacle(kind: kind, at: coordinate, note: note)
-                        mark.expiresAt = keep.lastDay
-                        context.insert(mark)
-                        try? context.save()
-                        if kind == .closed { onSaveClosed(coordinate) }
-                        dismiss()
-                    }
+
+                KitButton(title: "Mark it here", icon: "kit-icon-check", style: .primary, action: save)
                     .disabled(coordinate == nil)
+                Text("Saved on this phone. It shows on this route's map and brief, so you see it coming next time.")
+                    .font(.footnote).foregroundStyle(KitColor.muted)
+            }
+            .padding(20)
+        }
+        .kitScreen()
+    }
+
+    private func kindButton(_ k: ObstacleKind) -> some View {
+        let selected = kind == k
+        // A closed path is the one kind that reroutes the live ride (onSaveClosed).
+        let icon = k == .closed ? "kit-icon-close" : "kit-icon-hazard"
+        return Button { kind = k } label: {
+            VStack(spacing: 4) {
+                Image(icon).renderingMode(.template).resizable()
+                    .frame(width: 16, height: 16)
+                Text(k.rawValue).font(.subheadline.weight(.medium)).multilineTextAlignment(.center)
+                if k == .closed {
+                    Text("Reroutes you").font(.caption2).foregroundStyle(KitColor.muted)
                 }
             }
+            .foregroundStyle(KitColor.ink)
+            .frame(maxWidth: .infinity, minHeight: 52)
+            .padding(8)
+            .background(selected ? KitColor.gold : KitColor.paper)
+            .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
+            // Gold is a light fill: keep its ink dark in both themes.
+            .environment(\.colorScheme, selected ? .light : colorScheme)
         }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func save() {
+        guard let coordinate else { return dismiss() }
+        let mark = Obstacle(kind: kind, at: coordinate, note: note)
+        mark.expiresAt = keep.lastDay
+        context.insert(mark)
+        try? context.save()
+        if kind == .closed { onSaveClosed(coordinate) }
+        dismiss()
     }
 }
