@@ -102,7 +102,7 @@ struct HelpAlarmView: View {
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Near \(place)").font(.title3.bold())
-                        Text(String(format: "%.2f km along the route", kmAlong))
+                        Text(String(format: "%.2f km ridden", kmAlong))
                             .font(.subheadline)
                         Text(coordinate.map { String(format: "%.5f, %.5f", $0.latitude, $0.longitude) }
                              ?? "Location unavailable")

@@ -58,6 +58,8 @@ nonisolated enum AlertScheme: String, CaseIterable, Identifiable {
         for s in allCases {
             for fill in [s.fills.obstacle, s.fills.noAccess] {
                 assert(KitColor.contrast(text(on: fill), fill) >= 4.5, "\(s) alarm text fails WCAG AA on \(String(fill, radix: 16))")
+                // Button outlines use the text colour; the filled button is ink, outlined so it reads on dark fills.
+                assert(KitColor.contrast(text(on: fill), fill) >= 3, "\(s) button outlines fail non-text contrast")
             }
             assert(s.fills.obstacle != s.fills.noAccess, "\(s): hazard and no-access alarms must differ")
         }
@@ -127,7 +129,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Sounds")
                 } footer: {
-                    Text("The full-screen alarms and the help alarm always sound, even on silent. Spoken directions can also be muted during a ride.")
+                    Text("The help alarm always rings, even on silent and through the loudspeaker. Other alarms flash, vibrate and speak their warning even with spoken directions off; that speech follows the silent switch.")
                 }
 
                 Section {

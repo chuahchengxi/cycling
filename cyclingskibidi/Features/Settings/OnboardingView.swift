@@ -91,20 +91,13 @@ struct OnboardingView: View {
         }
     }
 
-    /// Fall sensitivity is saved only into an existing profile: an empty profile is what
-    /// tells the app to ask for interests next, so a new rider keeps it until the interests sheet.
+    /// Saved at once, so it holds even if the interests sheet is swiped away.
     private func finish() {
-        if var p = RiderProfile.decode(profileRaw) {
-            p.fallSensitivity = sensitivity
-            profileRaw = p.encoded
-        } else {
-            UserDefaults.standard.set(sensitivity.rawValue, forKey: OnboardingView.pendingSensitivityKey)
-        }
+        var p = RiderProfile.decode(profileRaw) ?? RiderProfile()
+        p.fallSensitivity = sensitivity
+        profileRaw = p.encoded
         onboarded = true
     }
-
-    /// A first-run choice waiting for the interests sheet to create the profile.
-    static let pendingSensitivityKey = "pendingFallSensitivity"
 }
 
 #Preview { OnboardingView() }

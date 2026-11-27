@@ -225,7 +225,8 @@ struct PlacePin: View {
 struct HoldButton: View {
     let title: String
     let seconds: Double
-    var tint: Color = .red
+    /// Deep reds: white text passes WCAG AA on both the track and the fill.
+    var tint: Color = Color(.sRGB, red: 0.72, green: 0.04, blue: 0.04)
     let action: () -> Void
 
     @State private var pressedAt: Date?
@@ -244,7 +245,7 @@ struct HoldButton: View {
                 .background(alignment: .leading) {
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
-                            tint.opacity(0.55)
+                            Color(.sRGB, red: 0.42, green: 0.05, blue: 0.05)
                             tint.frame(width: geo.size.width * fill)
                         }
                     }
@@ -259,7 +260,7 @@ struct HoldButton: View {
         .accessibilityElement()
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel(title)
-        .accessibilityHint("Press and hold to \(title.lowercased())")
+        .accessibilityHint("Press and hold for \(seconds.formatted()) seconds")
         .accessibilityAction { action() }
     }
 }

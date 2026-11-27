@@ -63,12 +63,7 @@ struct InterestsSheet: View {
                 .background(.bar)
             }
         }
-        .onAppear {
-            if let saved = RiderProfile.decode(raw) { profile = saved; return }
-            // First run: keep the fall setting chosen during the welcome.
-            let pending = UserDefaults.standard.string(forKey: OnboardingView.pendingSensitivityKey)
-            profile.fallSensitivity = pending.flatMap(FallSensitivity.init(rawValue:)) ?? .normal
-        }
+        .onAppear { profile = RiderProfile.decode(raw) ?? RiderProfile() }
     }
 
     private func section<Chips: View>(_ title: String, _ subtitle: String, @ViewBuilder chips: () -> Chips) -> some View {

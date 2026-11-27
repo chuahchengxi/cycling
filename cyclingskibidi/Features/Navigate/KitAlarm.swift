@@ -112,7 +112,7 @@ struct KitAlarmView: View {
                 .frame(maxWidth: .infinity, minHeight: 52)   // 52 pt touch targets (spec 7)
                 .foregroundStyle(filled ? KitColor.paper : KitColor.ink)
                 .background(filled ? KitColor.ink : KitColor.paper)
-                .overlay(Rectangle().stroke(KitColor.ink, lineWidth: 2))
+                .overlay(Rectangle().stroke(text, lineWidth: 2))   // the outline reads on every scheme
         }
         .buttonStyle(.plain)
     }

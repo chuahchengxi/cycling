@@ -19,7 +19,8 @@ nonisolated final class FallMonitor {
         stop()
         guard sensitivity != .off, manager.isDeviceMotionAvailable else { return }
         queue.maxConcurrentOperationCount = 1
-        detector = FallDetector(sensitivity: sensitivity)
+        // On the motion queue: a handler still queued from the last run must not race the reset.
+        queue.addOperation { [weak self] in self?.detector = FallDetector(sensitivity: sensitivity) }
         manager.deviceMotionUpdateInterval = 0.02
         manager.startDeviceMotionUpdates(to: queue) { [weak self] motion, _ in
             guard let self, let motion else { return }

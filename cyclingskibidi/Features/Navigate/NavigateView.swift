@@ -12,6 +12,7 @@ import SwiftUI
 import SwiftData
 import MapKit
 import AudioToolbox
+import UserNotifications
 import Combine
 
 struct NavigateView: View {
@@ -91,6 +92,13 @@ struct NavigateView: View {
             .ignoresSafeArea(edges: .bottom)
         }
         .onAppear(perform: begin)
+        // A ride keeps the screen awake, so the HELP screen is there when someone picks the phone up.
+        .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
+        .onChange(of: recorder.fallPhase) { _, phase in
+            guard phase != .none else { return }
+            pending = nil; placing = false   // the takeover must not sit under the obstacle form
+            if case .ringing = phase { postHelpNotification() }
+        }
         // The countdown's deadline lives on the recorder; the view just ticks it.
         .onReceive(Timer.publish(every: 1, on: .main, in: .common).autoconnect()) { _ in
             recorder.tickFall()
@@ -168,7 +176,7 @@ struct NavigateView: View {
                          onRingNow: { recorder.ringNow() })
                 .transition(.opacity)
         case .ringing(let since):
-            HelpAlarmView(since: since, place: helpSpot.place, kmAlong: recorder.distanceAlong / 1000,
+            HelpAlarmView(since: since, place: helpSpot.place, kmAlong: recorder.distance / 1000,
                           coordinate: helpSpot.coordinate, onStop: { recorder.stopHelp() })
                 .transition(.opacity)
         case .none:
@@ -365,6 +373,21 @@ struct NavigateView: View {
             AudioServicesPlayAlertSound(SystemSoundID(1005))
         }
         recorder.start()
+        UIApplication.shared.isIdleTimerDisabled = true
+        if (RiderProfile.decode(UserDefaults.standard.string(forKey: RiderProfile.storageKey) ?? "") ?? RiderProfile()).fallSensitivity != .off {
+            UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        }
+    }
+
+    /// The lock screen shows where the rider is, for whoever finds a locked phone.
+    private func postHelpNotification() {
+        let content = UNMutableNotificationContent()
+        content.title = "HELP · 救命 · TOLONG · உதவி"
+        let coords = helpSpot.coordinate.map { String(format: "%.5f, %.5f", $0.latitude, $0.longitude) } ?? "location unavailable"
+        content.body = "A cyclist may have fallen near \(helpSpot.place) (\(coords)). Call 995. Don't move them."
+        content.sound = .default
+        content.interruptionLevel = .active
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: "help", content: content, trigger: nil))
     }
 
     /// Snap the tapped point onto the displayed route and stage it for the form.

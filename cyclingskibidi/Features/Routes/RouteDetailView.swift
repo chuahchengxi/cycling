@@ -153,7 +153,13 @@ struct RouteDetailView: View {
     private func addStop(_ sight: Sight) {
         let line = route.polyline.map(\.cl), cum = Geo.cumulative(line), pins = route.waypoints
         guard pins.count >= 2, !Self.isPin(sight, in: pins) else { return }
-        let alongs = pins.map { Geo.snap($0.cl, to: line, cumulative: cum)?.along ?? 0 }
+        // Snap each pin forward from the last, so an out-and-back's return pins get return-leg distances.
+        var from = 0
+        let alongs = pins.map { p -> Double in
+            guard let s = Geo.snap(p.cl, to: line, cumulative: cum, from: from) else { return 0 }
+            from = s.index
+            return s.along
+        }
         var updated = pins
         updated.insert(Coord(sight.coordinate), at: Self.stopIndex(along: sight.offsetAlong, pinAlongs: alongs))
         route.waypointData = Blob.encode(updated)

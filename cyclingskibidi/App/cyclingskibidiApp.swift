@@ -35,11 +35,13 @@ struct cyclingskibidiApp: App {
         TilePack.selfCheck()
         RideMode.selfCheck()
         Routing.selfCheck()
+        RideRecorder.speechOff = true
         RideRecorder.selfCheck()
         RideRecorder.selfCheckState()
         RideRecorder.selfCheckNoBike()
         RideRecorder.selfCheckAlarms()
         RideRecorder.selfCheckFall()
+        RideRecorder.speechOff = false
         FlowLayout.selfCheck()
         Discovery.selfCheck()
         CreateRouteFlow.selfCheck()
