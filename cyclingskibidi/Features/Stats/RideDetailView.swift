@@ -23,23 +23,51 @@ struct RideDetailView: View {
             }
 
             Section("Summary") {
-                LabeledContent("When", value: ride.startedAt.formatted(date: .abbreviated, time: .shortened))
-                LabeledContent("Source", value: ride.source.rawValue)
-                LabeledContent("Distance", value: Fmt.km(ride.distanceMeters))
-                LabeledContent("Moving time", value: Fmt.clock(ride.movingSeconds))
-                LabeledContent("Avg speed", value: Fmt.speed(ride.averageSpeed))
-                LabeledContent("Max speed", value: Fmt.speed(ride.maxSpeed))
-                LabeledContent("Climbed", value: "\(Int(ride.ascentMeters)) m")
-                LabeledContent("Descended", value: "\(Int(ride.descentMeters)) m")
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("When").font(.kitLabel).foregroundStyle(KitColor.muted)
+                        Text(ride.startedAt.formatted(date: .abbreviated, time: .shortened))
+                            .font(.subheadline.weight(.semibold))
+                            .accessibilityLabel("When, \(ride.startedAt.formatted(date: .abbreviated, time: .shortened))")
+                        Text("Source: \(ride.source.rawValue)")
+                            .font(.caption).foregroundStyle(KitColor.muted)
+                            .accessibilityLabel("Source, \(ride.source.rawValue)")
+                    }
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                        KitStat(value: Fmt.km(ride.distanceMeters), caption: "Distance")
+                        KitStat(value: Fmt.clock(ride.movingSeconds), caption: "Moving time")
+                        KitStat(value: Fmt.speed(ride.averageSpeed), caption: "Avg speed")
+                        KitStat(value: Fmt.speed(ride.maxSpeed), caption: "Max speed")
+                        KitStat(value: "\(Int(ride.ascentMeters)) m", caption: "Climbed")
+                        KitStat(value: "\(Int(ride.descentMeters)) m", caption: "Descended")
+                    }
+                }
+                .kitCard()
+                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                .listRowSeparator(.hidden)
+                .listRowBackground(Color.clear)
             }
 
             if elevation.count > 1 {
-                Section("Elevation") { elevationChart.frame(height: 170) }
+                Section("Elevation") {
+                    elevationChart
+                        .frame(height: 170)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                }
             }
             if speed.count > 1 {
-                Section("Speed") { speedChart.frame(height: 170) }
+                Section("Speed") {
+                    speedChart
+                        .frame(height: 170)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                }
             }
         }
+        .kitScreen()
         .navigationTitle(ride.routeName.isEmpty ? "Ride" : ride.routeName)
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -87,31 +115,46 @@ struct RideDetailView: View {
                    pins: endPins(coords), initialRegion: region)
     }
 
+    /// Kit/chart · elevation: board fill, 2 pt ink border, sage bars, ochre steepest climb.
     private var elevationChart: some View {
-        Chart(Array(elevation.enumerated()), id: \.offset) { _, p in
-            AreaMark(x: .value("km", p.km), y: .value("m", p.alt))
-                .interpolationMethod(.monotone)
-                .foregroundStyle(.linearGradient(colors: [.accentColor.opacity(0.6), .accentColor.opacity(0.05)],
-                                                 startPoint: .top, endPoint: .bottom))
-            LineMark(x: .value("km", p.km), y: .value("m", p.alt))
-                .interpolationMethod(.monotone)
-                .foregroundStyle(Color.accentColor)
+        let samples = elevation
+        let steepest = Self.steepestClimb(in: samples)
+        return Chart(Array(samples.enumerated()), id: \.offset) { i, p in
+            BarMark(x: .value("km", p.km), y: .value("m", p.alt))
+                .foregroundStyle(i == steepest ? KitColor.gold : KitColor.sage)
         }
         .chartXAxisLabel("km")
         .chartYAxisLabel("m")
+        .foregroundStyle(KitColor.muted)
+        .background(KitColor.board)
+        .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Elevation profile")
-        .accessibilityValue("Min \(Int(elevation.map(\.alt).min() ?? 0)) m, max \(Int(elevation.map(\.alt).max() ?? 0)) m, \(Int(ride.ascentMeters)) m climbed")
+        .accessibilityValue("Min \(Int(samples.map(\.alt).min() ?? 0)) m, max \(Int(samples.map(\.alt).max() ?? 0)) m, \(Int(ride.ascentMeters)) m climbed")
+    }
+
+    /// Point at the top of the steepest climb, so only that bar is ochre.
+    private static func steepestClimb(in samples: [(km: Double, alt: Double)]) -> Int? {
+        var bestDelta = 0.0
+        var bestIndex: Int?
+        for i in 1..<samples.count {
+            let climb = samples[i].alt - samples[i - 1].alt
+            if climb > bestDelta { bestDelta = climb; bestIndex = i }
+        }
+        return bestIndex
     }
 
     private var speedChart: some View {
         Chart(Array(speed.enumerated()), id: \.offset) { _, p in
             LineMark(x: .value("min", p.min), y: .value("km/h", p.kmh))
                 .interpolationMethod(.monotone)
-                .foregroundStyle(Color.orange)
+                .foregroundStyle(KitColor.sage)
         }
         .chartXAxisLabel("min")
         .chartYAxisLabel("km/h")
+        .foregroundStyle(KitColor.muted)
+        .background(KitColor.board)
+        .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Speed over time")
         .accessibilityValue("Avg \(Fmt.speed(ride.averageSpeed)), max \(Fmt.speed(ride.maxSpeed))")

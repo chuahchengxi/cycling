@@ -157,6 +157,7 @@ struct SettingsView: View {
                     LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "")
                 }
             }
+            .kitScreen()
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
@@ -180,8 +181,8 @@ struct SettingsView: View {
     }
 
     private func swatch(_ hex: UInt32) -> some View {
-        RoundedRectangle(cornerRadius: 4).fill(Color(hex: hex)).frame(width: 22, height: 22)
-            .overlay(RoundedRectangle(cornerRadius: 4).stroke(.primary.opacity(0.3)))
+        Rectangle().fill(Color(hex: hex)).frame(width: 22, height: 22)
+            .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
             .accessibilityHidden(true)
     }
 }
