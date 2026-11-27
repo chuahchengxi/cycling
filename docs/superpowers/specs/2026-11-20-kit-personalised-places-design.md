@@ -1,7 +1,7 @@
 # Kit — Personalised, Offline Places Along Your Route — Design
 
 Date: 2026-11-20
-Status: approved. Built: section 0 (plan 1), section 1 (plan 2), section 2 (plan 3), section 3 (plan 4), section 4 (plan 5), section 5 (offline), section 6a (plan 2b), section 7 (plan 7, except LTA parking, fonts, export). Amended 26 Nov 2026: iOS 18 target, places from the shared OSM extract, section 6a no-bike ways.
+Status: approved. Built: section 0 (plan 1), section 1 (plan 2), section 2 (plan 3), section 3 (plan 4), section 4 (plan 5), section 5 (offline), section 6 (plan 6), section 6a (plan 2b), section 7 (plan 7, except LTA parking, fonts, export). Amended 26 Nov 2026: iOS 18 target, places from the shared OSM extract, section 6a no-bike ways.
 Builds on: Phase 2 PCN routing (`docs/superpowers/specs/2026-09-04-phase2-pcn-routing-design.md`), existing leisure sights (`Discovery.swift`, `Sight`, `RideRecorder.checkSights`).
 Research: `reports/Singapore PCN stops and reviews.md`, `reports/Singapore cycling rider personas.md` (+ `research_notes/`).
 Visual reference: Figma file `XXNkFRE4TcJ9VesSYFxnBx`, page "Cycling — Kit style", section "REDESIGN v3" (screens `v3 · 01`–`06`, components `Kit/bubble`, `Kit/timer`, `Kit/chart`, `Kit/avatar`).
