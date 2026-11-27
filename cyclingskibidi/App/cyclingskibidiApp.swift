@@ -25,6 +25,7 @@ struct cyclingskibidiApp: App {
         #if DEBUG
         // Only on request (the test script passes -selfcheck): on a phone they hold up launch.
         if ProcessInfo.processInfo.arguments.contains("-selfcheck") { Self.runSelfChecks() }
+        if ProcessInfo.processInfo.arguments.contains("-kiteval") { Task.detached { await KitEval.run() } }
         Self.watchMainThread()
         #endif
     }

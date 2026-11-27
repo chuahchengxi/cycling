@@ -685,16 +685,18 @@ struct ObstacleReportView: View {
         // A closed path is the one kind that reroutes the live ride (onSaveClosed).
         let icon = k == .closed ? "kit-icon-close" : "kit-icon-hazard"
         return Button { kind = k } label: {
-            VStack(spacing: 4) {
+            HStack(spacing: 10) {
                 Image(icon).renderingMode(.template).resizable()
                     .frame(width: 16, height: 16)
-                Text(k.rawValue).font(.subheadline.weight(.medium)).multilineTextAlignment(.center)
-                if k == .closed {
-                    Text("Reroutes you").font(.caption2).foregroundStyle(KitColor.muted)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(k.rawValue).font(.subheadline.weight(.medium))
+                    if k == .closed {
+                        Text("Reroutes you").font(.caption2).foregroundStyle(KitColor.muted)
+                    }
                 }
             }
             .foregroundStyle(KitColor.ink)
-            .frame(maxWidth: .infinity, minHeight: 52)
+            .frame(maxWidth: .infinity, minHeight: 52, alignment: .leading)
             .padding(8)
             .background(selected ? KitColor.gold : KitColor.paper)
             .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))

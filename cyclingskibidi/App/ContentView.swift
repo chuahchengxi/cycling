@@ -78,6 +78,8 @@ struct ContentView: View {
             switch Demo.screen {
             case "onboarding": OnboardingView()
             case "newroute": CreateRouteFlow()
+            case "interests": InterestsSheet()
+            case "mark": ObstacleReportView(coordinate: nil)
             case "stats": NavigationStack { StatsView() }
             case "settings": SettingsView()
             case "fall": AreYouOKView(deadline: .now.addingTimeInterval(24), onOK: {}, onRingNow: {})
