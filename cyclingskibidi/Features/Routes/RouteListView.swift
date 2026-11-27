@@ -78,8 +78,13 @@ struct RouteListView: View {
 
     var body: some View {
         ScrollView {
-            LazyVStack(spacing: 16) {
+            LazyVStack(spacing: 14) {
                 filterBar
+                if !filtered.isEmpty {
+                    Text("\(filtered.count) \(filtered.count == 1 ? "route" : "routes")")
+                        .font(.footnote).foregroundStyle(KitColor.muted)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
                 if filtered.isEmpty {
                     emptyState
                 } else {
@@ -93,6 +98,7 @@ struct RouteListView: View {
             }
             .padding(16)
         }
+        .kitScreen()
         .navigationTitle("Routes")
         .navigationDestination(for: Route.self) { RouteDetailView(route: $0) }
         .searchable(text: $search, placement: .toolbar, prompt: "Search...")
@@ -129,8 +135,7 @@ struct RouteListView: View {
                  : "Loosen a filter to see more routes.")
         } actions: {
             if routes.isEmpty {
-                Button("Create a route") { creating = true }
-                    .buttonStyle(.borderedProminent)
+                KitButton(title: "Create a route", style: .primary) { creating = true }
             }
         }
         .padding(.top, 40)
@@ -171,17 +176,20 @@ where T.RawValue == String, T.AllCases: RandomAccessCollection {
                 ForEach(T.allCases) { Text($0.rawValue).tag($0) }
             }
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: 6) {
                 Text(isDefault ? title : value.rawValue)
-                Image(systemName: "chevron.down").font(.caption2)
+                Image("kit-icon-chevron").renderingMode(.template).resizable()
+                    .frame(width: 14, height: 14)
             }
-            .font(.subheadline.weight(.medium))
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(KitColor.ink)
             .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .background(isDefault ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.tint.opacity(0.18)),
-                        in: .capsule)
-            .foregroundStyle(isDefault ? Color.primary : Color.accentColor)
+            .frame(minHeight: 44)
+            .background(isDefault ? KitColor.paper : KitColor.sage)
+            .overlay(Rectangle().strokeBorder(KitColor.ink, lineWidth: 2))
+            .kitSurface()
         }
+        .buttonStyle(.plain)
     }
 
     private var isDefault: Bool { value.rawValue == "Any" }
@@ -209,26 +217,47 @@ struct RouteCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             RouteSketch(coords: route.polyline)
-                .frame(height: 96)
+                .frame(height: 100)
                 .frame(maxWidth: .infinity)
-                .padding(.bottom, 8)
+                .padding(.bottom, 12)
 
             Text(route.name)
-                .font(.title3.bold())
+                .font(.title3.weight(.semibold))
                 .lineLimit(1)
 
             FlowLayout {
-                Pill(text: Fmt.km(route.distanceMeters))
-                Pill(text: Fmt.duration(route.currentExpectedSeconds))
-                Pill(text: route.difficulty.rawValue, tint: route.difficulty.color)
-                Pill(text: route.mode.rawValue, tint: .accentColor)
+                KitChip(text: Fmt.km(route.distanceMeters))
+                KitChip(text: Fmt.duration(route.currentExpectedSeconds))
+                KitChip(text: route.difficulty.rawValue, fill: kitFill(for: route.difficulty))
+                    .kitSurface()
+                if let icon = kitIcon(for: route.mode) {
+                    KitChip(text: route.mode.rawValue, icon: icon)
+                } else {
+                    KitChip(text: route.mode.rawValue)
+                }
             }
             .padding(.top, 10)
         }
-        .padding(14)
-        .background(.background.secondary, in: .rect(cornerRadius: 18))
-        .overlay(RoundedRectangle(cornerRadius: 18).strokeBorder(.separator))
-        .contentShape(.rect)
+        .kitCard()
+        .contentShape(Rectangle())
+    }
+}
+
+/// Kit's tag fills: light colours with dark ink in both themes.
+private func kitFill(for difficulty: Difficulty) -> Color {
+    switch difficulty {
+    case .easy: return KitColor.sage
+    case .medium: return KitColor.gold
+    case .hard: return KitColor.terracotta
+    }
+}
+
+/// Fast is text only on the route cards; the others carry their pixel mark.
+private func kitIcon(for mode: RideMode) -> String? {
+    switch mode {
+    case .fast: return nil
+    case .moderate: return "kit-icon-bike"
+    case .leisure: return "kit-icon-leaf"
     }
 }
 
@@ -255,24 +284,38 @@ struct RouteSketch: View {
                   let minLon = lons.min(), let maxLon = lons.max() else { return }
 
             // Keep the shape's aspect ratio; a squashed route is a lie about it.
-            let inset = 8.0
+            let inset = 10.0
             let w = max(maxLon - minLon, 1e-6), h = max(maxLat - minLat, 1e-6)
             let scale = min((size.width - inset * 2) / w, (size.height - inset * 2) / h)
             let ox = (size.width - w * scale) / 2, oy = (size.height - h * scale) / 2
 
             var path = Path()
+            var first: CGPoint?
+            var last: CGPoint?
             for (i, c) in coords.enumerated() {
                 let p = CGPoint(x: ox + (c.lon - minLon) * scale,
                                 y: size.height - oy - (c.lat - minLat) * scale)
-                i == 0 ? path.move(to: p) : path.addLine(to: p)
+                if i == 0 {
+                    path.move(to: p)
+                    first = p
+                } else {
+                    path.addLine(to: p)
+                }
+                last = p
             }
-            ctx.stroke(path, with: .color(.accentColor), style: .init(lineWidth: 3, lineCap: .round, lineJoin: .round))
+            ctx.stroke(path, with: .color(KitColor.accentStrong),
+                       style: .init(lineWidth: 3, lineCap: .butt, lineJoin: .miter))
 
-            if let start = path.currentPoint {
-                ctx.fill(Path(ellipseIn: .init(x: start.x - 4, y: start.y - 4, width: 8, height: 8)),
-                         with: .color(.red))
+            if let first {
+                let square = CGRect(x: first.x - 5, y: first.y - 5, width: 10, height: 10)
+                ctx.fill(Path(square), with: .color(KitColor.sage))
+                ctx.stroke(Path(square), with: .color(KitColor.ink), style: .init(lineWidth: 2))
+            }
+            if let last {
+                ctx.fill(Path(CGRect(x: last.x - 5, y: last.y - 5, width: 10, height: 10)),
+                         with: .color(KitColor.ink))
             }
         }
-        .background(.quaternary.opacity(0.4), in: .rect(cornerRadius: 12))
+        .background(KitColor.board)
     }
 }
