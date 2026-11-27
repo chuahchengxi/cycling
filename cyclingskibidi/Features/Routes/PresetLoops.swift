@@ -24,7 +24,7 @@ nonisolated enum PresetLoops {
     static let all: [PresetLoop] = [
         PresetLoop(
             id: "ecp-gbte", name: "East Coast Park ↔ Gardens by the Bay East",
-            blurb: "Ride the park connector from Gardens by the Bay East to East Coast Park and back, with a hawker centre stop by the bay.",
+            blurb: "Ride the park connector from Gardens by the Bay East along Tanjong Rhu to East Coast Park and back; Marine Parade hawker centre is a short walk inland.",
             waypoints: [
                 Coord(lat: 1.283557, lon: 103.872392),
                 Coord(lat: 1.294083, lon: 103.866502),
@@ -33,8 +33,8 @@ nonisolated enum PresetLoops {
                 Coord(lat: 1.283557, lon: 103.872392),
             ]),
         PresetLoop(
-            id: "marina-bay", name: "Marina Bay loop",
-            blurb: "Circle Marina Bay on the park connector, past the Singapore River to a hawker centre on the waterfront.",
+            id: "river-alexandra", name: "Singapore River and Alexandra Canal",
+            blurb: "From The Float up the Singapore River and Alexandra Canal park connector, back past Zion Riverside hawker centre.",
             waypoints: [
                 Coord(lat: 1.288767, lon: 103.857988),
                 Coord(lat: 1.289459, lon: 103.847976),
@@ -43,8 +43,8 @@ nonisolated enum PresetLoops {
                 Coord(lat: 1.288767, lon: 103.857988),
             ]),
         PresetLoop(
-            id: "punggol-coney", name: "Punggol Waterway and Coney Island",
-            blurb: "Follow the park connector along Punggol Waterway to Coney Island, with a hawker centre on the ride back.",
+            id: "punggol-coney", name: "Punggol Waterway and Promenade",
+            blurb: "Follow the park connector along Punggol Waterway and the Promenade, with One Punggol hawker centre just off the line.",
             waypoints: [
                 Coord(lat: 1.390461, lon: 103.915675),
                 Coord(lat: 1.404576, lon: 103.921352),
@@ -107,11 +107,11 @@ extension PresetLoops {
             print("Preset loop \(loop.name): \(Int(plan.distance)) m, \(loop.waypoints.count) pins")
         }
 
-        // A toy active closure on the Marina Bay circuit's line must be ridden round.
-        guard let marina = all.first(where: { $0.id == "marina-bay" }),
+        // A toy active closure on the river circuit's line must be ridden round.
+        guard let marina = all.first(where: { $0.id == "river-alexandra" }),
               marina.waypoints.count >= 3,
               let open = try? await Routing.plan(through: marina.waypoints, mode: .leisure) else {
-            assertionFailure("Marina Bay loop or its plan missing"); return
+            assertionFailure("river loop or its plan missing"); return
         }
         let line = open.polyline.coordinates, cum = Geo.cumulative(line)
         let junction = marina.waypoints[1]
@@ -137,8 +137,10 @@ extension PresetLoops {
         let away = Sight(name: "Far rack", category: "bikeParking", lat: rack.lat + 0.001, lon: rack.lon)
         assert(returnPoint(for: last, in: [away]) == nil, "a place 100 m away must not count")
         let rental = Sight(name: "Bike rental", category: "bikeRental", lat: rack.lat, lon: rack.lon)
+        let stall = Sight(name: "Stall", category: "hawker", lat: rack.lat, lon: rack.lon)
+        assert(returnPoint(for: last, in: [stall]) == nil, "only bike places count")
         assert(returnLine(for: last, in: [rental]) == "Return the bike here: Bike rental", "rental place not found")
-        assert(all.contains { $0.blurb.contains("park connector") }, "rider copy must spell out park connector")
-        assert(all.contains { $0.blurb.contains("hawker centre") }, "rider copy must spell out hawker centre")
+        assert(all.allSatisfy { $0.blurb.contains("park connector") }, "rider copy must spell out park connector")
+        assert(all.allSatisfy { $0.blurb.contains("hawker centre") }, "rider copy must spell out hawker centre")
     }
 }

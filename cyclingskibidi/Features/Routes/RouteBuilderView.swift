@@ -228,7 +228,7 @@ struct RouteBuilderView: View {
 
             if mode != .fast, let sights, !sights.isEmpty, !sightsLoading { KitCard(count: sights.count, byModel: kitByModel) }
             if mode != .fast { placesSection }
-            loopsSection
+            if waypoints.isEmpty { loopsSection }   // never wipes pins the rider placed
 
             HStack {
                 Button(role: .destructive) {
@@ -323,6 +323,7 @@ struct RouteBuilderView: View {
                                 Text(loop.name).font(.footnote.weight(.semibold)).lineLimit(1)
                                 Text(loop.blurb).font(.caption2).foregroundStyle(.secondary).lineLimit(2)
                             }
+                            .frame(width: 240, alignment: .leading)
                             .padding(.horizontal, 12)
                             .frame(minHeight: 44, alignment: .leading)
                             .background(.quaternary, in: .rect(cornerRadius: 12))
@@ -336,7 +337,7 @@ struct RouteBuilderView: View {
     }
 
     private func actionButton(_ title: String, _ action: @escaping () -> Void) -> some View {
-        Button(title, action: action).frame(minHeight: 44)
+        Button(action: action) { Text(title).frame(minHeight: 44) }
     }
 
     private func addWaypoint(_ c: CLLocationCoordinate2D, atStart: Bool = false) {
@@ -349,7 +350,6 @@ struct RouteBuilderView: View {
 
     private func use(_ loop: PresetLoop) {
         waypoints = loop.waypoints
-        mode = .leisure
         if let first = waypoints.first {
             focus = .region(.init(center: first.cl, latitudinalMeters: 12_000, longitudinalMeters: 12_000))
         }
@@ -358,7 +358,8 @@ struct RouteBuilderView: View {
         direct = nil
         results = []
         query = ""
-        replan()
+        // onChange(of: mode) replans by itself; only replan here when the mode is already Leisure.
+        if mode == .leisure { replan() } else { mode = .leisure }
     }
 
     // MARK: Actions
