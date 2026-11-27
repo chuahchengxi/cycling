@@ -33,14 +33,15 @@ nonisolated enum PresetLoops {
                 Coord(lat: 1.283557, lon: 103.872392),
             ]),
         PresetLoop(
-            id: "river-alexandra", name: "Singapore River and Alexandra Canal",
-            blurb: "From The Float up the Singapore River and Alexandra Canal park connector, back past Zion Riverside hawker centre.",
+            id: "marina-bay", name: "Marina Bay loop",
+            blurb: "Circle Marina Bay on the park connector from Esplanade past The Float and Marina Bay Sands, round Gardens by the Bay and the Marina Barrage out to Bay East, then back the same way; Makansutra Gluttons Bay hawker centre is a short walk from The Float.",
             waypoints: [
-                Coord(lat: 1.288767, lon: 103.857988),
-                Coord(lat: 1.289459, lon: 103.847976),
-                Coord(lat: 1.291791, lon: 103.823191),
-                Coord(lat: 1.291993, lon: 103.830810),
-                Coord(lat: 1.288767, lon: 103.857988),
+                Coord(lat: 1.288967, lon: 103.854085),
+                Coord(lat: 1.288820, lon: 103.857679),
+                Coord(lat: 1.284151, lon: 103.866662),
+                Coord(lat: 1.281507, lon: 103.870710),
+                Coord(lat: 1.294083, lon: 103.866502),
+                Coord(lat: 1.288967, lon: 103.854085),
             ]),
         PresetLoop(
             id: "punggol-coney", name: "Punggol Waterway and Promenade",
@@ -107,11 +108,11 @@ extension PresetLoops {
             print("Preset loop \(loop.name): \(Int(plan.distance)) m, \(loop.waypoints.count) pins")
         }
 
-        // A toy active closure on the river circuit's line must be ridden round.
-        guard let marina = all.first(where: { $0.id == "river-alexandra" }),
+        // A toy active closure on the marina circuit's line must be ridden round.
+        guard let marina = all.first(where: { $0.id == "marina-bay" }),
               marina.waypoints.count >= 3,
               let open = try? await Routing.plan(through: marina.waypoints, mode: .leisure) else {
-            assertionFailure("river loop or its plan missing"); return
+            assertionFailure("marina loop or its plan missing"); return
         }
         let line = open.polyline.coordinates, cum = Geo.cumulative(line)
         let junction = marina.waypoints[1]
